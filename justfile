@@ -24,12 +24,3 @@ wasm:
 # Layout engine WASM watch (rebuild on change)
 wasm-watch:
     watchexec -w layout-engine/src -w core/src -e rs -- just wasm
-
-# Eski core WASM build (typst-based, deprecated)
-wasm-legacy:
-    wasm-pack build core --target web --release --out-dir ../frontend/src/core/wasm-pkg -- --features wasm
-    cp frontend/src/core/wasm-pkg/dreport_core.js frontend/src/core/wasm/dreport_core.js
-    cp frontend/src/core/wasm-pkg/dreport_core.d.ts frontend/src/core/wasm/dreport_core.d.ts
-    cp frontend/src/core/wasm-pkg/dreport_core_bg.wasm frontend/src/core/wasm/dreport_core_bg.wasm
-    cp frontend/src/core/wasm-pkg/dreport_core_bg.wasm.d.ts frontend/src/core/wasm/dreport_core_bg.wasm.d.ts
-    cp frontend/src/core/wasm/dreport_core_bg.wasm frontend/public/wasm/dreport_core_bg.wasm

@@ -147,12 +147,7 @@ function applyZoom(delta: number, clientX: number, clientY: number) {
   const mousePageMmX = (clientX - pageRect.left) / oldScale
   const mousePageMmY = (clientY - pageRect.top) / oldScale
 
-  // Flex centering kayması: sayfa genişliği değişince ortalama kayar
-  // X ekseni: justify-content: center → kayma = (eskiBoyut - yeniBoyut) / 2
   const pageW = templateStore.template.page.width
-  const centerShiftX = pageW * (oldScale - newScale) / 2
-  // Y ekseni: align-items: flex-start → kayma yok
-  const centerShiftY = 0
 
   // Yeni pan: mouse'un gösterdiği mm noktası aynı ekran pozisyonunda kalmalı
   const newPanX = editorStore.panX + (mousePageMmX - pageW / 2) * (oldScale - newScale)

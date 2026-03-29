@@ -10,16 +10,16 @@ Temel fark: Editorde ayri bir canvas render engine (fabric.js, konva.js vb.) KUL
 
 ## Teknoloji Kararlari
 
-| Katman            | Teknoloji                            | Gerekce                                                        |
-| ----------------- | ------------------------------------ | -------------------------------------------------------------- |
-| Frontend          | Vue 3 (Composition API) + TypeScript | Kullanici tercihi                                              |
-| Layout Engine     | taffy (flexbox) + cosmic-text        | Template JSON → hesaplanmis pozisyonlar; hem WASM hem native   |
-| Editor Render     | HTML div'ler (LayoutRenderer.vue)    | Layout engine sonuclarina gore CSS ile render                  |
+| Katman            | Teknoloji                            | Gerekce                                                          |
+| ----------------- | ------------------------------------ | ---------------------------------------------------------------- |
+| Frontend          | Vue 3 (Composition API) + TypeScript | Kullanici tercihi                                                |
+| Layout Engine     | taffy (flexbox) + cosmic-text        | Template JSON → hesaplanmis pozisyonlar; hem WASM hem native     |
+| Editor Render     | HTML div'ler (LayoutRenderer.vue)    | Layout engine sonuclarina gore CSS ile render                    |
 | Etkilesim Katmani | DOM overlay (Vue bilesenleri)        | Layout sonuclari uzerine secim, surekleme, yeniden boyutlandirma |
-| Backend           | Rust + Axum                          | Layout engine'i dogrudan kullanabilme; performans              |
-| PDF Render        | krilla (server-side)                 | LayoutResult → PDF; font tutarliligi garantisi                 |
-| Veri Formati      | JSON (sablon tanimi + veri)          | Evrensel, kolay serialize/deserialize                          |
-| Paket Yonetimi    | bun (frontend), cargo (backend)      | —                                                              |
+| Backend           | Rust + Axum                          | Layout engine'i dogrudan kullanabilme; performans                |
+| PDF Render        | krilla (server-side)                 | LayoutResult → PDF; font tutarliligi garantisi                   |
+| Veri Formati      | JSON (sablon tanimi + veri)          | Evrensel, kolay serialize/deserialize                            |
+| Paket Yonetimi    | bun (frontend), cargo (backend)      | —                                                                |
 
 ---
 
@@ -90,9 +90,10 @@ let layout: LayoutResult = compute_layout(&template, &data, &fonts);
 ```
 
 WASM tarafinda (frontend):
+
 ```typescript
 // layout.worker.ts icinde
-import init, { computeLayout, loadFonts } from 'dreport-layout-wasm';
+import init, { computeLayout, loadFonts } from "dreport-layout-wasm";
 
 await init();
 await loadFonts(fontBytes);
@@ -116,6 +117,7 @@ CSS Flexbox mantigina benzeyen container-based layout:
 - **Opsiyonel absolute positioning:** Kullanici isterse bir elemani `position: "absolute"` yapabilir.
 
 Bu sayede:
+
 - Tablo satirlari artarsa alttaki elemanlar otomatik kayar.
 - Ayni satira iki kolon koymak icin ic ice container yeterlidir.
 - Absolute mod ile serbest pozisyonlama da mumkundur.
@@ -124,11 +126,11 @@ Bu sayede:
 
 Her eleman ve container icin `width` ve `height` su tiplerden biri olabilir:
 
-| Tip     | Aciklama                              | Taffy karsiligi                |
-| ------- | ------------------------------------- | ------------------------------ |
-| `fixed` | Sabit boyut (mm)                      | `Dimension::Length(pt)`        |
-| `auto`  | Iceriqe gore otomatik                 | `Dimension::Auto`              |
-| `fr`    | Kalan alani oransal doldur            | `flex_grow: n, flex_basis: 0`  |
+| Tip     | Aciklama                   | Taffy karsiligi               |
+| ------- | -------------------------- | ----------------------------- |
+| `fixed` | Sabit boyut (mm)           | `Dimension::Length(pt)`       |
+| `auto`  | Iceriqe gore otomatik      | `Dimension::Auto`             |
+| `fr`    | Kalan alani oransal doldur | `flex_grow: n, flex_basis: 0` |
 
 Ek olarak `minWidth`, `maxWidth`, `minHeight`, `maxHeight` (mm) desteklenir.
 
@@ -156,7 +158,10 @@ Ek olarak `minWidth`, `maxWidth`, `minHeight`, `maxHeight` (mm) desteklenir.
         "id": "c_header",
         "type": "container",
         "position": { "type": "flow" },
-        "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+        "size": {
+          "width": { "type": "fr", "value": 1 },
+          "height": { "type": "auto" },
+        },
         "direction": "row",
         "gap": 5,
         "padding": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
@@ -168,61 +173,70 @@ Ek olarak `minWidth`, `maxWidth`, `minHeight`, `maxHeight` (mm) desteklenir.
             "id": "el_firma",
             "type": "text",
             "position": { "type": "flow" },
-            "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+            "size": {
+              "width": { "type": "fr", "value": 1 },
+              "height": { "type": "auto" },
+            },
             "style": { "fontSize": 14, "fontWeight": "bold" },
-            "binding": { "type": "scalar", "path": "firma.unvan" }
+            "binding": { "type": "scalar", "path": "firma.unvan" },
           },
           {
             "id": "el_fatura_baslik",
             "type": "static_text",
             "position": { "type": "flow" },
-            "size": { "width": { "type": "auto" }, "height": { "type": "auto" } },
+            "size": {
+              "width": { "type": "auto" },
+              "height": { "type": "auto" },
+            },
             "style": { "fontSize": 12, "fontWeight": "bold", "align": "right" },
-            "content": "FATURA"
-          }
-        ]
+            "content": "FATURA",
+          },
+        ],
       },
       {
         "id": "el_cizgi",
         "type": "line",
         "position": { "type": "flow" },
-        "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
-        "style": { "strokeColor": "#000000", "strokeWidth": 0.5 }
-      }
-    ]
-  }
+        "size": {
+          "width": { "type": "fr", "value": 1 },
+          "height": { "type": "auto" },
+        },
+        "style": { "strokeColor": "#000000", "strokeWidth": 0.5 },
+      },
+    ],
+  },
 }
 ```
 
 ### Eleman Tipleri
 
-| Tip               | Aciklama                              | Binding          |
-| ----------------- | ------------------------------------- | ---------------- |
-| `container`       | Duzen kutusu, cocuk elemanlari barindirir | Yok          |
-| `static_text`     | Sabit metin, veri baglantisi yok      | Yok              |
-| `text`            | Dinamik metin, schema'dan veri ceker  | Scalar           |
-| `repeating_table` | Array verisinden tekrarlayan tablo    | Array            |
-| `line`            | Yatay/dikey cizgi                     | Yok              |
-| `image`           | Statik veya dinamik gorsel            | Opsiyonel scalar |
-| `page_number`     | Sayfa numarasi (cok sayfali belgeler) | Otomatik         |
+| Tip               | Aciklama                                  | Binding          |
+| ----------------- | ----------------------------------------- | ---------------- |
+| `container`       | Duzen kutusu, cocuk elemanlari barindirir | Yok              |
+| `static_text`     | Sabit metin, veri baglantisi yok          | Yok              |
+| `text`            | Dinamik metin, schema'dan veri ceker      | Scalar           |
+| `repeating_table` | Array verisinden tekrarlayan tablo        | Array            |
+| `line`            | Yatay/dikey cizgi                         | Yok              |
+| `image`           | Statik veya dinamik gorsel                | Opsiyonel scalar |
+| `page_number`     | Sayfa numarasi (cok sayfali belgeler)     | Otomatik         |
 
 ### Container Ozellikleri
 
-| Ozellik     | Tip                                      | Aciklama                          |
-| ----------- | ---------------------------------------- | --------------------------------- |
-| `direction` | `"row"` \| `"column"`                   | Cocuklari yatay mi dikey mi diz   |
-| `gap`       | number (mm)                              | Cocuklar arasi bosluk             |
-| `padding`   | `{ top, right, bottom, left }` (mm)     | Ic bosluk                         |
-| `align`     | `"start"` \| `"center"` \| `"end"` \| `"stretch"` | Cross-axis hizalama   |
-| `justify`   | `"start"` \| `"center"` \| `"end"` \| `"space-between"` | Main-axis dagilim |
-| `style`     | `{ backgroundColor, borderColor, borderWidth, borderRadius }` | Gorsel stil |
+| Ozellik     | Tip                                                           | Aciklama                        |
+| ----------- | ------------------------------------------------------------- | ------------------------------- |
+| `direction` | `"row"` \| `"column"`                                         | Cocuklari yatay mi dikey mi diz |
+| `gap`       | number (mm)                                                   | Cocuklar arasi bosluk           |
+| `padding`   | `{ top, right, bottom, left }` (mm)                           | Ic bosluk                       |
+| `align`     | `"start"` \| `"center"` \| `"end"` \| `"stretch"`             | Cross-axis hizalama             |
+| `justify`   | `"start"` \| `"center"` \| `"end"` \| `"space-between"`       | Main-axis dagilim               |
+| `style`     | `{ backgroundColor, borderColor, borderWidth, borderRadius }` | Gorsel stil                     |
 
 ### Positioning Modlari
 
-| Mod        | Aciklama                                    | Taffy karsiligi                    |
-| ---------- | ------------------------------------------- | ---------------------------------- |
-| `flow`     | Parent container'in flow'una katil (default)| `Position::Relative`               |
-| `absolute` | Parent container icinde sabit konum         | `Position::Absolute, inset: top/left` |
+| Mod        | Aciklama                                     | Taffy karsiligi                       |
+| ---------- | -------------------------------------------- | ------------------------------------- |
+| `flow`     | Parent container'in flow'una katil (default) | `Position::Relative`                  |
+| `absolute` | Parent container icinde sabit konum          | `Position::Absolute, inset: top/left` |
 
 ### Fatura Ornegi — Container Agaci
 
@@ -412,18 +426,18 @@ pub struct ElementLayout {
 
 ### Taffy Mapping
 
-| dreport                         | taffy                              |
-| ------------------------------- | ---------------------------------- |
-| `container(direction: row)`     | `FlexDirection::Row`               |
-| `container(direction: column)`  | `FlexDirection::Column`            |
-| `gap`                           | `gap: Size { width, height }`     |
-| `padding`                       | `padding: Rect { top, right, bottom, left }` |
-| `align: start/center/end/stretch` | `align_items`                   |
-| `justify: start/center/end/space-between` | `justify_content`       |
-| `SizeValue::Fixed(mm)`          | `Dimension::Length(pt)`            |
-| `SizeValue::Auto`               | `Dimension::Auto`                  |
-| `SizeValue::Fr(n)`              | `flex_grow: n, flex_basis: 0`      |
-| `PositionMode::Absolute`        | `Position::Absolute, inset: top/left` |
+| dreport                                   | taffy                                        |
+| ----------------------------------------- | -------------------------------------------- |
+| `container(direction: row)`               | `FlexDirection::Row`                         |
+| `container(direction: column)`            | `FlexDirection::Column`                      |
+| `gap`                                     | `gap: Size { width, height }`                |
+| `padding`                                 | `padding: Rect { top, right, bottom, left }` |
+| `align: start/center/end/stretch`         | `align_items`                                |
+| `justify: start/center/end/space-between` | `justify_content`                            |
+| `SizeValue::Fixed(mm)`                    | `Dimension::Length(pt)`                      |
+| `SizeValue::Auto`                         | `Dimension::Auto`                            |
+| `SizeValue::Fr(n)`                        | `flex_grow: n, flex_basis: 0`                |
+| `PositionMode::Absolute`                  | `Position::Absolute, inset: top/left`        |
 
 Text leaf node'lari → taffy `MeasureFunc` callback'i ile cosmic-text'ten olcum alir.
 
@@ -586,6 +600,7 @@ Template JSON + Data JSON alir, PDF doner.
 **Response:** `Content-Type: application/pdf` — binary PDF
 
 **Akis:**
+
 1. Template + Data JSON parse edilir.
 2. `compute_layout(template, data, fonts)` → `LayoutResult`
 3. `render_pdf(layout_result, fonts)` → PDF bytes
@@ -629,57 +644,11 @@ Sunucu saglik kontrolu.
 
 ---
 
-## Gelistirme Oncelikleri (Roadmap)
+## Roadmap
 
-### Faz 1: Temel Altyapi ✓
-
-- [x] Proje iskeleti kurulumu (Vue + Vite + Pinia, Axum boilerplate)
-- [x] Container-based layout sistemi (tree yapi, flow + absolute positioning)
-- [x] Font dosyalari (Noto Sans ailesi)
-
-### Faz 2: Custom Layout Engine ✓
-
-- [x] layout-engine crate olusturma (taffy + cosmic-text)
-- [x] Template → taffy node tree donusumu (tree.rs)
-- [x] SizeValue mapping (sizing.rs)
-- [x] Text olcum (text_measure.rs, cosmic-text)
-- [x] Binding cozumleme (data_resolve.rs)
-- [x] Tablo expansion (table_layout.rs)
-- [x] WASM bindings (wasm_api.rs)
-- [x] Frontend entegrasyonu (layout.worker.ts, useLayoutEngine.ts, LayoutRenderer.vue)
-- [x] InteractionOverlay adaptasyonu
-- [x] Typst bagimliliklarinin kaldirilmasi (backend)
-
-### Faz 3: PDF Render ✓
-
-- [x] pdf_render.rs — krilla ile PDF uretimi
-- [x] Backend route guncelleme (POST /api/render)
-- [x] Page break desteqi (page_break.rs)
-
-### Faz 4: Editor Temelleri
-
-- [ ] Schema tree paneli — JSON schema'dan agac olusturma
-- [ ] Schema'dan drag ile binding olusturma
-- [ ] Properties paneli — secili elemanin stillerini duzenleme (font, renk, boyut, hizalama)
-- [ ] Container properties paneli — direction, gap, padding, align ayarlari
-- [ ] Mock data generator — schema'dan ornek veri uretip onizlemede kullanma
-- [ ] Undo/redo
-- [ ] Toolbox paneli — eleman/container ekleme
-
-### Faz 5: Tablo ve Array Binding
-
-- [ ] Sutun tanimlama UI'i (alan secimi, genislik, hizalama)
-- [ ] Array field'larina binding
 - [ ] Tablo stili ayarlari (header, zebra, border)
 - [ ] Format fonksiyonlari (currency, date)
-
-### Faz 6: Polish
-
-- [ ] Snap guides ve hizalama
-- [ ] Zoom / pan
 - [ ] `image` eleman tipi (statik + dinamik)
-- [ ] Sayfa numarasi
-- [ ] Template kaydetme / yukleme (JSON dosyasi export/import)
 
 ---
 

@@ -125,7 +125,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_resolve_path() {
+    fn test_resolve_path_simple() {
+        let data: Value = serde_json::json!({"name": "test"});
+        assert_eq!(value_to_string(resolve_path(&data, "name")), "test");
+    }
+
+    #[test]
+    fn test_resolve_path_nested() {
         let data: Value = serde_json::json!({
             "firma": {
                 "unvan": "Acme A.Ş.",
@@ -140,10 +146,30 @@ mod tests {
             value_to_string(resolve_path(&data, "firma.vergiNo")),
             "123"
         );
-        assert_eq!(
-            value_to_string(resolve_path(&data, "nonexistent.path")),
-            ""
-        );
+    }
+
+    #[test]
+    fn test_resolve_path_missing() {
+        let data: Value = serde_json::json!({"name": "test"});
+        let result = resolve_path(&data, "nonexistent.path");
+        assert!(result.is_null());
+        assert_eq!(value_to_string(result), "");
+    }
+
+    #[test]
+    fn test_resolve_path_deep_missing() {
+        let data: Value = serde_json::json!({"a": {"b": 42}});
+        let result = resolve_path(&data, "a.b.c.d");
+        assert!(result.is_null());
+    }
+
+    #[test]
+    fn test_value_to_string_types() {
+        assert_eq!(value_to_string(&serde_json::json!("hello")), "hello");
+        assert_eq!(value_to_string(&serde_json::json!(42)), "42");
+        assert_eq!(value_to_string(&serde_json::json!(3.14)), "3.14");
+        assert_eq!(value_to_string(&serde_json::json!(true)), "true");
+        assert_eq!(value_to_string(&serde_json::json!(null)), "");
     }
 
     #[test]
@@ -157,5 +183,262 @@ mod tests {
         let arr = resolve_path(&data, "kalemler");
         assert!(arr.is_array());
         assert_eq!(arr.as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_resolve_template_text_binding() {
+        let template = Template {
+            id: "t1".to_string(),
+            name: "Test".to_string(),
+            page: PageSettings { width: 210.0, height: 297.0 },
+            fonts: vec![],
+            root: ContainerElement {
+                id: "root".to_string(),
+                position: PositionMode::Flow,
+                size: SizeConstraint::default(),
+                direction: "column".to_string(),
+                gap: 0.0,
+                padding: Padding::default(),
+                align: "stretch".to_string(),
+                justify: "start".to_string(),
+                style: ContainerStyle::default(),
+                children: vec![
+                    TemplateElement::Text(TextElement {
+                        id: "el_name".to_string(),
+                        position: PositionMode::Flow,
+                        size: SizeConstraint::default(),
+                        style: TextStyle::default(),
+                        content: None,
+                        binding: ScalarBinding { path: "firma.unvan".to_string() },
+                    }),
+                ],
+            },
+        };
+
+        let data = serde_json::json!({
+            "firma": { "unvan": "Acme Teknoloji A.Ş." }
+        });
+
+        let resolved = resolve_template(&template, &data);
+        assert_eq!(
+            resolved.texts.get("el_name").unwrap(),
+            "Acme Teknoloji A.Ş."
+        );
+    }
+
+    #[test]
+    fn test_resolve_template_text_with_prefix() {
+        let template = Template {
+            id: "t1".to_string(),
+            name: "Test".to_string(),
+            page: PageSettings { width: 210.0, height: 297.0 },
+            fonts: vec![],
+            root: ContainerElement {
+                id: "root".to_string(),
+                position: PositionMode::Flow,
+                size: SizeConstraint::default(),
+                direction: "column".to_string(),
+                gap: 0.0,
+                padding: Padding::default(),
+                align: "stretch".to_string(),
+                justify: "start".to_string(),
+                style: ContainerStyle::default(),
+                children: vec![
+                    TemplateElement::Text(TextElement {
+                        id: "el_no".to_string(),
+                        position: PositionMode::Flow,
+                        size: SizeConstraint::default(),
+                        style: TextStyle::default(),
+                        content: Some("Fatura No: ".to_string()),
+                        binding: ScalarBinding { path: "fatura.no".to_string() },
+                    }),
+                ],
+            },
+        };
+
+        let data = serde_json::json!({
+            "fatura": { "no": "FTR-001" }
+        });
+
+        let resolved = resolve_template(&template, &data);
+        assert_eq!(
+            resolved.texts.get("el_no").unwrap(),
+            "Fatura No: FTR-001"
+        );
+    }
+
+    #[test]
+    fn test_resolve_template_static_text() {
+        let template = Template {
+            id: "t1".to_string(),
+            name: "Test".to_string(),
+            page: PageSettings { width: 210.0, height: 297.0 },
+            fonts: vec![],
+            root: ContainerElement {
+                id: "root".to_string(),
+                position: PositionMode::Flow,
+                size: SizeConstraint::default(),
+                direction: "column".to_string(),
+                gap: 0.0,
+                padding: Padding::default(),
+                align: "stretch".to_string(),
+                justify: "start".to_string(),
+                style: ContainerStyle::default(),
+                children: vec![
+                    TemplateElement::StaticText(StaticTextElement {
+                        id: "title".to_string(),
+                        position: PositionMode::Flow,
+                        size: SizeConstraint::default(),
+                        style: TextStyle::default(),
+                        content: "FATURA".to_string(),
+                    }),
+                ],
+            },
+        };
+
+        let resolved = resolve_template(&template, &serde_json::json!({}));
+        assert_eq!(resolved.texts.get("title").unwrap(), "FATURA");
+    }
+
+    #[test]
+    fn test_resolve_template_table_binding() {
+        let template = Template {
+            id: "t1".to_string(),
+            name: "Test".to_string(),
+            page: PageSettings { width: 210.0, height: 297.0 },
+            fonts: vec![],
+            root: ContainerElement {
+                id: "root".to_string(),
+                position: PositionMode::Flow,
+                size: SizeConstraint::default(),
+                direction: "column".to_string(),
+                gap: 0.0,
+                padding: Padding::default(),
+                align: "stretch".to_string(),
+                justify: "start".to_string(),
+                style: ContainerStyle::default(),
+                children: vec![
+                    TemplateElement::RepeatingTable(RepeatingTableElement {
+                        id: "tbl".to_string(),
+                        position: PositionMode::Flow,
+                        size: SizeConstraint::default(),
+                        data_source: ArrayBinding { path: "kalemler".to_string() },
+                        columns: vec![
+                            TableColumn {
+                                id: "col_adi".to_string(),
+                                field: "adi".to_string(),
+                                title: "Urun Adi".to_string(),
+                                width: SizeValue::Fr { value: 1.0 },
+                                align: "left".to_string(),
+                                format: None,
+                            },
+                            TableColumn {
+                                id: "col_tutar".to_string(),
+                                field: "tutar".to_string(),
+                                title: "Tutar".to_string(),
+                                width: SizeValue::Fixed { value: 30.0 },
+                                align: "right".to_string(),
+                                format: None,
+                            },
+                        ],
+                        style: TableStyle::default(),
+                    }),
+                ],
+            },
+        };
+
+        let data = serde_json::json!({
+            "kalemler": [
+                { "adi": "Widget", "tutar": 100 },
+                { "adi": "Gadget", "tutar": 200 }
+            ]
+        });
+
+        let resolved = resolve_template(&template, &data);
+        let table = resolved.tables.get("tbl").unwrap();
+        assert_eq!(table.rows.len(), 2);
+        assert_eq!(table.rows[0], vec!["Widget", "100"]);
+        assert_eq!(table.rows[1], vec!["Gadget", "200"]);
+    }
+
+    #[test]
+    fn test_resolve_template_table_empty_array() {
+        let template = Template {
+            id: "t1".to_string(),
+            name: "Test".to_string(),
+            page: PageSettings { width: 210.0, height: 297.0 },
+            fonts: vec![],
+            root: ContainerElement {
+                id: "root".to_string(),
+                position: PositionMode::Flow,
+                size: SizeConstraint::default(),
+                direction: "column".to_string(),
+                gap: 0.0,
+                padding: Padding::default(),
+                align: "stretch".to_string(),
+                justify: "start".to_string(),
+                style: ContainerStyle::default(),
+                children: vec![
+                    TemplateElement::RepeatingTable(RepeatingTableElement {
+                        id: "tbl".to_string(),
+                        position: PositionMode::Flow,
+                        size: SizeConstraint::default(),
+                        data_source: ArrayBinding { path: "items".to_string() },
+                        columns: vec![
+                            TableColumn {
+                                id: "c1".to_string(),
+                                field: "name".to_string(),
+                                title: "Name".to_string(),
+                                width: SizeValue::Fr { value: 1.0 },
+                                align: "left".to_string(),
+                                format: None,
+                            },
+                        ],
+                        style: TableStyle::default(),
+                    }),
+                ],
+            },
+        };
+
+        let data = serde_json::json!({ "items": [] });
+        let resolved = resolve_template(&template, &data);
+        let table = resolved.tables.get("tbl").unwrap();
+        assert_eq!(table.rows.len(), 0);
+    }
+
+    #[test]
+    fn test_resolve_template_missing_binding_path() {
+        let template = Template {
+            id: "t1".to_string(),
+            name: "Test".to_string(),
+            page: PageSettings { width: 210.0, height: 297.0 },
+            fonts: vec![],
+            root: ContainerElement {
+                id: "root".to_string(),
+                position: PositionMode::Flow,
+                size: SizeConstraint::default(),
+                direction: "column".to_string(),
+                gap: 0.0,
+                padding: Padding::default(),
+                align: "stretch".to_string(),
+                justify: "start".to_string(),
+                style: ContainerStyle::default(),
+                children: vec![
+                    TemplateElement::Text(TextElement {
+                        id: "el_missing".to_string(),
+                        position: PositionMode::Flow,
+                        size: SizeConstraint::default(),
+                        style: TextStyle::default(),
+                        content: None,
+                        binding: ScalarBinding { path: "does.not.exist".to_string() },
+                    }),
+                ],
+            },
+        };
+
+        let data = serde_json::json!({});
+        let resolved = resolve_template(&template, &data);
+        // Missing binding path should resolve to empty string
+        assert_eq!(resolved.texts.get("el_missing").unwrap(), "");
     }
 }

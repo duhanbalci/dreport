@@ -5,7 +5,7 @@ import type { Template, JsonSchema } from './lib'
 
 // --- Full Invoice Schema ---
 
-const invoiceSchema: JsonSchema = {
+const defaultInvoiceSchema: JsonSchema = {
   $id: 'fatura-schema',
   type: 'object',
   properties: {
@@ -72,6 +72,31 @@ const invoiceSchema: JsonSchema = {
     },
   },
 }
+
+const currentSchema = ref<JsonSchema>(structuredClone(defaultInvoiceSchema))
+
+// --- Schema persistence ---
+
+const SCHEMA_STORAGE_KEY = 'dreport-schema'
+
+function loadSchemaFromLocalStorage(): JsonSchema | null {
+  try {
+    const raw = localStorage.getItem(SCHEMA_STORAGE_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as JsonSchema
+  } catch {
+    return null
+  }
+}
+
+const savedSchema = loadSchemaFromLocalStorage()
+if (savedSchema) {
+  currentSchema.value = savedSchema
+}
+
+watch(currentSchema, (val) => {
+  localStorage.setItem(SCHEMA_STORAGE_KEY, JSON.stringify(val))
+}, { deep: true })
 
 // --- Sample Invoice Data ---
 
@@ -457,6 +482,7 @@ watch(template, (val) => {
 const editorRef = ref<InstanceType<typeof DreportEditor> | null>(null)
 const pdfLoading = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const schemaFileInputRef = ref<HTMLInputElement | null>(null)
 
 function triggerImport() {
   fileInputRef.value?.click()
@@ -469,6 +495,19 @@ function onImportFile(e: Event) {
   const reader = new FileReader()
   reader.onload = () => {
     try {
+      const parsed = JSON.parse(reader.result as string)
+      // Detect bundle (has both 'template' and 'schema' keys)
+      if (parsed.template && parsed.schema) {
+        editorRef.value?.importTemplate(JSON.stringify(parsed.template))
+        currentSchema.value = parsed.schema
+        return
+      }
+      // Detect standalone template (has 'root' key)
+      if (parsed.root) {
+        editorRef.value?.importTemplate(reader.result as string)
+        return
+      }
+      // Fallback: try as template
       editorRef.value?.importTemplate(reader.result as string)
     } catch {
       alert('Gecersiz sablon dosyasi')
@@ -486,6 +525,59 @@ function exportTemplate() {
   const a = document.createElement('a')
   a.href = url
   a.download = `${template.value.name || 'sablon'}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// --- Schema import/export ---
+
+function triggerSchemaImport() {
+  schemaFileInputRef.value?.click()
+}
+
+function onSchemaImportFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    try {
+      const schema = JSON.parse(reader.result as string)
+      currentSchema.value = schema
+    } catch {
+      alert('Gecersiz schema dosyasi')
+    }
+  }
+  reader.readAsText(file)
+  input.value = ''
+}
+
+function exportSchema() {
+  const json = JSON.stringify(currentSchema.value, null, 2)
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'schema.json'
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+// --- Bundle export (template + schema) ---
+
+function exportBundle() {
+  const templateJson = editorRef.value?.exportTemplate()
+  if (!templateJson) return
+  const bundle = {
+    template: JSON.parse(templateJson),
+    schema: currentSchema.value,
+  }
+  const json = JSON.stringify(bundle, null, 2)
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${template.value.name || 'sablon'}-bundle.json`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -510,7 +602,9 @@ async function downloadPdf() {
 
 function resetTemplate() {
   template.value = structuredClone(defaultInvoiceTemplate)
+  currentSchema.value = structuredClone(defaultInvoiceSchema)
   localStorage.removeItem(STORAGE_KEY)
+  localStorage.removeItem(SCHEMA_STORAGE_KEY)
 }
 </script>
 
@@ -521,17 +615,50 @@ function resetTemplate() {
       <span class="app-header__subtitle">Belge Tasarim Araci</span>
       <div style="flex: 1"></div>
       <input ref="fileInputRef" type="file" accept=".json" style="display: none" @change="onImportFile" />
-      <button class="header-btn header-btn--secondary" @click="resetTemplate">Sifirla</button>
-      <button class="header-btn header-btn--secondary" @click="triggerImport">Yukle</button>
-      <button class="header-btn header-btn--secondary" @click="exportTemplate">Kaydet</button>
+      <input ref="schemaFileInputRef" type="file" accept=".json" style="display: none" @change="onSchemaImportFile" />
+
+      <!-- Template operations -->
+      <button class="header-btn header-btn--secondary" @click="resetTemplate" title="Sifirla">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8a6 6 0 0 1 10.2-4.3L14 2v4h-4l1.7-1.7A4.5 4.5 0 1 0 12.5 8" /><path d="M12.5 8a4.5 4.5 0 0 1-8.2 2.5" /></svg>
+        Sifirla
+      </button>
+      <button class="header-btn header-btn--secondary" @click="triggerImport" title="Sablon Yukle">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10V2m0 0L5 5m3-3 3 3" /><path d="M2 10v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" /></svg>
+        Yukle
+      </button>
+      <button class="header-btn header-btn--secondary" @click="exportTemplate" title="Sablon Kaydet">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8m0 0 3-3m-3 3L5 7" /><path d="M2 10v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" /></svg>
+        Kaydet
+      </button>
+      <button class="header-btn header-btn--secondary" @click="exportBundle" title="Sablon + Schema Birlikte Kaydet">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="1" width="12" height="14" rx="1.5" /><path d="M5 4h6M5 7h6M5 10h4" /></svg>
+        Paket
+      </button>
+
+      <div class="header-divider"></div>
+
+      <!-- Schema operations -->
+      <button class="header-btn header-btn--secondary" @click="triggerSchemaImport" title="Schema Yukle">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10V2m0 0L5 5m3-3 3 3" /><path d="M2 10v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" /></svg>
+        Schema
+      </button>
+      <button class="header-btn header-btn--secondary" @click="exportSchema" title="Schema Kaydet">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8m0 0 3-3m-3 3L5 7" /><path d="M2 10v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" /></svg>
+        Schema
+      </button>
+
+      <div class="header-divider"></div>
+
+      <!-- Output -->
       <button class="header-btn" :disabled="pdfLoading" @click="downloadPdf">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="1" width="10" height="14" rx="1.5" /><path d="M6 5h4M6 8h4M6 11h2" /></svg>
         {{ pdfLoading ? 'Hazirlaniyor...' : 'PDF Indir' }}
       </button>
     </header>
     <DreportEditor
       ref="editorRef"
       v-model="template"
-      :schema="invoiceSchema"
+      :schema="currentSchema"
       :data="sampleData"
       :config="{ apiBaseUrl: 'http://localhost:3001/api' }"
     />
@@ -548,8 +675,8 @@ function resetTemplate() {
 
 .app-header {
   display: flex;
-  align-items: baseline;
-  gap: 12px;
+  align-items: center;
+  gap: 8px;
   padding: 8px 16px;
   background: #1e293b;
   color: white;
@@ -598,5 +725,21 @@ function resetTemplate() {
 .header-btn--secondary:hover {
   background: #334155;
   color: white;
+}
+
+.header-btn svg {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.header-divider {
+  width: 1px;
+  height: 20px;
+  background: #475569;
+  margin: 0 4px;
+  flex-shrink: 0;
 }
 </style>

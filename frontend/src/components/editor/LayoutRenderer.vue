@@ -8,7 +8,7 @@ const props = defineProps<{
 }>()
 
 // WASM barcode üretme fonksiyonu (EditorCanvas'tan provide edilir)
-const generateBarcode = inject<(format: string, value: string, width: number, height: number) => Promise<{ width: number; height: number; rgba: ArrayBuffer } | null>>('generateBarcode')
+const generateBarcode = inject<(format: string, value: string, width: number, height: number, includeText: boolean) => Promise<{ width: number; height: number; rgba: ArrayBuffer } | null>>('generateBarcode')
 
 const pageElements = computed(() => {
   if (!props.layout || props.layout.pages.length === 0) return []

@@ -130,7 +130,7 @@ fn render_text_cosmic(
     buffer.set_size(&mut font_system, Some(img_w as f32), Some(text_h as f32));
 
     let attrs = Attrs::new().family(Family::SansSerif);
-    buffer.set_text(&mut font_system, text, attrs, Shaping::Advanced);
+    buffer.set_text(&mut font_system, text, &attrs, Shaping::Advanced, None);
     buffer.shape_until_scroll(&mut font_system, false);
 
     let mut swash_cache = SwashCache::new();

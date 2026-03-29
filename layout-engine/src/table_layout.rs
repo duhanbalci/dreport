@@ -189,3 +189,220 @@ pub fn expand_table(
         children,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::data_resolve::{ResolvedData, ResolvedTable};
+    use std::collections::HashMap;
+
+    fn make_table(num_columns: usize) -> RepeatingTableElement {
+        let columns: Vec<TableColumn> = (0..num_columns)
+            .map(|i| TableColumn {
+                id: format!("col_{}", i),
+                field: format!("field_{}", i),
+                title: format!("Column {}", i),
+                width: SizeValue::Fr { value: 1.0 },
+                align: "left".to_string(),
+                format: None,
+            })
+            .collect();
+
+        RepeatingTableElement {
+            id: "tbl".to_string(),
+            position: PositionMode::Flow,
+            size: SizeConstraint {
+                width: SizeValue::Fr { value: 1.0 },
+                height: SizeValue::Auto,
+                ..Default::default()
+            },
+            data_source: ArrayBinding { path: "items".to_string() },
+            columns,
+            style: TableStyle::default(),
+        }
+    }
+
+    fn make_resolved(table_id: &str, rows: Vec<Vec<String>>) -> ResolvedData {
+        let mut tables = HashMap::new();
+        tables.insert(table_id.to_string(), ResolvedTable { rows });
+        ResolvedData {
+            texts: HashMap::new(),
+            tables,
+            barcodes: HashMap::new(),
+            images: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn test_expand_table_structure() {
+        let table = make_table(2);
+        let resolved = make_resolved("tbl", vec![
+            vec!["A".to_string(), "1".to_string()],
+            vec!["B".to_string(), "2".to_string()],
+        ]);
+
+        let container = expand_table(&table, &resolved);
+
+        // Wrapper container properties
+        assert_eq!(container.id, "tbl");
+        assert_eq!(container.direction, "column");
+
+        // Children: header row + 2 data rows (no border_color so no separator line)
+        assert_eq!(container.children.len(), 3);
+
+        // First child is header row container
+        match &container.children[0] {
+            TemplateElement::Container(c) => {
+                assert_eq!(c.id, "tbl_header");
+                assert_eq!(c.direction, "row");
+                assert_eq!(c.children.len(), 2); // 2 columns
+                // Check header cell text
+                match &c.children[0] {
+                    TemplateElement::StaticText(t) => assert_eq!(t.content, "Column 0"),
+                    _ => panic!("Expected StaticText for header cell"),
+                }
+            }
+            _ => panic!("Expected Container for header row"),
+        }
+
+        // Data rows
+        for (row_idx, child) in container.children[1..].iter().enumerate() {
+            match child {
+                TemplateElement::Container(c) => {
+                    assert_eq!(c.id, format!("tbl_row_{}", row_idx));
+                    assert_eq!(c.direction, "row");
+                    assert_eq!(c.children.len(), 2);
+                }
+                _ => panic!("Expected Container for data row"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_expand_table_empty_data() {
+        let table = make_table(3);
+        let resolved = make_resolved("tbl", vec![]);
+
+        let container = expand_table(&table, &resolved);
+
+        // Only header row, no data rows
+        assert_eq!(container.children.len(), 1);
+
+        // Header should still have all 3 columns
+        match &container.children[0] {
+            TemplateElement::Container(c) => {
+                assert_eq!(c.children.len(), 3);
+            }
+            _ => panic!("Expected Container for header row"),
+        }
+    }
+
+    #[test]
+    fn test_expand_table_column_count() {
+        let table = make_table(4);
+        let resolved = make_resolved("tbl", vec![
+            vec!["a".into(), "b".into(), "c".into(), "d".into()],
+        ]);
+
+        let container = expand_table(&table, &resolved);
+
+        // header + 1 data row
+        assert_eq!(container.children.len(), 2);
+
+        // Both header and data row should have 4 cells
+        match &container.children[0] {
+            TemplateElement::Container(c) => assert_eq!(c.children.len(), 4),
+            _ => panic!("Expected Container"),
+        }
+        match &container.children[1] {
+            TemplateElement::Container(c) => assert_eq!(c.children.len(), 4),
+            _ => panic!("Expected Container"),
+        }
+    }
+
+    #[test]
+    fn test_expand_table_data_cell_content() {
+        let table = make_table(2);
+        let resolved = make_resolved("tbl", vec![
+            vec!["Hello".to_string(), "42".to_string()],
+        ]);
+
+        let container = expand_table(&table, &resolved);
+
+        // Data row cells should contain the resolved text
+        match &container.children[1] {
+            TemplateElement::Container(c) => {
+                match &c.children[0] {
+                    TemplateElement::StaticText(t) => assert_eq!(t.content, "Hello"),
+                    _ => panic!("Expected StaticText"),
+                }
+                match &c.children[1] {
+                    TemplateElement::StaticText(t) => assert_eq!(t.content, "42"),
+                    _ => panic!("Expected StaticText"),
+                }
+            }
+            _ => panic!("Expected Container"),
+        }
+    }
+
+    #[test]
+    fn test_expand_table_with_border_adds_separator() {
+        let mut table = make_table(2);
+        table.style.border_color = Some("#000000".to_string());
+        let resolved = make_resolved("tbl", vec![
+            vec!["A".to_string(), "1".to_string()],
+        ]);
+
+        let container = expand_table(&table, &resolved);
+
+        // header + separator line + 1 data row = 3
+        assert_eq!(container.children.len(), 3);
+
+        // Second child should be a Line
+        match &container.children[1] {
+            TemplateElement::Line(l) => {
+                assert_eq!(l.id, "tbl_header_line");
+            }
+            _ => panic!("Expected Line separator after header"),
+        }
+    }
+
+    #[test]
+    fn test_expand_table_zebra_stripes() {
+        let mut table = make_table(1);
+        table.style.zebra_odd = Some("#f0f0f0".to_string());
+        table.style.zebra_even = Some("#ffffff".to_string());
+        let resolved = make_resolved("tbl", vec![
+            vec!["row0".into()],
+            vec!["row1".into()],
+            vec!["row2".into()],
+        ]);
+
+        let container = expand_table(&table, &resolved);
+
+        // header + 3 data rows
+        assert_eq!(container.children.len(), 4);
+
+        // row_0 (even index) => zebra_odd
+        match &container.children[1] {
+            TemplateElement::Container(c) => {
+                assert_eq!(c.style.background_color, Some("#f0f0f0".to_string()));
+            }
+            _ => panic!("Expected Container"),
+        }
+        // row_1 (odd index) => zebra_even
+        match &container.children[2] {
+            TemplateElement::Container(c) => {
+                assert_eq!(c.style.background_color, Some("#ffffff".to_string()));
+            }
+            _ => panic!("Expected Container"),
+        }
+        // row_2 (even index) => zebra_odd
+        match &container.children[3] {
+            TemplateElement::Container(c) => {
+                assert_eq!(c.style.background_color, Some("#f0f0f0".to_string()));
+            }
+            _ => panic!("Expected Container"),
+        }
+    }
+}

@@ -17,7 +17,7 @@ const isSelected = computed(() => editorStore.selectedElementId === props.elemen
 const isContainerEl = computed(() => isContainer(props.element))
 const isAbsolute = computed(() => props.element.position.type === 'absolute')
 
-// --- CSS style: layout'u Typst ile eşleştir ---
+// --- CSS style: layout engine sonuçlarına göre ---
 const layoutStyle = computed(() => {
   const el = props.element
   const s = props.scale

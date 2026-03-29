@@ -54,8 +54,8 @@ pub fn compute(
         display: Display::Flex,
         flex_direction: FlexDirection::Column,
         size: Size {
-            width: Dimension::Length(page_w_pt),
-            height: Dimension::Length(page_h_pt),
+            width: Dimension::length(page_w_pt),
+            height: Dimension::length(page_h_pt),
         },
         ..Default::default()
     };
@@ -197,7 +197,7 @@ fn build_element(
             // Line: genişlik parent'tan, yükseklik stroke width
             let mut leaf_style = style;
             if matches!(e.size.height, SizeValue::Auto) {
-                leaf_style.size.height = Dimension::Length(mm_to_pt(stroke_w));
+                leaf_style.size.height = Dimension::length(mm_to_pt(stroke_w));
             }
 
             let node = taffy.new_leaf(leaf_style).unwrap();
@@ -246,10 +246,10 @@ fn build_element(
             let default_h = if is_qr { 20.0 } else { 15.0 }; // mm
             let default_w = if is_qr { 20.0 } else { 40.0 }; // mm
             if matches!(e.size.height, SizeValue::Auto) {
-                style.min_size.height = Dimension::Length(mm_to_pt(default_h));
+                style.min_size.height = Dimension::length(mm_to_pt(default_h));
             }
             if matches!(e.size.width, SizeValue::Auto) {
-                style.min_size.width = Dimension::Length(mm_to_pt(default_w));
+                style.min_size.width = Dimension::length(mm_to_pt(default_w));
             }
 
             let node = taffy.new_leaf(style).unwrap();

@@ -6,6 +6,7 @@ import type { ElementLayout } from '../../core/layout-types'
 import type { TemplateElement, SizeValue, ContainerElement } from '../../core/types'
 import { isContainer, sz } from '../../core/types'
 import ElementToolbar from './ElementToolbar.vue'
+import { useSnapGuides } from '../../composables/useSnapGuides'
 
 const props = defineProps<{
   scale: number
@@ -14,6 +15,7 @@ const props = defineProps<{
 
 const templateStore = useTemplateStore()
 const editorStore = useEditorStore()
+const { activeGuides, collectEdges, calculateSnap, calculateResizeSnap, clearGuides } = useSnapGuides()
 
 // Tüm elemanları flat olarak topla (root hariç)
 const flatElements = computed(() => {
@@ -382,6 +384,8 @@ function onAbsoluteDragStart(e: PointerEvent, el: TemplateElement) {
     elY: el.position.y,
   }
 
+  collectEdges(props.layoutMap, el.id, templateStore.template.page.width, templateStore.template.page.height)
+
   window.addEventListener('pointermove', onAbsoluteDragMove)
   window.addEventListener('pointerup', onAbsoluteDragEnd)
 }
@@ -400,8 +404,16 @@ function onAbsoluteDragMove(e: PointerEvent) {
   }
 
   const pxToMm = 1 / props.scale
-  const newX = Math.max(0, absoluteDragStart.value.elX + dx * pxToMm)
-  const newY = Math.max(0, absoluteDragStart.value.elY + dy * pxToMm)
+  const proposedX = Math.max(0, absoluteDragStart.value.elX + dx * pxToMm)
+  const proposedY = Math.max(0, absoluteDragStart.value.elY + dy * pxToMm)
+
+  const layout = props.layoutMap[absoluteDragId.value]
+  const elW = layout ? layout.width_mm : 0
+  const elH = layout ? layout.height_mm : 0
+
+  const snap = calculateSnap(proposedX, proposedY, elW, elH)
+  const newX = snap.snappedX_mm
+  const newY = snap.snappedY_mm
 
   templateStore.updateElementPosition(absoluteDragId.value, {
     type: 'absolute',
@@ -417,6 +429,7 @@ function onAbsoluteDragEnd() {
   isDragging.value = false
   absoluteDragId.value = null
   editorStore.setDragging(false)
+  clearGuides()
   setTimeout(() => { didDrag.value = false }, 50)
 }
 
@@ -455,6 +468,8 @@ function onResizeStart(e: PointerEvent, elId: string, handle: string) {
   resizeGhost.value = { x: l.x_mm * s, y: l.y_mm * s, width: l.width_mm * s, height: l.height_mm * s }
   resizeFinalMm.value = { width: l.width_mm, height: l.height_mm }
 
+  collectEdges(props.layoutMap, elId, templateStore.template.page.width, templateStore.template.page.height)
+
   window.addEventListener('pointermove', onResizeMove)
   window.addEventListener('pointerup', onResizeEnd)
 }
@@ -485,11 +500,25 @@ function onResizeMove(e: PointerEvent) {
 
   const startWMm = resizeStart.value.width * pxToMm
   const startHMm = resizeStart.value.height * pxToMm
+  const startXMm = resizeStart.value.x * pxToMm
+  const startYMm = resizeStart.value.y * pxToMm
   let wMm = startWMm, hMm = startHMm
-  if (handle.includes('e')) wMm = Math.max(5, startWMm + dx * pxToMm)
-  if (handle.includes('w')) wMm = Math.max(5, startWMm - dx * pxToMm)
-  if (handle.includes('s')) hMm = Math.max(3, startHMm + dy * pxToMm)
-  if (handle.includes('n')) hMm = Math.max(3, startHMm - dy * pxToMm)
+  if (handle.includes('e')) {
+    const rightEdge = calculateResizeSnap('right', startXMm + startWMm + dx * pxToMm)
+    wMm = Math.max(5, rightEdge - startXMm)
+  }
+  if (handle.includes('w')) {
+    const leftEdge = calculateResizeSnap('left', startXMm + dx * pxToMm)
+    wMm = Math.max(5, startXMm + startWMm - leftEdge)
+  }
+  if (handle.includes('s')) {
+    const bottomEdge = calculateResizeSnap('bottom', startYMm + startHMm + dy * pxToMm)
+    hMm = Math.max(3, bottomEdge - startYMm)
+  }
+  if (handle.includes('n')) {
+    const topEdge = calculateResizeSnap('top', startYMm + dy * pxToMm)
+    hMm = Math.max(3, startYMm + startHMm - topEdge)
+  }
 
   if (ar > 0) {
     hMm = wMm / ar
@@ -519,6 +548,7 @@ function onResizeEnd() {
   isResizing.value = false
   resizeElementId.value = null
   resizeHandle.value = ''
+  clearGuides()
 }
 
 // ============================================================
@@ -628,6 +658,23 @@ const isAnyDragActive = computed(() =>
 
     <!-- Drop indicator (ortak — hem eleman hem toolbox sürükleme) -->
     <div v-if="isAnyDragActive" :style="dropIndicatorStyle" />
+
+    <!-- Snap guides -->
+    <div
+      v-for="(guide, gi) in activeGuides"
+      :key="'guide-' + gi"
+      class="snap-guide"
+      :style="{
+        position: 'absolute',
+        ...(guide.type === 'vertical'
+          ? { left: `${guide.position_mm * scale}px`, top: '0', bottom: '0', width: '1px' }
+          : { top: `${guide.position_mm * scale}px`, left: '0', right: '0', height: '1px' }),
+        background: '#3b82f6',
+        opacity: 0.7,
+        pointerEvents: 'none',
+        zIndex: 9999,
+      }"
+    />
 
     <!-- Element toolbar — seçili elemanın üstünde -->
     <ElementToolbar
