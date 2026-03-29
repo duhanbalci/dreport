@@ -1,11 +1,17 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTemplateStore } from '../../stores/template'
 import { useEditorStore } from '../../stores/editor'
 import { useTypstCompiler } from '../../composables/useTypstCompiler'
 import TypstSvgLayer from './TypstSvgLayer.vue'
 import InteractionOverlay from './InteractionOverlay.vue'
+
+const props = withDefaults(defineProps<{
+  handleErrors?: boolean
+}>(), {
+  handleErrors: true,
+})
 
 const templateStore = useTemplateStore()
 const editorStore = useEditorStore()
@@ -14,8 +20,14 @@ const { template, mockData } = storeToRefs(templateStore)
 const containerRef = ref<HTMLElement | null>(null)
 const containerWidth = ref(800)
 
+const emit = defineEmits<{
+  'compile-error': [error: string | null]
+}>()
+
 // Typst compiler — template + data'yı worker'a gönderir, WASM ile derlenir
 const { svg, error, compiling, layout, dispose } = useTypstCompiler(template, mockData)
+
+watch(error, (val) => emit('compile-error', val))
 
 // mm → px dönüşüm katsayısı
 const scale = computed(() => {
@@ -141,7 +153,7 @@ function onPointerUp(e: PointerEvent) {
     </div>
 
     <!-- Sabit overlay'ler — scroll dışında -->
-    <div v-if="error" class="editor-canvas__error">
+    <div v-if="props.handleErrors && error" class="editor-canvas__error">
       {{ error }}
     </div>
     <div v-if="compiling" class="editor-canvas__compiling">

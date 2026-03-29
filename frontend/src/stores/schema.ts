@@ -3,68 +3,14 @@ import { ref, computed } from 'vue'
 import type { JsonSchema, SchemaNode } from '../core/schema-parser'
 import { parseSchema, findArrayFields, findScalarFields } from '../core/schema-parser'
 
-/** Varsayılan fatura schema'sı */
-const defaultSchema: JsonSchema = {
-  $id: 'fatura-schema',
+/** Minimal boş schema — gerçek schema dışarıdan (DreportEditor prop) gelir */
+const emptySchema: JsonSchema = {
   type: 'object',
-  properties: {
-    firma: {
-      type: 'object',
-      title: 'Firma',
-      properties: {
-        unvan: { type: 'string', title: 'Firma Unvani' },
-        vergiNo: { type: 'string', title: 'Vergi No' },
-        logo: { type: 'string', title: 'Logo', format: 'image' },
-        adres: { type: 'string', title: 'Adres' },
-        telefon: { type: 'string', title: 'Telefon' },
-      },
-    },
-    fatura: {
-      type: 'object',
-      title: 'Fatura',
-      properties: {
-        no: { type: 'string', title: 'Fatura No' },
-        tarih: { type: 'string', title: 'Tarih', format: 'date' },
-      },
-    },
-    musteri: {
-      type: 'object',
-      title: 'Musteri',
-      properties: {
-        unvan: { type: 'string', title: 'Musteri Unvani' },
-        vergiNo: { type: 'string', title: 'Vergi No' },
-        adres: { type: 'string', title: 'Adres' },
-      },
-    },
-    kalemler: {
-      type: 'array',
-      title: 'Fatura Kalemleri',
-      items: {
-        type: 'object',
-        properties: {
-          siraNo: { type: 'integer', title: 'Sira No' },
-          adi: { type: 'string', title: 'Urun / Hizmet Adi' },
-          miktar: { type: 'number', title: 'Miktar' },
-          birim: { type: 'string', title: 'Birim' },
-          birimFiyat: { type: 'number', title: 'Birim Fiyat', format: 'currency' },
-          tutar: { type: 'number', title: 'Tutar', format: 'currency' },
-        },
-      },
-    },
-    toplamlar: {
-      type: 'object',
-      title: 'Toplamlar',
-      properties: {
-        araToplam: { type: 'number', title: 'Ara Toplam', format: 'currency' },
-        kdv: { type: 'number', title: 'KDV', format: 'currency' },
-        genelToplam: { type: 'number', title: 'Genel Toplam', format: 'currency' },
-      },
-    },
-  },
+  properties: {},
 }
 
 export const useSchemaStore = defineStore('schema', () => {
-  const rawSchema = ref<JsonSchema>(defaultSchema)
+  const rawSchema = ref<JsonSchema>(emptySchema)
 
   const schemaTree = computed<SchemaNode>(() => parseSchema(rawSchema.value))
 

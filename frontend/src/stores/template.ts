@@ -47,7 +47,14 @@ function createDefaultTemplate(): Template {
 export const useTemplateStore = defineStore('template', () => {
   const template = ref<Template>(createDefaultTemplate())
 
-  const mockData = computed(() => generateMockData(template.value))
+  /** Dışarıdan verilen önizleme verisi (null ise mock data üretilir) */
+  const overrideData = ref<Record<string, unknown> | null>(null)
+
+  const mockData = computed(() => overrideData.value ?? generateMockData(template.value))
+
+  function setOverrideData(data: Record<string, unknown> | null) {
+    overrideData.value = data
+  }
 
   // Undo / Redo
   const { undo, redo, canUndo, canRedo } = useUndoRedo(template)
@@ -148,6 +155,7 @@ export const useTemplateStore = defineStore('template', () => {
     exportTemplate,
     importTemplate,
     resetTemplate,
+    setOverrideData,
     undo,
     redo,
     canUndo,
