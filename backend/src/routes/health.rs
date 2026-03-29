@@ -1,7 +1,7 @@
 use axum::{Router, routing::get, Json};
+use dreport_layout::FontData;
 use serde::Serialize;
 use std::sync::Arc;
-use typst_kit::fonts::Fonts;
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -16,6 +16,6 @@ async fn health() -> Json<HealthResponse> {
     })
 }
 
-pub fn router() -> Router<Arc<Fonts>> {
+pub fn router() -> Router<Arc<Vec<FontData>>> {
     Router::new().route("/api/health", get(health))
 }

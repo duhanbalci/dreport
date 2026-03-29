@@ -52,12 +52,36 @@ export const useTemplateStore = defineStore('template', () => {
 
   const mockData = computed(() => overrideData.value ?? generateMockData(template.value))
 
+  /**
+   * Layout version counter — her template/data mutasyonunda artar.
+   * useLayoutEngine bu counter'ı izler (deep watch yerine).
+   * Vue'nun tüm template ağacını recursive karşılaştırması yerine
+   * tek bir sayı karşılaştırması yapılır.
+   */
+  const layoutVersion = ref(0)
+
+  /** Layout yeniden hesaplamasını tetikle */
+  function bumpLayoutVersion() {
+    layoutVersion.value++
+  }
+
   function setOverrideData(data: Record<string, unknown> | null) {
     overrideData.value = data
+    bumpLayoutVersion()
   }
 
   // Undo / Redo
-  const { undo, redo, canUndo, canRedo } = useUndoRedo(template)
+  const { undo: _undo, redo: _redo, canUndo, canRedo } = useUndoRedo(template)
+
+  function undo() {
+    _undo()
+    bumpLayoutVersion()
+  }
+
+  function redo() {
+    _redo()
+    bumpLayoutVersion()
+  }
 
   // --- Element CRUD ---
 
@@ -78,6 +102,7 @@ export const useTemplateStore = defineStore('template', () => {
     } else {
       parent.children.push(element)
     }
+    bumpLayoutVersion()
   }
 
   /** Element'i ağaçtan kaldır */
@@ -85,13 +110,18 @@ export const useTemplateStore = defineStore('template', () => {
     const parent = getParent(elementId)
     if (!parent) return
     const idx = parent.children.findIndex(c => c.id === elementId)
-    if (idx !== -1) parent.children.splice(idx, 1)
+    if (idx !== -1) {
+      parent.children.splice(idx, 1)
+      bumpLayoutVersion()
+    }
   }
 
   /** Element'i başka bir container'a taşı */
   function moveElement(elementId: string, targetParentId: string, index?: number) {
     const el = getElementById(elementId)
     if (!el) return
+    // removeElement bump'lar, addChild de bump'lar — ama tek mantıksal operasyon.
+    // Fazladan 1 bump sorun değil (debounce var), ama istersek optimize edebiliriz.
     removeElement(elementId)
     addChild(targetParentId, el, index)
   }
@@ -99,7 +129,10 @@ export const useTemplateStore = defineStore('template', () => {
   /** Absolute pozisyon güncelle */
   function updateElementPosition(elementId: string, position: PositionMode) {
     const el = getElementById(elementId)
-    if (el) el.position = position
+    if (el) {
+      el.position = position
+      bumpLayoutVersion()
+    }
   }
 
   /** Boyut güncelle */
@@ -107,13 +140,17 @@ export const useTemplateStore = defineStore('template', () => {
     const el = getElementById(elementId)
     if (el) {
       el.size = { ...el.size, ...size }
+      bumpLayoutVersion()
     }
   }
 
   /** Herhangi bir element özelliğini güncelle */
   function updateElement(elementId: string, updates: Partial<TemplateElement>) {
     const el = getElementById(elementId)
-    if (el) Object.assign(el, updates)
+    if (el) {
+      Object.assign(el, updates)
+      bumpLayoutVersion()
+    }
   }
 
   /** Çocuk sırasını değiştir (aynı parent içinde) */
@@ -122,6 +159,7 @@ export const useTemplateStore = defineStore('template', () => {
     if (!parent || !isContainer(parent)) return
     const [moved] = parent.children.splice(fromIndex, 1)
     parent.children.splice(toIndex, 0, moved)
+    bumpLayoutVersion()
   }
 
   /** Şablonu JSON olarak dışa aktar */
@@ -133,16 +171,20 @@ export const useTemplateStore = defineStore('template', () => {
   function importTemplate(json: string) {
     const parsed = JSON.parse(json) as Template
     template.value = parsed
+    bumpLayoutVersion()
   }
 
   /** Yeni boş şablon oluştur */
   function resetTemplate() {
     template.value = createDefaultTemplate()
+    bumpLayoutVersion()
   }
 
   return {
     template,
     mockData,
+    layoutVersion,
+    bumpLayoutVersion,
     getElementById,
     getParent,
     addChild,

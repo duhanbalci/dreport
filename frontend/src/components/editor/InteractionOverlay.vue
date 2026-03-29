@@ -2,24 +2,17 @@
 import { computed, ref } from 'vue'
 import { useTemplateStore } from '../../stores/template'
 import { useEditorStore } from '../../stores/editor'
-import type { ElementLayout } from '../../core/template-to-typst'
+import type { ElementLayout } from '../../core/layout-types'
 import type { TemplateElement, SizeValue, ContainerElement } from '../../core/types'
 import { isContainer, sz } from '../../core/types'
 
 const props = defineProps<{
   scale: number
-  layout: Record<string, ElementLayout>
-  pageWidthPt: number
+  layoutMap: Record<string, ElementLayout>
 }>()
 
 const templateStore = useTemplateStore()
 const editorStore = useEditorStore()
-
-// pt→px dönüşüm katsayısı
-const ptToPx = computed(() => {
-  const pageWidthPx = templateStore.template.page.width * props.scale
-  return props.pageWidthPt > 0 ? pageWidthPx / props.pageWidthPt : 1
-})
 
 // Tüm elemanları flat olarak topla (root hariç)
 const flatElements = computed(() => {
@@ -50,20 +43,20 @@ const allContainers = computed(() => {
 })
 
 function getElementStyle(el: TemplateElement) {
-  const l = props.layout[el.id]
+  const l = props.layoutMap[el.id]
   if (!l) return { display: 'none' }
 
-  const s = ptToPx.value
-  const h = l.height * s
+  const s = props.scale
+  const h = l.height_mm * s
   const minH = 8
   const actualH = Math.max(h, minH)
   const yOffset = h < minH ? (minH - h) / 2 : 0
 
   return {
     position: 'absolute' as const,
-    left: `${l.x * s}px`,
-    top: `${l.y * s - yOffset}px`,
-    width: `${l.width * s}px`,
+    left: `${l.x_mm * s}px`,
+    top: `${l.y_mm * s - yOffset}px`,
+    width: `${l.width_mm * s}px`,
     height: `${actualH}px`,
   }
 }
@@ -90,23 +83,23 @@ const dropLogicalIndex = ref<number | null>(null)
 
 /** Mouse pozisyonuna göre en derin container'ı bul */
 function findDeepestContainer(mouseX: number, mouseY: number, excludeId?: string): ContainerElement {
-  const s = ptToPx.value
+  const s = props.scale
   let best: ContainerElement = templateStore.template.root
 
   for (const c of allContainers.value) {
     if (c.id === excludeId) continue
-    const l = props.layout[c.id]
+    const l = props.layoutMap[c.id]
     if (!l) continue
 
-    const cx = l.x * s
-    const cy = l.y * s
-    const cw = l.width * s
-    const ch = l.height * s
+    const cx = l.x_mm * s
+    const cy = l.y_mm * s
+    const cw = l.width_mm * s
+    const ch = l.height_mm * s
 
     if (mouseX >= cx && mouseX <= cx + cw && mouseY >= cy && mouseY <= cy + ch) {
       // Daha küçük (daha derin) container'ı tercih et
-      const bestL = props.layout[best.id]
-      if (!bestL || (cw * ch < bestL.width * s * bestL.height * s)) {
+      const bestL = props.layoutMap[best.id]
+      if (!bestL || (cw * ch < bestL.width_mm * s * bestL.height_mm * s)) {
         best = c
       }
     }
@@ -116,20 +109,20 @@ function findDeepestContainer(mouseX: number, mouseY: number, excludeId?: string
 
 /** Container içinde drop index hesapla */
 function computeDropIndex(container: ContainerElement, mouseX: number, mouseY: number, excludeId?: string) {
-  const s = ptToPx.value
+  const s = props.scale
   const flowChildren = container.children.filter(c => c.position.type !== 'absolute' && c.id !== excludeId)
   const isRow = container.direction === 'row'
 
   let visualIdx = flowChildren.length
 
   for (let i = 0; i < flowChildren.length; i++) {
-    const l = props.layout[flowChildren[i].id]
+    const l = props.layoutMap[flowChildren[i].id]
     if (!l) continue
     if (isRow) {
-      const centerX = l.x * s + (l.width * s) / 2
+      const centerX = l.x_mm * s + (l.width_mm * s) / 2
       if (mouseX < centerX) { visualIdx = i; break }
     } else {
-      const centerY = l.y * s + (l.height * s) / 2
+      const centerY = l.y_mm * s + (l.height_mm * s) / 2
       if (mouseY < centerY) { visualIdx = i; break }
     }
   }
@@ -184,7 +177,7 @@ const dropIndicatorStyle = computed(() => {
   const container = templateStore.getElementById(dropTargetContainerId.value)
   if (!container || !isContainer(container)) return { display: 'none' }
 
-  const s = ptToPx.value
+  const s = props.scale
   const idx = dropVisualIndex.value
   const isRow = container.direction === 'row'
 
@@ -192,37 +185,37 @@ const dropIndicatorStyle = computed(() => {
   const dragId = dragElementId.value
   const flowChildren = container.children.filter(c => c.position.type !== 'absolute' && c.id !== dragId)
 
-  const cl = props.layout[container.id]
+  const cl = props.layoutMap[container.id]
   if (!cl) return { display: 'none' }
 
   if (isRow) {
     // Row container: dikey gösterge çizgisi
     let x = 0
     if (idx === 0 && flowChildren.length > 0) {
-      const l = props.layout[flowChildren[0].id]
-      if (l) x = (cl.x * s + l.x * s) / 2
-      else x = cl.x * s
+      const l = props.layoutMap[flowChildren[0].id]
+      if (l) x = (cl.x_mm * s + l.x_mm * s) / 2
+      else x = cl.x_mm * s
     } else if (idx < flowChildren.length && idx > 0) {
-      const left = props.layout[flowChildren[idx - 1].id]
-      const right = props.layout[flowChildren[idx].id]
+      const left = props.layoutMap[flowChildren[idx - 1].id]
+      const right = props.layoutMap[flowChildren[idx].id]
       if (left && right) {
-        const leftEnd = (left.x + left.width) * s
-        const rightStart = right.x * s
+        const leftEnd = (left.x_mm + left.width_mm) * s
+        const rightStart = right.x_mm * s
         x = (leftEnd + rightStart) / 2
       }
     } else if (idx === 0 && flowChildren.length === 0) {
-      x = cl.x * s + 8
+      x = cl.x_mm * s + 8
     } else if (flowChildren.length > 0) {
       const last = flowChildren[flowChildren.length - 1]
-      const l = props.layout[last.id]
+      const l = props.layoutMap[last.id]
       if (l) {
         const gapPx = container.gap * props.scale
-        x = (l.x + l.width) * s + gapPx / 2
+        x = (l.x_mm + l.width_mm) * s + gapPx / 2
       }
     }
 
-    const top = cl.y * s
-    const height = cl.height * s
+    const top = cl.y_mm * s
+    const height = cl.height_mm * s
 
     return {
       position: 'absolute' as const,
@@ -240,33 +233,33 @@ const dropIndicatorStyle = computed(() => {
   // Column container: yatay gösterge çizgisi
   let y = 0
   if (idx === 0 && flowChildren.length > 0) {
-    const l = props.layout[flowChildren[0].id]
+    const l = props.layoutMap[flowChildren[0].id]
     if (l) {
-      y = (cl.y * s + l.y * s) / 2
+      y = (cl.y_mm * s + l.y_mm * s) / 2
     } else {
-      y = cl.y * s - 4
+      y = cl.y_mm * s - 4
     }
   } else if (idx < flowChildren.length && idx > 0) {
-    const above = props.layout[flowChildren[idx - 1].id]
-    const below = props.layout[flowChildren[idx].id]
+    const above = props.layoutMap[flowChildren[idx - 1].id]
+    const below = props.layoutMap[flowChildren[idx].id]
     if (above && below) {
-      const aboveBottom = (above.y + above.height) * s
-      const belowTop = below.y * s
+      const aboveBottom = (above.y_mm + above.height_mm) * s
+      const belowTop = below.y_mm * s
       y = (aboveBottom + belowTop) / 2
     }
   } else if (idx === 0 && flowChildren.length === 0) {
-    y = cl.y * s + 8
+    y = cl.y_mm * s + 8
   } else if (flowChildren.length > 0) {
     const last = flowChildren[flowChildren.length - 1]
-    const l = props.layout[last.id]
+    const l = props.layoutMap[last.id]
     if (l) {
       const gapPx = container.gap * props.scale
-      y = (l.y + l.height) * s + gapPx / 2
+      y = (l.y_mm + l.height_mm) * s + gapPx / 2
     }
   }
 
-  const x = cl.x * s
-  const width = cl.width * s
+  const x = cl.x_mm * s
+  const width = cl.width_mm * s
 
   return {
     position: 'absolute' as const,
@@ -297,20 +290,20 @@ function onDragStart(e: PointerEvent, el: TemplateElement) {
     return
   }
 
-  const l = props.layout[el.id]
+  const l = props.layoutMap[el.id]
   if (!l) return
 
-  const s = ptToPx.value
+  const s = props.scale
   dragElementId.value = el.id
   didDrag.value = false
 
   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
   dragOffset.value = { x: e.clientX - rect.left, y: e.clientY - rect.top }
   dragGhost.value = {
-    x: l.x * s,
-    y: l.y * s,
-    width: l.width * s,
-    height: l.height * s,
+    x: l.x_mm * s,
+    y: l.y_mm * s,
+    width: l.width_mm * s,
+    height: l.height_mm * s,
   }
 
   window.addEventListener('pointermove', onDragMove)
@@ -440,27 +433,26 @@ function onResizeStart(e: PointerEvent, elId: string, handle: string) {
   e.stopPropagation()
   e.preventDefault()
 
-  const l = props.layout[elId]
+  const l = props.layoutMap[elId]
   if (!l) return
 
   resizeElementId.value = elId
   resizeHandle.value = handle
   isResizing.value = true
 
-  const s = ptToPx.value
-  const ptToMm = 1 / 2.8346
+  const s = props.scale
 
-  // Barkod elemanları için aspect ratio'yu kaydet
+  // Barkod ve görsel elemanları için aspect ratio'yu kaydet
   const el = flatElements.value.find(e => e.id === elId)
-  resizeAspectRatio.value = (el?.type === 'barcode' && l.height > 0) ? l.width / l.height : 0
+  resizeAspectRatio.value = ((el?.type === 'barcode' || el?.type === 'image') && l.height_mm > 0) ? l.width_mm / l.height_mm : 0
 
   resizeStart.value = {
     mouseX: e.clientX, mouseY: e.clientY,
-    x: l.x * s, y: l.y * s,
-    width: l.width * s, height: l.height * s,
+    x: l.x_mm * s, y: l.y_mm * s,
+    width: l.width_mm * s, height: l.height_mm * s,
   }
-  resizeGhost.value = { x: l.x * s, y: l.y * s, width: l.width * s, height: l.height * s }
-  resizeFinalMm.value = { width: l.width * ptToMm, height: l.height * ptToMm }
+  resizeGhost.value = { x: l.x_mm * s, y: l.y_mm * s, width: l.width_mm * s, height: l.height_mm * s }
+  resizeFinalMm.value = { width: l.width_mm, height: l.height_mm }
 
   window.addEventListener('pointermove', onResizeMove)
   window.addEventListener('pointerup', onResizeEnd)
@@ -511,9 +503,15 @@ function onResizeEnd() {
 
   if (resizeElementId.value) {
     const handle = resizeHandle.value
+    const ar = resizeAspectRatio.value
     const sizeUpdate: { width?: SizeValue; height?: SizeValue } = {}
     if (handle.includes('e') || handle.includes('w')) sizeUpdate.width = sz.fixed(resizeFinalMm.value.width)
     if (handle.includes('s') || handle.includes('n')) sizeUpdate.height = sz.fixed(resizeFinalMm.value.height)
+    // Aspect ratio aktifken her zaman hem width hem height güncelle
+    if (ar > 0) {
+      sizeUpdate.width = sz.fixed(resizeFinalMm.value.width)
+      sizeUpdate.height = sz.fixed(resizeFinalMm.value.height)
+    }
     templateStore.updateElementSize(resizeElementId.value, sizeUpdate)
   }
 
@@ -589,8 +587,8 @@ const isAnyDragActive = computed(() =>
 
       <!-- Resize handles -->
       <template v-if="editorStore.selectedElementId === el.id && !isResizing">
-        <template v-if="el.type === 'barcode'">
-          <!-- Barkod: sadece yatay resize (aspect ratio korunur) -->
+        <template v-if="el.type === 'barcode' || el.type === 'image'">
+          <!-- Barkod/Görsel: sadece yatay resize (aspect ratio korunur) -->
           <div class="resize-handle resize-handle--e" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'e')" />
           <div class="resize-handle resize-handle--w" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'w')" />
         </template>

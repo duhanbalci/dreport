@@ -6,13 +6,11 @@ use axum::{
     routing::post,
     Json,
 };
+use dreport_layout::FontData;
 use serde::Deserialize;
 use std::sync::Arc;
 
 use crate::models::Template;
-use crate::typst_engine::compiler::compile_pdf;
-use crate::typst_engine::template_to_typst::{self, RenderMode};
-use typst_kit::fonts::Fonts;
 
 #[derive(Deserialize)]
 pub struct RenderRequest {
@@ -22,17 +20,14 @@ pub struct RenderRequest {
 
 /// POST /api/render — Template + Data → PDF
 pub async fn render(
-    State(fonts): State<Arc<Fonts>>,
+    State(fonts): State<Arc<Vec<FontData>>>,
     Json(payload): Json<RenderRequest>,
 ) -> impl IntoResponse {
-    // 1. Template JSON → Typst markup
-    let typst_markup = template_to_typst::template_to_typst(&payload.template, &payload.data, RenderMode::Pdf);
+    // 1. Layout hesapla
+    let layout = dreport_layout::compute_layout(&payload.template, &payload.data, &fonts);
 
-    // 2. Base64 image'ları çıkar
-    let files = template_to_typst::extract_image_files(&payload.template);
-
-    // 3. Typst markup → PDF
-    match compile_pdf(typst_markup, &fonts, files) {
+    // 2. PDF render
+    match dreport_layout::pdf_render::render_pdf(&layout, &fonts) {
         Ok(pdf_bytes) => (
             StatusCode::OK,
             [(header::CONTENT_TYPE, "application/pdf")],
@@ -41,12 +36,12 @@ pub async fn render(
             .into_response(),
         Err(err) => (
             StatusCode::INTERNAL_SERVER_ERROR,
-            format!("PDF derleme hatasi: {}", err),
+            format!("PDF render hatasi: {}", err),
         )
             .into_response(),
     }
 }
 
-pub fn router() -> Router<Arc<Fonts>> {
+pub fn router() -> Router<Arc<Vec<FontData>>> {
     Router::new().route("/api/render", post(render))
 }

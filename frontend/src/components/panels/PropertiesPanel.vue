@@ -397,8 +397,8 @@ function deleteElement() {
       <div v-if="selectedElement.type === 'line'" class="prop-section">
         <div class="prop-section__title">Çizgi Stili</div>
         <div class="prop-row">
-          <label class="prop-label">Kalınlık (pt)</label>
-          <input class="prop-input" type="number" step="0.25" min="0.25"
+          <label class="prop-label">Kalınlık (mm)</label>
+          <input class="prop-input" type="number" step="0.1" min="0.1"
             :value="(selectedElement as LineElement).style.strokeWidth ?? 0.5"
             @input="(e) => updateStyle('strokeWidth', parseFloat((e.target as HTMLInputElement).value) || 0.5)" />
         </div>
@@ -509,6 +509,12 @@ function deleteElement() {
             <button v-if="(selectedElement as BarcodeElement).style.color" class="prop-clear" @click="updateStyle('color', undefined)">x</button>
           </div>
         </div>
+        <div v-if="(selectedElement as BarcodeElement).format !== 'qr'" class="prop-row">
+          <label class="prop-label">Metin Goster</label>
+          <input type="checkbox"
+            :checked="(selectedElement as BarcodeElement).style.includeText ?? ((selectedElement as BarcodeElement).format === 'ean13' || (selectedElement as BarcodeElement).format === 'ean8')"
+            @change="(e) => updateStyle('includeText', (e.target as HTMLInputElement).checked)" />
+        </div>
         <div v-if="schemaStore.scalarFields.length > 0" class="prop-row">
           <label class="prop-label">Veri Baglama</label>
           <select class="prop-input prop-select"
@@ -613,8 +619,8 @@ function deleteElement() {
           </div>
         </div>
         <div class="prop-row">
-          <label class="prop-label">Kenarlık (pt)</label>
-          <input class="prop-input" type="number" step="0.5" min="0"
+          <label class="prop-label">Kenarlık (mm)</label>
+          <input class="prop-input" type="number" step="0.1" min="0"
             :value="(selectedElement as ContainerElement).style.borderWidth ?? 0"
             @input="(e) => updateStyle('borderWidth', parseFloat((e.target as HTMLInputElement).value) || 0)" />
         </div>
@@ -638,8 +644,8 @@ function deleteElement() {
           </select>
         </div>
         <div class="prop-row">
-          <label class="prop-label">Radius (pt)</label>
-          <input class="prop-input" type="number" step="1" min="0"
+          <label class="prop-label">Radius (mm)</label>
+          <input class="prop-input" type="number" step="0.5" min="0"
             :value="(selectedElement as ContainerElement).style.borderRadius ?? 0"
             @input="(e) => updateStyle('borderRadius', parseFloat((e.target as HTMLInputElement).value) || 0)" />
         </div>
@@ -791,8 +797,8 @@ function deleteElement() {
           </div>
         </div>
         <div class="prop-row">
-          <label class="prop-label">Kenarlık (pt)</label>
-          <input class="prop-input" type="number" step="0.25" min="0"
+          <label class="prop-label">Kenarlık (mm)</label>
+          <input class="prop-input" type="number" step="0.1" min="0"
             :value="(selectedElement as RepeatingTableElement).style.borderWidth ?? 0.5"
             @input="(e) => updateTableStyle('borderWidth', parseFloat((e.target as HTMLInputElement).value) || 0)" />
         </div>

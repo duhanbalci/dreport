@@ -2,10 +2,10 @@ mod health;
 mod render;
 
 use axum::Router;
+use dreport_layout::FontData;
 use std::sync::Arc;
-use typst_kit::fonts::Fonts;
 
-pub fn router() -> Router<Arc<Fonts>> {
+pub fn router() -> Router<Arc<Vec<FontData>>> {
     Router::new()
         .merge(health::router())
         .merge(render::router())

@@ -110,8 +110,22 @@ function onKeyDown(e: KeyboardEvent) {
   }
 }
 
-onMounted(() => window.addEventListener('keydown', onKeyDown))
-onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown))
+// Browser'ın native pinch-zoom'unu editör alanında engelle
+function onGlobalWheel(e: WheelEvent) {
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeyDown)
+  // passive: false olmadan preventDefault çalışmaz
+  document.addEventListener('wheel', onGlobalWheel, { passive: false })
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKeyDown)
+  document.removeEventListener('wheel', onGlobalWheel)
+})
 
 // --- Exposed API ---
 
@@ -179,6 +193,7 @@ defineExpose({
   flex: 1;
   min-height: 0;
   height: 100%;
+  overflow: hidden;
 }
 
 .dreport-editor__sidebar {

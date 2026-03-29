@@ -1,0 +1,29 @@
+[package]
+name = "dreport-layout"
+version = "0.1.0"
+edition = "2024"
+
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+dreport-core = { path = "../core" }
+taffy = "0.7"
+cosmic-text = { version = "0.12", default-features = false, features = ["std", "swash"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rxing = { version = "0.8", default-features = false, features = ["encoding_rs"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+krilla = { version = "0.6", features = ["raster-images", "simple-text"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+base64 = "0.22"
+
+[features]
+default = []
+wasm = []

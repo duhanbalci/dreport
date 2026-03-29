@@ -14,7 +14,7 @@ pub enum SizeValue {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", default)]
 pub struct SizeConstraint {
     pub width: SizeValue,
     pub height: SizeValue,
@@ -24,25 +24,43 @@ pub struct SizeConstraint {
     pub max_height: Option<f64>,
 }
 
+impl Default for SizeConstraint {
+    fn default() -> Self {
+        Self {
+            width: SizeValue::Auto,
+            height: SizeValue::Auto,
+            min_width: None,
+            min_height: None,
+            max_width: None,
+            max_height: None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PageSettings {
     pub width: f64,
     pub height: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Padding {
+    #[serde(default)]
     pub top: f64,
+    #[serde(default)]
     pub right: f64,
+    #[serde(default)]
     pub bottom: f64,
+    #[serde(default)]
     pub left: f64,
 }
 
 // --- Positioning ---
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum PositionMode {
+    #[default]
     #[serde(rename = "flow")]
     Flow,
     #[serde(rename = "absolute")]
@@ -124,6 +142,7 @@ pub struct TableStyle {
 #[serde(rename_all = "camelCase", default)]
 pub struct BarcodeStyle {
     pub color: Option<String>,
+    pub include_text: Option<bool>,
 }
 
 // --- Element tipleri ---
@@ -200,16 +219,29 @@ impl TemplateElement {
 #[serde(rename_all = "camelCase")]
 pub struct ContainerElement {
     pub id: String,
+    #[serde(default)]
     pub position: PositionMode,
+    #[serde(default)]
     pub size: SizeConstraint,
+    #[serde(default = "default_column")]
     pub direction: String,
+    #[serde(default)]
     pub gap: f64,
+    #[serde(default)]
     pub padding: Padding,
+    #[serde(default = "default_stretch")]
     pub align: String,
+    #[serde(default = "default_start")]
     pub justify: String,
+    #[serde(default)]
     pub style: ContainerStyle,
+    #[serde(default)]
     pub children: Vec<TemplateElement>,
 }
+
+fn default_column() -> String { "column".to_string() }
+fn default_stretch() -> String { "stretch".to_string() }
+fn default_start() -> String { "start".to_string() }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

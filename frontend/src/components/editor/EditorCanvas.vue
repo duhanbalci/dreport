@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, provide, onMounted, onBeforeUnmount } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useTemplateStore } from '../../stores/template'
 import { useEditorStore } from '../../stores/editor'
-import { useTypstCompiler } from '../../composables/useTypstCompiler'
-import TypstSvgLayer from './TypstSvgLayer.vue'
+import { useLayoutEngine } from '../../composables/useLayoutEngine'
+import LayoutRenderer from './LayoutRenderer.vue'
 import InteractionOverlay from './InteractionOverlay.vue'
 
 const props = withDefaults(defineProps<{
@@ -15,7 +15,7 @@ const props = withDefaults(defineProps<{
 
 const templateStore = useTemplateStore()
 const editorStore = useEditorStore()
-const { template, mockData } = storeToRefs(templateStore)
+const { template, mockData, layoutVersion } = storeToRefs(templateStore)
 
 const containerRef = ref<HTMLElement | null>(null)
 const containerWidth = ref(800)
@@ -24,8 +24,11 @@ const emit = defineEmits<{
   'compile-error': [error: string | null]
 }>()
 
-// Typst compiler — template + data'yı worker'a gönderir, WASM ile derlenir
-const { svg, error, compiling, layout, dispose } = useTypstCompiler(template, mockData)
+// Layout engine — template + data'yı worker'a gönderir, WASM ile layout hesaplar
+const { layout, layoutMap, error, computing: compiling, generateBarcode, dispose } = useLayoutEngine(template, mockData, layoutVersion)
+
+// LayoutRenderer'ın barcode üretmek için kullanabileceği fonksiyon
+provide('generateBarcode', generateBarcode)
 
 watch(error, (val) => emit('compile-error', val))
 
@@ -89,13 +92,74 @@ onBeforeUnmount(() => {
   window.removeEventListener('keyup', onKeyUp)
 })
 
-// Zoom
+// Zoom & Pan via wheel/trackpad
+const pageRef = ref<HTMLElement | null>(null)
+
+let zoomRAF: number | null = null
+let zoomDeltaAccum = 0
+let zoomClientX = 0
+let zoomClientY = 0
+
 function onWheel(e: WheelEvent) {
   if (e.ctrlKey || e.metaKey) {
     e.preventDefault()
-    const delta = e.deltaY > 0 ? -0.1 : 0.1
-    editorStore.setZoom(editorStore.zoom + delta)
+
+    zoomDeltaAccum += e.deltaY
+    zoomClientX = e.clientX
+    zoomClientY = e.clientY
+
+    if (zoomRAF === null) {
+      zoomRAF = requestAnimationFrame(() => {
+        const delta = Math.max(-4, Math.min(4, zoomDeltaAccum))
+        if (Math.abs(delta) > 0.01) {
+          applyZoom(delta, zoomClientX, zoomClientY)
+        }
+        zoomDeltaAccum = 0
+        zoomRAF = null
+      })
+    }
+  } else {
+    // İki parmak pan (touchpad) veya normal scroll
+    e.preventDefault()
+    editorStore.setPan(
+      editorStore.panX - e.deltaX,
+      editorStore.panY - e.deltaY,
+    )
   }
+}
+
+function applyZoom(delta: number, clientX: number, clientY: number) {
+  const pageEl = pageRef.value
+  if (!pageEl) return
+
+  const oldZoom = editorStore.zoom
+  const zoomFactor = Math.pow(0.99, delta)
+  const newZoom = Math.max(0.25, Math.min(4, oldZoom * zoomFactor))
+  if (newZoom === oldZoom) return
+
+  // Sayfa elemanının şu anki ekran pozisyonunu al (centering + pan dahil)
+  const pageRect = pageEl.getBoundingClientRect()
+
+  // Mouse'un sayfa üzerindeki pozisyonu (mm cinsinden)
+  const baseScale = containerWidth.value / templateStore.template.page.width
+  const oldScale = baseScale * oldZoom
+  const newScale = baseScale * newZoom
+  const mousePageMmX = (clientX - pageRect.left) / oldScale
+  const mousePageMmY = (clientY - pageRect.top) / oldScale
+
+  // Flex centering kayması: sayfa genişliği değişince ortalama kayar
+  // X ekseni: justify-content: center → kayma = (eskiBoyut - yeniBoyut) / 2
+  const pageW = templateStore.template.page.width
+  const centerShiftX = pageW * (oldScale - newScale) / 2
+  // Y ekseni: align-items: flex-start → kayma yok
+  const centerShiftY = 0
+
+  // Yeni pan: mouse'un gösterdiği mm noktası aynı ekran pozisyonunda kalmalı
+  const newPanX = editorStore.panX + (mousePageMmX - pageW / 2) * (oldScale - newScale)
+  const newPanY = editorStore.panY + mousePageMmY * (oldScale - newScale)
+
+  editorStore.setZoom(newZoom)
+  editorStore.setPan(newPanX, newPanY)
 }
 
 function onKeyDown(e: KeyboardEvent) {
@@ -146,9 +210,9 @@ function onPointerUp(e: PointerEvent) {
       @pointerup="onPointerUp"
     >
       <!-- Sayfa -->
-      <div class="editor-canvas__page" :style="[pageStyle, panTransform ? { transform: panTransform } : {}]">
-        <TypstSvgLayer :svg="svg" />
-        <InteractionOverlay :scale="scale" :layout="layout" :page-width-pt="templateStore.template.page.width * 2.8346" />
+      <div ref="pageRef" class="editor-canvas__page" :style="[pageStyle, panTransform ? { transform: panTransform } : {}]">
+        <LayoutRenderer :layout="layout" :scale="scale" />
+        <InteractionOverlay :scale="scale" :layout-map="layoutMap" />
       </div>
     </div>
 
@@ -170,12 +234,14 @@ function onPointerUp(e: PointerEvent) {
   flex: 1;
   position: relative;
   min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .editor-canvas {
   width: 100%;
   height: 100%;
-  overflow: auto;
+  overflow: hidden;
   background: #e5e7eb;
   display: flex;
   align-items: flex-start;

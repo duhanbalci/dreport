@@ -1,99 +1,106 @@
 # CLAUDE.md — dreport
 
-## Proje Özeti
+## Proje Ozeti
 
-**dreport**, kullanıcıların fatura, irsaliye, rapor gibi belge şablonlarını görsel bir drag & drop editör ile tasarlayıp, JSON veri ile birleştirerek PDF çıktı almasını sağlayan bir belge tasarım aracıdır.
+**dreport**, kullanicilarin fatura, irsaliye, rapor gibi belge sablonlarini gorsel bir drag & drop editor ile tasarlayip, JSON veri ile birlestirerek PDF cikti almasini saglayan bir belge tasarim aracidir.
 
-Temel fark: Editördeki önizleme doğrudan Typst render çıktısıdır. Canvas üzerinde ayrı bir render engine çalışmaz — kullanıcı her zaman gerçek Typst çıktısını görür. Bu sayede "editörde gördüğüm ile PDF'te aldığım farklı" sorunu ortadan kalkar.
-
----
-
-## Teknoloji Kararları
-
-| Katman            | Teknoloji                            | Gerekçe                                                   |
-| ----------------- | ------------------------------------ | --------------------------------------------------------- |
-| Frontend          | Vue 3 (Composition API) + TypeScript | Kullanıcı tercihi                                         |
-| Editör Render     | Typst WASM → SVG                     | Editör çıktısı = PDF çıktısı tutarlılığı                  |
-| Typst WASM        | `@myriaddreamin/typst.ts`            | Tarayıcıda Typst derleme; SVG çıktı üretimi               |
-| Etkileşim Katmanı | SVG overlay (Vue bileşenleri)        | Typst SVG üzerine seçim, sürükleme, yeniden boyutlandırma |
-| Backend           | Rust + Axum                          | Typst crate'lerini doğrudan kullanabilme; performans      |
-| PDF Render        | `typst` Rust crate (server-side)     | Nihai PDF üretimi sunucuda; font tutarlılığı garantisi    |
-| Veri Formatı      | JSON (şablon tanımı + veri)          | Evrensel, kolay serialize/deserialize                     |
-| Paket Yönetimi    | bun (frontend), cargo (backend)      | —                                                         |
+Temel fark: Editorde ayri bir canvas render engine (fabric.js, konva.js vb.) KULLANILMAZ. Bunun yerine custom bir layout engine (taffy + cosmic-text) kullanilir. Ayni layout engine hem editorde onizleme (HTML div'ler) hem backend'de PDF uretimi (krilla) icin calisir. Bu sayede "editorde gordugum ile PDF'te aldigim farkli" sorunu ortadan kalkar.
 
 ---
 
-## Mimari Genel Bakış
+## Teknoloji Kararlari
+
+| Katman            | Teknoloji                            | Gerekce                                                        |
+| ----------------- | ------------------------------------ | -------------------------------------------------------------- |
+| Frontend          | Vue 3 (Composition API) + TypeScript | Kullanici tercihi                                              |
+| Layout Engine     | taffy (flexbox) + cosmic-text        | Template JSON → hesaplanmis pozisyonlar; hem WASM hem native   |
+| Editor Render     | HTML div'ler (LayoutRenderer.vue)    | Layout engine sonuclarina gore CSS ile render                  |
+| Etkilesim Katmani | DOM overlay (Vue bilesenleri)        | Layout sonuclari uzerine secim, surekleme, yeniden boyutlandirma |
+| Backend           | Rust + Axum                          | Layout engine'i dogrudan kullanabilme; performans              |
+| PDF Render        | krilla (server-side)                 | LayoutResult → PDF; font tutarliligi garantisi                 |
+| Veri Formati      | JSON (sablon tanimi + veri)          | Evrensel, kolay serialize/deserialize                          |
+| Paket Yonetimi    | bun (frontend), cargo (backend)      | —                                                              |
+
+---
+
+## Mimari Genel Bakis
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   VUE FRONTEND                       │
-│                                                     │
-│  ┌───────────────┐    ┌──────────────────────────┐  │
-│  │ Sol Panel      │    │ Editör Canvas             │  │
-│  │ - Bileşenler   │    │                          │  │
-│  │ - Schema Tree  │    │  ┌────────────────────┐  │  │
-│  │ - Özellikler   │    │  │ Typst WASM → SVG   │  │  │
-│  │                │    │  │ (gerçek render)     │  │  │
-│  │                │    │  └────────────────────┘  │  │
-│  │                │    │  ┌────────────────────┐  │  │
-│  │                │    │  │ SVG Overlay (Vue)   │  │  │
-│  │                │    │  │ seçim / drag / resize│  │  │
-│  │                │    │  └────────────────────┘  │  │
-│  └───────────────┘    └──────────────────────────┘  │
-│                                                     │
-│  Template JSON ←→ Typst Markup ←→ SVG Render        │
-└──────────────────────────┬──────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│                   VUE FRONTEND                        │
+│                                                      │
+│  ┌───────────────┐    ┌───────────────────────────┐  │
+│  │ Sol Panel      │    │ Editor Canvas              │  │
+│  │ - Bilesenler   │    │                           │  │
+│  │ - Schema Tree  │    │  ┌─────────────────────┐  │  │
+│  │ - Ozellikler   │    │  │ LayoutRenderer.vue  │  │  │
+│  │                │    │  │ (HTML div render)   │  │  │
+│  │                │    │  └─────────────────────┘  │  │
+│  │                │    │  ┌─────────────────────┐  │  │
+│  │                │    │  │ InteractionOverlay  │  │  │
+│  │                │    │  │ secim / drag / resize│  │  │
+│  │                │    │  └─────────────────────┘  │  │
+│  └───────────────┘    └───────────────────────────┘  │
+│                                                      │
+│  Template JSON → layout-engine WASM → LayoutResult   │
+│                → LayoutRenderer (HTML) + Overlay      │
+└──────────────────────────┬───────────────────────────┘
                            │ POST /api/render
                            ▼
-┌─────────────────────────────────────────────────────┐
-│                   RUST BACKEND (Axum)                │
-│                                                     │
-│  Template JSON + Data JSON → Typst Markup → PDF     │
-│  (typst crate ile doğrudan derleme)                 │
-└─────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│                   RUST BACKEND (Axum)                  │
+│                                                      │
+│  Template JSON + Data JSON                           │
+│    → compute_layout() (taffy + cosmic-text)          │
+│    → render_pdf() (krilla)                           │
+│    → PDF bytes                                       │
+└──────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Editör Render Stratejisi: Typst WASM Full Render
+## Render Pipeline
 
 ### Temel Prensip
 
-Editörde ayrı bir canvas render engine (fabric.js, konva.js vb.) KULLANILMAZ. Bunun yerine:
+Typst KULLANILMAZ. Bunun yerine custom layout engine:
 
-1. Kullanıcının tasarımı bir **Template JSON** olarak tutulur.
-2. Template JSON'dan **Typst markup** üretilir (frontend'de, saf fonksiyon).
-3. Typst markup, **typst.ts WASM** modülü ile tarayıcıda derlenir → **SVG** çıktı üretilir.
-4. SVG, editör alanında gösterilir.
-5. SVG üzerine **Vue bileşenleriyle bir interaction overlay** yerleştirilir (seçim kutuları, drag handle'lar, resize köşeleri).
-6. Kullanıcı bir elemanı sürüklediğinde → Template JSON güncellenir → Typst yeniden derlenir → SVG güncellenir.
+1. Kullanicinin tasarimi bir **Template JSON** olarak tutulur.
+2. Template JSON + Data JSON, **layout-engine** WASM modulu ile tarayicide islenir → **LayoutResult** uretilir.
+3. LayoutResult, her elemanin mutlak pozisyonunu (x, y, width, height mm cinsinden) icerir.
+4. **LayoutRenderer.vue** bu sonuclari HTML div'ler olarak render eder.
+5. **InteractionOverlay.vue** ayni pozisyon bilgisiyle secim, drag, resize handle'lar koyar.
+6. Kullanici bir elemani suruklediqinde → Template JSON guncellenir → layout-engine yeniden calisir → HTML guncellenir.
 
 ### Performans Stratejisi
 
-Typst incremental compilation destekler, ancak her fare hareketi için full render döngüsü ağır olabilir. Bu yüzden:
+- **Drag sirasinda:** Overlay katmaninda sadece CSS transform ile gorsel geri bildirim ver. Layout engine calistirma.
+- **Drag bittiginde (mouseup/pointerup):** Template JSON'i guncelle, layout engine calistir, HTML'i yenile.
+- **Debounce:** Ozellik panelinden yapilan degisikliklerde 150-300ms debounce ile hesapla.
+- **Web Worker:** Layout engine WASM'i bir Web Worker icinde calistir. Ana thread'i ASLA bloklamayacak.
 
-- **Drag sırasında:** Overlay katmanında sadece CSS transform ile görsel geri bildirim ver (hafif, anlık). Typst derleme YAPMA.
-- **Drag bittiğinde (mouseup/pointerup):** Template JSON'ı güncelle, Typst derle, SVG'yi yenile.
-- **Debounce:** Özellik panelinden yapılan değişikliklerde (font boyutu, renk vs.) 150-300ms debounce ile derle.
-- **Web Worker:** Typst WASM derlemeyi bir Web Worker içinde çalıştır. Ana thread'i ASLA bloklamayacak.
+### Layout Engine (layout-engine crate)
 
-### typst.ts Entegrasyonu
+```rust
+// Temel kullanim
+use dreport_layout::{compute_layout, LayoutResult};
 
-```typescript
-// Temel kullanım şeması
-import { $typst } from "@myriaddreamin/typst.ts/dist/esm/contrib/snippet.mjs";
-
-// Worker içinde:
-async function compile(typstMarkup: string): Promise<string> {
-  const svg = await $typst.svg({ mainContent: typstMarkup });
-  return svg;
-}
+let layout: LayoutResult = compute_layout(&template, &data, &fonts);
+// layout.pages[0].elements → her elemanin x, y, width, height (mm)
 ```
 
-- WASM modülleri: `typst-ts-web-compiler` (~7.6 MB) + `typst-ts-renderer` (~350 KB)
-- Fontlar: Projeye gömülü font seti gerekecek (~4.4 MB). Başlangıçta Noto Sans / Inter gibi bir set yeterli.
-- İlk yükleme ağır olabilir — lazy loading ve cache stratejisi gerekli (Service Worker ile WASM cache'leme).
+WASM tarafinda (frontend):
+```typescript
+// layout.worker.ts icinde
+import init, { computeLayout, loadFonts } from 'dreport-layout-wasm';
+
+await init();
+await loadFonts(fontBytes);
+const layoutJson = computeLayout(templateJson, dataJson);
+```
+
+- WASM modulu: ~1-2 MB (vs eski Typst 8MB)
+- Fontlar: Ayni Noto Sans seti (~4-5 MB), font olcum icin gerekli.
 
 ---
 
@@ -101,31 +108,31 @@ async function compile(typstMarkup: string): Promise<string> {
 
 ### Layout Sistemi: Container-Based
 
-Eski model (her eleman absolute `place()`) yerine, CSS Flexbox mantığına benzeyen container-based layout kullanılır:
+CSS Flexbox mantigina benzeyen container-based layout:
 
-- **Sayfa = kök container.** `page.margins` → kök container'ın `padding`'i olur.
-- **Container'lar iç içe geçebilir.** `direction: "row" | "column"` ile yatay/dikey dizilim.
-- **Elemanlar varsayılan olarak flow içindedir** — otomatik pozisyonlanır.
-- **Opsiyonel absolute positioning:** Kullanıcı isterse bir elemanı `position: "absolute"` yapabilir. Bu durumda eleman parent container içinde absolute konumlanır (`place()` ile).
+- **Sayfa = kok container.** `page.margins` → kok container'in `padding`'i olur.
+- **Container'lar ic ice gecebilir.** `direction: "row" | "column"` ile yatay/dikey dizilim.
+- **Elemanlar varsayilan olarak flow icindedir** — otomatik pozisyonlanir.
+- **Opsiyonel absolute positioning:** Kullanici isterse bir elemani `position: "absolute"` yapabilir.
 
 Bu sayede:
-- Tablo satırları artarsa alttaki elemanlar otomatik kayar.
-- Aynı satıra iki kolon koymak için iç içe container yeterlidir.
-- Absolute mod ile serbest pozisyonlama da mümkündür.
+- Tablo satirlari artarsa alttaki elemanlar otomatik kayar.
+- Ayni satira iki kolon koymak icin ic ice container yeterlidir.
+- Absolute mod ile serbest pozisyonlama da mumkundur.
 
 ### Boyut Sistemi (SizeValue)
 
-Her eleman ve container için `width` ve `height` şu tiplerden biri olabilir:
+Her eleman ve container icin `width` ve `height` su tiplerden biri olabilir:
 
-| Tip     | Açıklama                              | Typst karşılığı |
-| ------- | ------------------------------------- | --------------- |
-| `fixed` | Sabit boyut (mm)                      | `80mm`          |
-| `auto`  | İçeriğe göre otomatik                 | `auto`          |
-| `fr`    | Kalan alanı oransal doldur            | `1fr`, `2fr`    |
+| Tip     | Aciklama                              | Taffy karsiligi                |
+| ------- | ------------------------------------- | ------------------------------ |
+| `fixed` | Sabit boyut (mm)                      | `Dimension::Length(pt)`        |
+| `auto`  | Iceriqe gore otomatik                 | `Dimension::Auto`              |
+| `fr`    | Kalan alani oransal doldur            | `flex_grow: n, flex_basis: 0`  |
 
 Ek olarak `minWidth`, `maxWidth`, `minHeight`, `maxHeight` (mm) desteklenir.
 
-### Template JSON (Şablon Tanımı)
+### Template JSON (Sablon Tanimi)
 
 ```jsonc
 {
@@ -189,64 +196,64 @@ Ek olarak `minWidth`, `maxWidth`, `minHeight`, `maxHeight` (mm) desteklenir.
 
 ### Eleman Tipleri
 
-| Tip               | Açıklama                              | Binding          |
+| Tip               | Aciklama                              | Binding          |
 | ----------------- | ------------------------------------- | ---------------- |
-| `container`       | Düzen kutusu, çocuk elemanları barındırır | Yok          |
-| `static_text`     | Sabit metin, veri bağlantısı yok      | Yok              |
-| `text`            | Dinamik metin, schema'dan veri çeker  | Scalar           |
+| `container`       | Duzen kutusu, cocuk elemanlari barindirir | Yok          |
+| `static_text`     | Sabit metin, veri baglantisi yok      | Yok              |
+| `text`            | Dinamik metin, schema'dan veri ceker  | Scalar           |
 | `repeating_table` | Array verisinden tekrarlayan tablo    | Array            |
-| `line`            | Yatay/dikey çizgi                     | Yok              |
-| `image`           | Statik veya dinamik görsel            | Opsiyonel scalar |
-| `page_number`     | Sayfa numarası (çok sayfalı belgeler) | Otomatik         |
+| `line`            | Yatay/dikey cizgi                     | Yok              |
+| `image`           | Statik veya dinamik gorsel            | Opsiyonel scalar |
+| `page_number`     | Sayfa numarasi (cok sayfali belgeler) | Otomatik         |
 
-### Container Özellikleri
+### Container Ozellikleri
 
-| Özellik     | Tip                                      | Açıklama                          |
+| Ozellik     | Tip                                      | Aciklama                          |
 | ----------- | ---------------------------------------- | --------------------------------- |
-| `direction` | `"row"` \| `"column"`                   | Çocukları yatay mı dikey mi diz   |
-| `gap`       | number (mm)                              | Çocuklar arası boşluk             |
-| `padding`   | `{ top, right, bottom, left }` (mm)     | İç boşluk                         |
+| `direction` | `"row"` \| `"column"`                   | Cocuklari yatay mi dikey mi diz   |
+| `gap`       | number (mm)                              | Cocuklar arasi bosluk             |
+| `padding`   | `{ top, right, bottom, left }` (mm)     | Ic bosluk                         |
 | `align`     | `"start"` \| `"center"` \| `"end"` \| `"stretch"` | Cross-axis hizalama   |
-| `justify`   | `"start"` \| `"center"` \| `"end"` \| `"space-between"` | Main-axis dağılım |
-| `style`     | `{ backgroundColor, borderColor, borderWidth, borderRadius }` | Görsel stil |
+| `justify`   | `"start"` \| `"center"` \| `"end"` \| `"space-between"` | Main-axis dagilim |
+| `style`     | `{ backgroundColor, borderColor, borderWidth, borderRadius }` | Gorsel stil |
 
-### Positioning Modları
+### Positioning Modlari
 
-| Mod        | Açıklama                                    | Typst karşılığı         |
-| ---------- | ------------------------------------------- | ----------------------- |
-| `flow`     | Parent container'ın flow'una katıl (default)| `stack` / `box` içinde  |
-| `absolute` | Parent container içinde sabit konum         | `place(dx, dy)`         |
+| Mod        | Aciklama                                    | Taffy karsiligi                    |
+| ---------- | ------------------------------------------- | ---------------------------------- |
+| `flow`     | Parent container'in flow'una katil (default)| `Position::Relative`               |
+| `absolute` | Parent container icinde sabit konum         | `Position::Absolute, inset: top/left` |
 
-### Fatura Örneği — Container Ağacı
+### Fatura Ornegi — Container Agaci
 
 ```
-Sayfa (kök container, column, padding: 15mm)
+Sayfa (kok container, column, padding: 15mm)
 ├── Header (container, row, gap: 5mm)
-│   ├── Logo alanı (container, column, width: 60mm)
+│   ├── Logo alani (container, column, width: 60mm)
 │   │   ├── image (logo)
-│   │   └── text (firma ünvanı)
+│   │   └── text (firma unvani)
 │   └── Fatura bilgi (container, column, width: fill, align: end)
 │       ├── static_text ("FATURA")
 │       ├── text (fatura no)
 │       └── text (tarih)
-├── line (ayırıcı çizgi)
+├── line (ayirici cizgi)
 ├── repeating_table (kalemler)
 └── Footer (container, row)
-    ├── boş alan (width: fill)
+    ├── bos alan (width: fill)
     └── Toplamlar (container, column, width: 80mm)
         ├── text (ara toplam)
         ├── text (KDV)
         └── text (genel toplam)
 ```
 
-### Data JSON (Gerçek Veri)
+### Data JSON (Gercek Veri)
 
-Render zamanında şablonla birleştirilen veri:
+Render zamaninda sablonla birlestirilen veri:
 
 ```jsonc
 {
   "firma": {
-    "unvan": "Acme Teknoloji A.Ş.",
+    "unvan": "Acme Teknoloji A.S.",
     "vergiNo": "1234567890",
     "logo": "data:image/png;base64,...",
   },
@@ -257,7 +264,7 @@ Render zamanında şablonla birleştirilen veri:
   "kalemler": [
     {
       "siraNo": 1,
-      "adi": "Web Geliştirme Hizmeti",
+      "adi": "Web Gelistirme Hizmeti",
       "miktar": 1,
       "birim": "Adet",
       "birimFiyat": 15000,
@@ -265,7 +272,7 @@ Render zamanında şablonla birleştirilen veri:
     },
     {
       "siraNo": 2,
-      "adi": "SSL Sertifikası",
+      "adi": "SSL Sertifikasi",
       "miktar": 2,
       "birim": "Adet",
       "birimFiyat": 500,
@@ -280,9 +287,9 @@ Render zamanında şablonla birleştirilen veri:
 }
 ```
 
-### JSON Schema (Veri Yapısı Tanımı)
+### JSON Schema (Veri Yapisi Tanimi)
 
-Editörün sol panelinde kullanıcıya sunulan, bağlanabilir alanların ağaç yapısı. Kullanıcı bu ağaçtan sürükleyerek elemanları bağlar.
+Editorun sol panelinde kullaniciya sunulan, baglanabilir alanlarin agac yapisi. Kullanici bu agactan surukleyerek elemanlari baglar.
 
 ```jsonc
 {
@@ -292,7 +299,7 @@ Editörün sol panelinde kullanıcıya sunulan, bağlanabilir alanların ağaç 
     "firma": {
       "type": "object",
       "properties": {
-        "unvan": { "type": "string", "title": "Firma Ünvanı" },
+        "unvan": { "type": "string", "title": "Firma Unvani" },
         "vergiNo": { "type": "string", "title": "Vergi No" },
         "logo": { "type": "string", "title": "Logo", "format": "image" },
       },
@@ -310,8 +317,8 @@ Editörün sol panelinde kullanıcıya sunulan, bağlanabilir alanların ağaç 
       "items": {
         "type": "object",
         "properties": {
-          "siraNo": { "type": "integer", "title": "Sıra No" },
-          "adi": { "type": "string", "title": "Ürün / Hizmet Adı" },
+          "siraNo": { "type": "integer", "title": "Sira No" },
+          "adi": { "type": "string", "title": "Urun / Hizmet Adi" },
           "miktar": { "type": "number", "title": "Miktar" },
           "birim": { "type": "string", "title": "Birim" },
           "birimFiyat": {
@@ -345,180 +352,146 @@ Editörün sol panelinde kullanıcıya sunulan, bağlanabilir alanların ağaç 
 
 ---
 
-## Binding Mekanizması
+## Binding Mekanizmasi
 
 ### Scalar Binding
 
-Basit alan bağlama — bir eleman, JSON'daki tek bir değere bağlanır.
+Basit alan baglama — bir eleman, JSON'daki tek bir degere baglanir.
 
-- Editörde: Kullanıcı schema ağacından bir alanı sürükleyip text elemanına bırakır.
+- Editorde: Kullanici schema agacindan bir alani surukleyip text elemanina birakir.
 - Template JSON'da: `"binding": { "type": "scalar", "path": "firma.vergiNo" }`
-- Typst çıktısında: `#data.firma.vergiNo`
+- Layout engine'de: `data_resolve.rs` JSON path'i cozumler, text icerigini uretir.
 
 ### Array Binding (Tekrarlayan Tablo)
 
-Array verisi için özel tablo bileşeni. Kullanıcı:
+Array verisi icin ozel tablo bileseni. Kullanici:
 
-1. Araç çubuğundan "Tekrarlayan Tablo" bileşenini sürükler.
-2. `dataSource` olarak schema'daki bir array alanı seçer (ör: `kalemler`).
-3. Sütun tanımlarında array'in alt alanlarını seçer (ör: `kalemler[].adi`).
-4. Tablo stili (header rengi, zebra satırlar vs.) ayarlar.
+1. Arac kutusundan "Tekrarlayan Tablo" bilesenini surukler.
+2. `dataSource` olarak schema'daki bir array alani secer (or: `kalemler`).
+3. Sutun tanimlarinda array'in alt alanlarini secer (or: `kalemler[].adi`).
+4. Tablo stili (header rengi, zebra satirlar vs.) ayarlar.
 
-Typst çıktısında:
+Layout engine'de: `table_layout.rs` repeating_table'i satir/sutun container agacina acar, taffy ile layout hesaplar.
 
-```typst
-#let kalemler = data.kalemler
-#table(
-  columns: (8%, 40%, 12%, 10%, 15%, 15%),
-  align: (center, left, right, center, right, right),
-  fill: (_, row) => if row == 0 { rgb("#f0f0f0") } else if calc.odd(row) { rgb("#fafafa") } else { none },
-  [*\#*], [*Ürün / Hizmet*], [*Miktar*], [*Birim*], [*Birim Fiyat*], [*Tutar*],
-  ..kalemler.map(k => (
-    [#k.siraNo],
-    [#k.adi],
-    [#k.miktar],
-    [#k.birim],
-    [#format-currency(k.birimFiyat)],
-    [#format-currency(k.tutar)],
-  )).flatten()
-)
+### Format Fonksiyonlari
+
+Schema'daki `format` alanina gore formatlama yapilir:
+
+- `currency` → para birimi formatlama (binlik ayiraci, kurus, ₺ sembolu)
+- `date` → tarih formatlama (gun.ay.yil)
+- `percentage` → yuzde formatlama
+
+---
+
+## Layout Engine Detaylari
+
+### LayoutResult (engine ciktisi)
+
+```rust
+pub struct LayoutResult {
+    pub pages: Vec<PageLayout>,
+}
+
+pub struct PageLayout {
+    pub width_mm: f64,
+    pub height_mm: f64,
+    pub elements: Vec<ElementLayout>,
+}
+
+pub struct ElementLayout {
+    pub id: String,
+    pub x_mm: f64,           // Sayfa sol ustten mutlak pozisyon
+    pub y_mm: f64,
+    pub width_mm: f64,
+    pub height_mm: f64,
+    pub element_type: String,
+    pub content: Option<ResolvedContent>,
+    pub style: ResolvedStyle,
+}
 ```
 
-### Format Fonksiyonları
+### Taffy Mapping
 
-Schema'daki `format` alanına göre Typst helper fonksiyonları üretilir:
+| dreport                         | taffy                              |
+| ------------------------------- | ---------------------------------- |
+| `container(direction: row)`     | `FlexDirection::Row`               |
+| `container(direction: column)`  | `FlexDirection::Column`            |
+| `gap`                           | `gap: Size { width, height }`     |
+| `padding`                       | `padding: Rect { top, right, bottom, left }` |
+| `align: start/center/end/stretch` | `align_items`                   |
+| `justify: start/center/end/space-between` | `justify_content`       |
+| `SizeValue::Fixed(mm)`          | `Dimension::Length(pt)`            |
+| `SizeValue::Auto`               | `Dimension::Auto`                  |
+| `SizeValue::Fr(n)`              | `flex_grow: n, flex_basis: 0`      |
+| `PositionMode::Absolute`        | `Position::Absolute, inset: top/left` |
 
-- `currency` → para birimi formatlama (binlik ayracı, kuruş, ₺ sembolü)
-- `date` → tarih formatlama (gün.ay.yıl)
-- `percentage` → yüzde formatlama
+Text leaf node'lari → taffy `MeasureFunc` callback'i ile cosmic-text'ten olcum alir.
 
----
+### PDF Render (Backend)
 
-## Template JSON → Typst Markup Dönüşümü
+```rust
+// render.rs akisi
+let layout = dreport_layout::compute_layout(&template, &data, &fonts);
+let pdf_bytes = dreport_layout::pdf_render::render_pdf(&layout, &fonts)?;
+// → Response olarak dondurulur
+```
 
-Bu dönüşüm hem frontend'de (WASM önizleme için) hem backend'de (PDF üretimi için) çalışır. Aynı saf fonksiyon her iki tarafta da kullanılmalıdır:
-
-- **Frontend:** TypeScript'te yazılır (`core/template-to-typst.ts`).
-- **Backend:** Aynı mantık Rust'ta implemente edilir.
-
-Her iki implementasyon da birebir aynı Typst çıktısını üretmelidir. Tutarlılık testleri yazılmalıdır.
-
-### Dönüşüm Kuralları (Container-Based)
-
-1. **Sayfa ayarları** — kök container'ın padding'i = sayfa margin:
-
-   ```typst
-   #set page(width: 210mm, height: 297mm, margin: (top: 15mm, right: 15mm, bottom: 15mm, left: 15mm))
-   ```
-
-2. **Veri enjeksiyonu:**
-
-   ```typst
-   #let data = ( firma: ( unvan: "Acme A.Ş.", ... ), ... )
-   ```
-
-3. **Container (column) → `stack(dir: ttb)`:**
-
-   ```typst
-   #stack(dir: ttb, spacing: 5mm,
-     [#text(size: 18pt, weight: "bold")[dreport]],
-     [#text(size: 11pt, fill: rgb("#666666"))[Alt başlık]],
-   )
-   ```
-
-4. **Container (row) → `stack(dir: ltr)`:**
-
-   ```typst
-   #stack(dir: ltr, spacing: 5mm,
-     [#box(width: 1fr)[Sol kolon]],
-     [#box(width: 1fr)[Sağ kolon]],
-   )
-   ```
-
-5. **İç içe container → `box` + `stack`:**
-
-   ```typst
-   #box(width: 1fr, inset: (top: 5mm, bottom: 5mm))[
-     #stack(dir: ttb, spacing: 3mm,
-       [#text[Eleman 1]],
-       [#text[Eleman 2]],
-     )
-   ]
-   ```
-
-6. **Absolute eleman → `place()` (sadece absolute positioning seçilmişse):**
-
-   ```typst
-   #place(top + left, dx: 130mm, dy: 30mm)[
-     #text(size: 12pt, weight: "bold")[FATURA]
-   ]
-   ```
-
-7. **Çizgi → `line()`:**
-
-   ```typst
-   #line(length: 1fr, stroke: 0.5pt + rgb("#000000"))
-   ```
-
-8. **Önizleme vs. nihai render:**
-   - Önizleme: `data` mock veri ile doldurulur.
-   - Nihai render: `data` gerçek JSON verisi ile doldurulur.
+krilla kutuphanesi ile her ElementLayout'u PDF sayfasina cizer: text, line, rect, image, table.
 
 ---
 
-## SVG Overlay — Etkileşim Katmanı
+## Interaction Overlay
 
-Typst SVG'si read-only bir render çıktısıdır — tıklama veya sürükleme algılamaz. SVG'nin üstüne Vue bileşenleriyle bir etkileşim katmanı (overlay) koyulur.
+Layout engine pozisyon bilgisi uretiyor — bu pozisyonlar hem gorsel render (LayoutRenderer.vue) hem etkilesim katmani (InteractionOverlay.vue) tarafindan kullanilir.
 
-### Overlay Nasıl Çalışır (Container Layout)
+### Overlay Nasil Calisir
 
-1. Overlay, template JSON'un ağaç yapısını yansıtır (recursive `ElementHandle` bileşenleri).
-2. Kök overlay, sayfa padding'ini CSS padding olarak uygular.
-3. Flow elemanlar `position: relative` ile doğal akışta durur.
-4. Absolute elemanlar `position: absolute` ile parent container içinde konumlanır.
-5. Tıklama ile seçim → mavi kenarlık (container ise mor kenarlık) + resize handle'lar.
-6. Absolute elemanlar sürüklenebilir — drag sırasında CSS transform, bırakınca Typst re-render.
-7. Flow elemanlar sürüklenemez — sıra değişikliği drag-to-reorder ile yapılır (ilerideki fazda).
+1. LayoutResult'taki her eleman icin pozisyon ve boyut bilgisi (mm) alinir.
+2. mm → px donusumu yapilir: `px = mm * scale * zoomLevel`
+3. Her eleman icin CSS `position: absolute` + `left/top/width/height` ile handle yerlestirilir.
+4. Tikla ile secim → mavi kenarlik (container ise mor kenarlik) + resize handle'lar.
+5. Absolute elemanlar suruklenebilir — drag sirasinda CSS transform, birakinca layout engine re-compute.
+6. Flow elemanlar suruklenemez — sira degisikligi drag-to-reorder ile yapilir.
 
-### Overlay ↔ SVG Koordinat Eşleştirme
+### En Buyuk Kazanim
 
-- Overlay container'ı, sayfa CSS variable'ları ile margin'leri eşler.
-- Zoom yapıldığında hem SVG hem overlay aynı oranda scale edilir.
-- Koordinat dönüşümü: `px = mm * (containerWidthPx / pageWidthMm) * zoomLevel`
+Eski mimari: Typst SVG (opak) + Vue overlay (pozisyon sync'i sorunlu)
+Yeni mimari: Layout engine pozisyon verir → DOM div'ler hem gorsel hem etkilesim katmani. Ayri SVG/overlay senkronizasyonu sorunu yok.
 
 ---
 
-## Proje Yapısı (Monorepo)
+## Proje Yapisi (Monorepo)
 
 ```
 dreport/
 ├── CLAUDE.md
-├── README.md
+├── Cargo.toml                      # Workspace: core, backend, layout-engine
+├── justfile
 ├── frontend/                       # Vue 3 + TypeScript
 │   ├── package.json
 │   ├── vite.config.ts
 │   ├── tsconfig.json
 │   ├── public/
-│   │   └── fonts/                  # Typst WASM için gömülü fontlar
+│   │   └── fonts/                  # Layout engine WASM icin gomulu fontlar
 │   ├── src/
 │   │   ├── main.ts
 │   │   ├── App.vue
 │   │   ├── stores/                 # Pinia
 │   │   │   ├── template.ts         # Template JSON state
 │   │   │   ├── schema.ts           # JSON Schema state
-│   │   │   └── editor.ts           # Editör UI state (seçili eleman, zoom vs.)
+│   │   │   └── editor.ts           # Editor UI state (secili eleman, zoom vs.)
 │   │   ├── components/
 │   │   │   ├── editor/
-│   │   │   │   ├── EditorCanvas.vue        # Ana editör alanı (SVG + overlay container)
-│   │   │   │   ├── TypstSvgLayer.vue       # Typst SVG render katmanı
-│   │   │   │   ├── InteractionOverlay.vue  # Etkileşim katmanı (tüm handle'ların parent'ı)
-│   │   │   │   ├── ElementHandle.vue       # Tekil eleman seçim/drag/resize handle
-│   │   │   │   ├── SnapGuides.vue          # Hizalama çizgileri
+│   │   │   │   ├── EditorCanvas.vue        # Ana editor alani (LayoutRenderer + overlay)
+│   │   │   │   ├── LayoutRenderer.vue      # LayoutResult → HTML div render
+│   │   │   │   ├── InteractionOverlay.vue  # Etkilesim katmani (secim/drag/resize)
+│   │   │   │   ├── ElementHandle.vue       # Tekil eleman secim/drag/resize handle
+│   │   │   │   ├── SnapGuides.vue          # Hizalama cizgileri
 │   │   │   │   └── RulerBar.vue            # Cetvel
 │   │   │   ├── panels/
-│   │   │   │   ├── ToolboxPanel.vue        # Sol: bileşen araç kutusu
-│   │   │   │   ├── SchemaTreePanel.vue     # Sol: JSON schema ağacı (drag source)
-│   │   │   │   └── PropertiesPanel.vue     # Sağ: seçili elemanın özellikleri
+│   │   │   │   ├── ToolboxPanel.vue        # Sol: bilesen arac kutusu
+│   │   │   │   ├── SchemaTreePanel.vue     # Sol: JSON schema agaci (drag source)
+│   │   │   │   └── PropertiesPanel.vue     # Sag: secili elemanin ozellikleri
 │   │   │   ├── properties/
 │   │   │   │   ├── TextProperties.vue
 │   │   │   │   ├── TableProperties.vue
@@ -527,26 +500,45 @@ dreport/
 │   │   │   └── common/
 │   │   │       ├── ColorPicker.vue
 │   │   │       ├── FontSelector.vue
-│   │   │       └── UnitInput.vue           # mm/pt girişi
+│   │   │       └── UnitInput.vue           # mm/pt girisi
 │   │   ├── composables/
-│   │   │   ├── useTypstCompiler.ts         # Typst WASM yönetimi (Web Worker iletişimi)
-│   │   │   ├── useDragDrop.ts              # Sürükle-bırak mantığı
-│   │   │   ├── useElementSelection.ts      # Eleman seçimi
-│   │   │   ├── useSnapGuides.ts            # Mıknatıslı hizalama
+│   │   │   ├── useLayoutEngine.ts          # Layout engine WASM yonetimi (Web Worker iletisimi)
+│   │   │   ├── useDragDrop.ts              # Surukle-birak mantigi
+│   │   │   ├── useElementSelection.ts      # Eleman secimi
+│   │   │   ├── useSnapGuides.ts            # Miknatisli hizalama
 │   │   │   ├── useUndoRedo.ts              # Geri al / yinele
-│   │   │   └── useZoomPan.ts               # Zoom ve kaydırma
+│   │   │   └── useZoomPan.ts               # Zoom ve kaydirma
 │   │   ├── workers/
-│   │   │   └── typst.worker.ts             # Typst WASM Web Worker
+│   │   │   └── layout.worker.ts            # Layout engine WASM Web Worker
 │   │   ├── core/
-│   │   │   ├── template-to-typst.ts        # Template JSON → Typst markup dönüşümü
-│   │   │   ├── schema-parser.ts            # JSON Schema → ağaç yapısı (panel için)
-│   │   │   ├── mock-data-generator.ts      # Schema'dan örnek veri üretme
-│   │   │   └── types.ts                    # Ortak TypeScript tip tanımları
+│   │   │   ├── types.ts                    # Ortak TypeScript tip tanimlari
+│   │   │   ├── layout-types.ts             # LayoutResult TypeScript tipleri
+│   │   │   ├── schema-parser.ts            # JSON Schema → agac yapisi (panel icin)
+│   │   │   └── mock-data-generator.ts      # Schema'dan ornek veri uretme
 │   │   └── styles/
 │   │       └── editor.css
 │   └── tests/
-│       ├── template-to-typst.test.ts
 │       └── schema-parser.test.ts
+│
+├── core/                           # Ortak Rust modelleri
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs
+│       └── models.rs               # Template JSON serde modelleri (tum crate'ler kullanir)
+│
+├── layout-engine/                  # Custom layout engine (taffy + cosmic-text)
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lib.rs                  # Public API: compute_layout()
+│       ├── tree.rs                 # Template → taffy node tree
+│       ├── sizing.rs               # SizeValue → taffy Style mapping
+│       ├── text_measure.rs         # cosmic-text ile text olcum
+│       ├── table_layout.rs         # RepeatingTable → container agacina expand
+│       ├── data_resolve.rs         # Binding'leri cozumle (gercek text content uret)
+│       ├── page_break.rs           # Cok sayfali belgeler icin icerik bolme
+│       ├── pdf_render.rs           # LayoutResult → PDF (krilla, sadece native)
+│       ├── wasm_api.rs             # wasm_bindgen exports (loadFonts, computeLayout)
+│       └── font.rs                 # Font yukleme (WASM fetch vs native file read)
 │
 ├── backend/                        # Rust + Axum
 │   ├── Cargo.toml
@@ -554,27 +546,21 @@ dreport/
 │   │   ├── main.rs
 │   │   ├── routes/
 │   │   │   ├── mod.rs
-│   │   │   ├── render.rs           # POST /api/render → PDF
+│   │   │   ├── render.rs           # POST /api/render → PDF (layout-engine kullanir)
 │   │   │   └── health.rs           # GET /api/health
-│   │   ├── typst_engine/
-│   │   │   ├── mod.rs
-│   │   │   ├── compiler.rs         # typst crate wrapper (World impl)
-│   │   │   ├── template_to_typst.rs # Template JSON → Typst markup (Rust)
-│   │   │   └── fonts.rs            # Font yönetimi ve yükleme
 │   │   └── models/
 │   │       ├── mod.rs
 │   │       ├── template.rs         # Template JSON serde modelleri
 │   │       └── schema.rs           # JSON Schema modelleri
-│   ├── fonts/                      # Gömülü font dosyaları
+│   ├── fonts/                      # Gomulu font dosyalari
 │   │   ├── NotoSans-Regular.ttf
 │   │   ├── NotoSans-Bold.ttf
 │   │   ├── NotoSans-Italic.ttf
 │   │   └── NotoSansMono-Regular.ttf
 │   └── tests/
-│       ├── render_test.rs
-│       └── template_to_typst_test.rs
+│       └── render_test.rs
 │
-└── shared/                         # Ortak şema tanımları
+└── shared/                         # Ortak sema tanimlari
     └── schemas/
         ├── fatura.schema.json
         └── irsaliye.schema.json
@@ -584,11 +570,9 @@ dreport/
 
 ## API Endpoints
 
-İlk aşamada minimal API:
-
 ### `POST /api/render`
 
-Template JSON + Data JSON alır, PDF döner.
+Template JSON + Data JSON alir, PDF doner.
 
 **Request:**
 
@@ -601,168 +585,134 @@ Template JSON + Data JSON alır, PDF döner.
 
 **Response:** `Content-Type: application/pdf` — binary PDF
 
+**Akis:**
+1. Template + Data JSON parse edilir.
+2. `compute_layout(template, data, fonts)` → `LayoutResult`
+3. `render_pdf(layout_result, fonts)` → PDF bytes
+4. Response olarak dondurulur.
+
 ### `GET /api/health`
 
-Sunucu sağlık kontrolü.
+Sunucu saglik kontrolu.
 
 ---
 
-## Editör UI/UX Davranışları
+## Editor UI/UX Davranislari
 
 ### Eleman Ekleme
 
-- **Araç kutusundan sürükle-bırak:** Container, statik metin, çizgi, görsel, tekrarlayan tablo.
-- **Container'a bırakma:** Eleman hedef container'ın flow'una eklenir. Drop pozisyonuna göre sıra belirlenir.
-- **Schema ağacından sürükle-bırak:** Scalar alan container'a bırakılınca `text` elemanı oluşur, binding ayarlanır.
-- **Schema'dan array alanı sürükle-bırak:** `repeating_table` oluşur, sütunları ayarlama diyaloğu açılır.
+- **Arac kutusundan surukle-birak:** Container, statik metin, cizgi, gorsel, tekrarlayan tablo.
+- **Container'a birakma:** Eleman hedef container'in flow'una eklenir. Drop pozisyonuna gore sira belirlenir.
+- **Schema agacindan surukle-birak:** Scalar alan container'a birakilinca `text` elemani olusur, binding ayarlanir.
+- **Schema'dan array alani surukle-birak:** `repeating_table` olusur, sutunlari ayarlama diyalogu acilir.
 
-### Eleman Seçimi ve Manipülasyon
+### Eleman Secimi ve Manipulasyon
 
-- Tıklama ile seçim → mavi kenarlık (container ise mor kenarlık) + resize handle'lar.
-- **Flow elemanlar:** Sürüklenemez (pozisyon otomatik). Sıra değişikliği drag-to-reorder ile.
-- **Absolute elemanlar:** Drag ile taşınır. Sürükleme sırasında CSS transform, bırakınca Typst re-render.
-- **Container seçimi:** Tıklayınca sağ panelde direction, gap, align, padding ayarları.
-- **Positioning modu değişikliği:** Sağ panelde flow ↔ absolute geçişi.
+- Tiklama ile secim → mavi kenarlik (container ise mor kenarlik) + resize handle'lar.
+- **Flow elemanlar:** Suruklenemez (pozisyon otomatik). Sira degisikligi drag-to-reorder ile.
+- **Absolute elemanlar:** Drag ile tasinir. Surukleme sirasinda CSS transform, birakinca layout engine re-compute.
+- **Container secimi:** Tiklayinca sag panelde direction, gap, align, padding ayarlari.
+- **Positioning modu degisikligi:** Sag panelde flow ↔ absolute gecisi.
 - Delete/Backspace ile silme.
-- Shift+tıklama ile çoklu seçim.
+- Shift+tiklama ile coklu secim.
 
 ### Undo/Redo
 
-- Template JSON üzerinde immutable snapshot stack.
+- Template JSON uzerinde immutable snapshot stack.
 - Ctrl+Z / Ctrl+Shift+Z.
 
 ### Zoom ve Pan
 
 - Ctrl+scroll ile zoom.
-- Space+drag veya orta fare tuşu ile pan.
-- Zoom aralığı: %25 – %400.
+- Space+drag veya orta fare tusu ile pan.
+- Zoom araligi: %25 – %400.
 
 ---
 
-## Geliştirme Öncelikleri (Roadmap)
+## Gelistirme Oncelikleri (Roadmap)
 
-### Faz 1: Temel Altyapı ✓
+### Faz 1: Temel Altyapi ✓
 
 - [x] Proje iskeleti kurulumu (Vue + Vite + Pinia, Axum boilerplate)
-- [x] Typst WASM entegrasyonu — Web Worker'da Typst markup → SVG
-- [x] Template JSON → Typst markup dönüşümü (static_text, text, line)
-- [x] Container-based layout sistemi (tree yapı, flow + absolute positioning)
-- [x] EditorCanvas: Typst SVG + recursive overlay + seçim
-- [x] Absolute elemanlar için drag ile taşıma
-- [x] Resize handle'lar
-- [x] Backend iskeleti (Axum, health endpoint, render placeholder)
-- [x] Font dosyaları (Noto Sans ailesi)
+- [x] Container-based layout sistemi (tree yapi, flow + absolute positioning)
+- [x] Font dosyalari (Noto Sans ailesi)
 
-### Faz 2: Editör Temelleri
+### Faz 2: Custom Layout Engine ✓
 
-- [ ] `text` (dinamik binding'li) eleman tipi (Typst dönüşümü var, UI eksik)
-- [ ] Schema tree paneli — JSON schema'dan ağaç oluşturma
-- [ ] Schema'dan drag ile binding oluşturma
-- [ ] Properties paneli — seçili elemanın stillerini düzenleme (font, renk, boyut, hizalama)
-- [ ] Container properties paneli — direction, gap, padding, align ayarları
-- [ ] Mock data generator — schema'dan örnek veri üretip önizlemede kullanma
+- [x] layout-engine crate olusturma (taffy + cosmic-text)
+- [x] Template → taffy node tree donusumu (tree.rs)
+- [x] SizeValue mapping (sizing.rs)
+- [x] Text olcum (text_measure.rs, cosmic-text)
+- [x] Binding cozumleme (data_resolve.rs)
+- [x] Tablo expansion (table_layout.rs)
+- [x] WASM bindings (wasm_api.rs)
+- [x] Frontend entegrasyonu (layout.worker.ts, useLayoutEngine.ts, LayoutRenderer.vue)
+- [x] InteractionOverlay adaptasyonu
+- [x] Typst bagimliliklarinin kaldirilmasi (backend)
+
+### Faz 3: PDF Render ✓
+
+- [x] pdf_render.rs — krilla ile PDF uretimi
+- [x] Backend route guncelleme (POST /api/render)
+- [x] Page break desteqi (page_break.rs)
+
+### Faz 4: Editor Temelleri
+
+- [ ] Schema tree paneli — JSON schema'dan agac olusturma
+- [ ] Schema'dan drag ile binding olusturma
+- [ ] Properties paneli — secili elemanin stillerini duzenleme (font, renk, boyut, hizalama)
+- [ ] Container properties paneli — direction, gap, padding, align ayarlari
+- [ ] Mock data generator — schema'dan ornek veri uretip onizlemede kullanma
 - [ ] Undo/redo
 - [ ] Toolbox paneli — eleman/container ekleme
 
-### Faz 3: Tablo ve Array Binding
+### Faz 5: Tablo ve Array Binding
 
-- [ ] `repeating_table` bileşeni ve Typst markup üretimi
-- [ ] Sütun tanımlama UI'ı (alan seçimi, genişlik, hizalama)
-- [ ] Array field'larına binding
-- [ ] Tablo stili ayarları (header, zebra, border)
-- [ ] Format fonksiyonları (currency, date)
+- [ ] Sutun tanimlama UI'i (alan secimi, genislik, hizalama)
+- [ ] Array field'larina binding
+- [ ] Tablo stili ayarlari (header, zebra, border)
+- [ ] Format fonksiyonlari (currency, date)
 
-### Faz 4: PDF Render Backend
-
-- [ ] Axum server setup + `POST /api/render`
-- [ ] Rust'ta template-to-typst dönüşümü (TypeScript versiyonuyla tutarlı)
-- [ ] `typst` crate ile `World` trait implementasyonu
-- [ ] PDF derleme ve response olarak dönme
-- [ ] Font embed (frontend ile aynı font seti)
-- [ ] Frontend'den "PDF İndir" butonu
-
-### Faz 5: Polish
+### Faz 6: Polish
 
 - [ ] Snap guides ve hizalama
 - [ ] Zoom / pan
-- [ ] `line`, `rect` eleman tipleri
 - [ ] `image` eleman tipi (statik + dinamik)
-- [ ] Sayfa numarası
-- [ ] Çoklu sayfa desteği
-- [ ] Template kaydetme / yükleme (JSON dosyası export/import)
+- [ ] Sayfa numarasi
+- [ ] Template kaydetme / yukleme (JSON dosyasi export/import)
 
 ---
 
-## Önemli Teknik Notlar
+## Onemli Teknik Notlar
 
-### Typst WASM Font Stratejisi
+### Font Stratejisi
 
-Typst tarayıcıda çalışırken sistem fontlarına erişemez. Font dosyaları (`*.ttf` / `*.otf`) projeye dahil edilmeli ve WASM'a yüklenmelidir. Başlangıçta minimal bir set:
+Layout engine (hem WASM hem native) cosmic-text ile text olcum yapar — bu nedenle font dosyalarina ihtiyac duyar. Font dosyalari projeye dahil edilmeli ve hem WASM'a hem backend'e yuklenmelidir. Baslangicta minimal bir set:
 
 - Noto Sans (Regular, Bold, Italic, Bold Italic) — genel metin
-- Noto Sans Mono (Regular) — tablo sayıları, monospace ihtiyaçları
+- Noto Sans Mono (Regular) — tablo sayilari, monospace ihtiyaclari
 - Toplam ~4-5 MB
 
-**Kritik:** Backend'de (Rust) ve frontend'de (WASM) birebir aynı font dosyaları kullanılmalıdır. Farklı font = farklı metrik = render uyumsuzluğu.
+**Kritik:** Backend'de (native Rust) ve frontend'de (WASM) birebir ayni font dosyalari kullanilmalidir. Farkli font = farkli metrik = layout uyumsuzlugu.
 
 ### Koordinat Sistemi
 
-- Tüm pozisyonlar **milimetre (mm)** cinsindendir.
-- Template JSON'daki değerler mm, Typst'e `Xmm` olarak yazılır.
-- Editör canvas'ta mm → px dönüşümü: `px = mm * (containerWidthPx / pageWidthMm) * zoomLevel`
+- Tum pozisyonlar **milimetre (mm)** cinsindendir.
+- Template JSON'daki degerler mm, taffy'ye point'e cevrilerek verilir.
+- LayoutResult'taki degerler mm cinsindendir.
+- Editor canvas'ta mm → px donusumu: `px = mm * scale * zoomLevel`
 - Referans: A4 = 210mm × 297mm.
 
-### Typst Özel Karakter Escape
+### Hata Yonetimi
 
-Template JSON → Typst dönüşümünde kullanıcı verisindeki özel karakterler escape edilmelidir:
+- Layout engine hatasi olursa → editorde kirmizi banner ile hata mesaji goster.
+- Hesaplama basarisiz oldugunda son basarili LayoutResult'i koru, kullanicinin calsimasini bozma.
+- Web Worker crash olursa → yeniden baslat, state'i koru.
 
-- `#`, `$`, `@`, `*`, `_`, `<`, `>`, `\` Typst'te özel anlam taşır.
-- Kullanıcı verisi `[...]` content block'a sarılarak büyük ölçüde güvenli hale gelir.
-- İçerideki `[`, `]` karakterleri ise `\[`, `\]` olarak escape edilmelidir.
+### Eleman Sirasi (Z-Order)
 
-### Hata Yönetimi
-
-- Typst derleme hatası olursa → editörde kırmızı banner ile hata mesajı göster.
-- Derleme başarısız olduğunda son başarılı SVG'yi koru, kullanıcının çalışmasını bozma.
-- Web Worker crash olursa → yeniden başlat, state'i koru.
-
-### Eleman Sırası (Z-Order)
-
-- Template JSON'daki `elements` dizisinin sırası = çizim sırası (sonraki üstte).
-- Kullanıcı "Öne Getir" / "Arkaya Gönder" yapabilmeli → dizi sırası değişir.
-
----
-
-## Rust Backend — Typst World Implementasyonu
-
-Typst crate ile PDF üretmek için `World` trait'i implement etmek gerekir. Bu trait, Typst'e dosya sistemi, fontlar ve zaman bilgisi sağlar.
-
-```rust
-use typst::World;
-
-struct DreportWorld {
-    /// Ana .typ dosyasının içeriği (dinamik üretilen markup)
-    main_source: String,
-    /// Yüklenmiş font dosyaları
-    fonts: Vec<typst::text::Font>,
-    /// Data JSON (json dosyası olarak erişilebilir)
-    data_json: String,
-}
-
-impl World for DreportWorld {
-    // file(), font(), main(), source(), ... implementasyonları
-}
-```
-
-Derleme akışı:
-
-1. HTTP request gelir (template + data JSON).
-2. Template JSON → Typst markup string üretilir.
-3. Data JSON, sanal dosya sistemi üzerinden `data.json` olarak erişilebilir yapılır.
-4. `DreportWorld` oluşturulur.
-5. `typst::compile(&world)` → `Document` elde edilir.
-6. `typst_pdf::pdf(&document, ...)` → PDF bytes.
-7. Response olarak döndürülür.
+- Template JSON'daki `children` dizisinin sirasi = cizim sirasi (sonraki ustte).
+- Kullanici "One Getir" / "Arkaya Gonder" yapabilmeli → dizi sirasi degisir.
 
 ---
 
@@ -772,33 +722,33 @@ Derleme akışı:
 
 - Composition API + `<script setup>` kullan, Options API KULLANMA.
 - Pinia store'lar `defineStore` ile.
-- Tip güvenliği: `strict: true` tsconfig'de. `any` kullanma, gerekirse `unknown` + type guard.
+- Tip guvenligi: `strict: true` tsconfig'de. `any` kullanma, gerekirse `unknown` + type guard.
 - Composable isimlendirme: `useXxx` pattern.
-- Bileşen isimleri: PascalCase, en az iki kelime (ör: `EditorCanvas`, `SchemaTreePanel`).
+- Bilesen isimleri: PascalCase, en az iki kelime (or: `EditorCanvas`, `SchemaTreePanel`).
 - CSS: Scoped styles veya CSS modules. Global CSS minimum.
 
 ### Backend (Rust)
 
 - Axum handler'lar async.
 - Serde ile JSON serialize/deserialize (`#[derive(Serialize, Deserialize)]`).
-- Hata yönetimi: `thiserror` ile typed errors, handler'larda `anyhow` kabul edilebilir.
-- Typst crate dependency: `typst`, `typst-pdf`.
-- Clippy uyarıları temiz tutulacak.
+- Hata yonetimi: `thiserror` ile typed errors, handler'larda `anyhow` kabul edilebilir.
+- Layout engine dependency: `dreport-layout` crate.
+- Clippy uyarilari temiz tutulacak.
 
 ### Genel
 
-- Commit mesajları: conventional commits (`feat:`, `fix:`, `refactor:`, `docs:` vs.).
-- Türkçe yorum yazılabilir, kod ve değişken isimleri İngilizce.
-- Template JSON field isimleri İngilizce (ör: `position`, `size`, `binding`).
-- UI etiketleri ve kullanıcıya gösterilen metinler Türkçe.
+- Commit mesajlari: conventional commits (`feat:`, `fix:`, `refactor:`, `docs:` vs.).
+- Turkce yorum yazilabilir, kod ve degisken isimleri Ingilizce.
+- Template JSON field isimleri Ingilizce (or: `position`, `size`, `binding`).
+- UI etiketleri ve kullaniciya gosterilen metinler Turkce.
 
 ---
 
-## Kısıtlamalar ve Bilinçli Tercihler
+## Kisitlamalar ve Bilincli Tercihler
 
-1. **Veritabanı yok (ilk aşama).** Template'ler JSON dosyası olarak import/export edilir.
-2. **Kullanıcı auth yok.** Tek kullanıcılı yerel kullanım senaryosu.
-3. **Sadece PDF çıktı.** Typst'in SVG/PNG/HTML çıktıları ileride eklenebilir.
-4. **Tekrarlayan bölge (repeating region) yok — sadece tekrarlayan tablo.** Array binding yalnızca tablo bileşeni ile yapılır. Serbest form repeating region ilerideki fazlarda değerlendirilir.
-5. **WYSIWYG garantisi Typst üzerinden.** Editörde kendi render engine'imiz yok — Typst ne üretiyorsa kullanıcı onu görür.
-6. **Canvas kütüphanesi (fabric.js / konva.js) kullanılmıyor.** Etkileşim katmanı saf Vue bileşenleri + pointer event'ler ile yapılır. Render zaten Typst SVG'sidir.
+1. **Veritabani yok (ilk asama).** Template'ler JSON dosyasi olarak import/export edilir.
+2. **Kullanici auth yok.** Tek kullanicili yerel kullanim senaryosu.
+3. **Sadece PDF cikti.** Ileride PNG/SVG eklenebilir.
+4. **Tekrarlayan bolge (repeating region) yok — sadece tekrarlayan tablo.** Array binding yalnizca tablo bileseni ile yapilir. Serbest form repeating region ilerideki fazlarda degerlendirilir.
+5. **WYSIWYG garantisi layout engine uzerinden.** Ayni layout engine (taffy + cosmic-text) hem editorde hem PDF'te kullanilir. Editor HTML div render, PDF krilla render — ama pozisyonlar ayni engine'den gelir.
+6. **Canvas kutuphanesi (fabric.js / konva.js) kullanilmiyor.** Etkilesim katmani saf Vue bilesenleri + pointer event'ler ile yapilir. Render LayoutRenderer.vue ile HTML div'lerdir.

@@ -109,6 +109,7 @@ export type BarcodeFormat = 'qr' | 'ean13' | 'ean8' | 'code128' | 'code39'
 
 export interface BarcodeStyle {
   color?: string // ön plan rengi (varsayılan: siyah)
+  includeText?: boolean // barkod altına değer yazılsın mı (QR hariç)
 }
 
 // --- Element tipleri ---
