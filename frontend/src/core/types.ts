@@ -62,6 +62,7 @@ export interface ContainerStyle {
   borderColor?: string
   borderWidth?: number // pt
   borderRadius?: number // pt
+  borderStyle?: 'solid' | 'dashed' | 'dotted'
 }
 
 // --- Binding ---
@@ -71,7 +72,44 @@ export interface ScalarBinding {
   path: string // ör: "firma.unvan"
 }
 
-export type ElementBinding = ScalarBinding
+export interface ArrayBinding {
+  type: 'array'
+  path: string // ör: "kalemler"
+}
+
+export type ElementBinding = ScalarBinding | ArrayBinding
+
+// --- Tablo ---
+
+export type FormatType = 'currency' | 'date' | 'percentage' | 'number'
+
+export interface TableColumn {
+  id: string
+  field: string // array item içindeki alan — ör: "adi", "tutar"
+  title: string // Sütun başlığı
+  width: SizeValue
+  align: 'left' | 'center' | 'right'
+  format?: FormatType
+}
+
+export interface TableStyle {
+  headerBg?: string // hex — header arka plan rengi
+  headerColor?: string // hex — header metin rengi
+  zebraOdd?: string // hex — tek satır arka plan
+  zebraEven?: string // hex — çift satır arka plan
+  borderColor?: string // hex
+  borderWidth?: number // pt
+  fontSize?: number // pt
+  headerFontSize?: number // pt
+}
+
+// --- Barcode ---
+
+export type BarcodeFormat = 'qr' | 'ean13' | 'ean8' | 'code128' | 'code39'
+
+export interface BarcodeStyle {
+  color?: string // ön plan rengi (varsayılan: siyah)
+}
 
 // --- Element tipleri ---
 
@@ -99,6 +137,31 @@ export interface LineElement extends BaseElement {
   style: LineStyle
 }
 
+export interface ImageStyle {
+  objectFit?: 'contain' | 'cover' | 'stretch'
+}
+
+export interface ImageElement extends BaseElement {
+  type: 'image'
+  src?: string // statik görsel: data URI veya URL
+  binding?: ScalarBinding // dinamik görsel: schema'dan path
+  style: ImageStyle
+}
+
+export interface PageNumberElement extends BaseElement {
+  type: 'page_number'
+  style: TextStyle
+  format?: string // ör: "{current} / {total}"
+}
+
+export interface BarcodeElement extends BaseElement {
+  type: 'barcode'
+  format: BarcodeFormat
+  value?: string // statik değer
+  binding?: ScalarBinding // dinamik değer (schema'dan)
+  style: BarcodeStyle
+}
+
 export interface ContainerElement extends BaseElement {
   type: 'container'
   direction: 'row' | 'column'
@@ -110,7 +173,14 @@ export interface ContainerElement extends BaseElement {
   children: TemplateElement[]
 }
 
-export type LeafElement = StaticTextElement | TextElement | LineElement
+export interface RepeatingTableElement extends BaseElement {
+  type: 'repeating_table'
+  dataSource: ArrayBinding
+  columns: TableColumn[]
+  style: TableStyle
+}
+
+export type LeafElement = StaticTextElement | TextElement | LineElement | RepeatingTableElement | ImageElement | PageNumberElement | BarcodeElement
 export type TemplateElement = LeafElement | ContainerElement
 
 // --- Template ---

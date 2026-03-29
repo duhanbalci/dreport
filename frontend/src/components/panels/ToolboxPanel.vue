@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { useEditorStore } from '../../stores/editor'
-import type { TemplateElement } from '../../core/types'
+import { useSchemaStore } from '../../stores/schema'
+import type { TemplateElement, RepeatingTableElement, TableColumn, ImageElement, PageNumberElement, BarcodeElement } from '../../core/types'
 import { sz } from '../../core/types'
+import { schemaFormatToFormatType, defaultAlignForSchema } from '../../core/schema-parser'
 
 const editorStore = useEditorStore()
+const schemaStore = useSchemaStore()
 
 let idCounter = Date.now()
 function nextId(prefix: string) {
@@ -55,6 +58,81 @@ const tools: ToolItem[] = [
       position: { type: 'flow' },
       size: { width: sz.fr(1), height: sz.auto() },
       style: { strokeColor: '#000000', strokeWidth: 0.5 },
+    }),
+  },
+  {
+    label: 'Tablo',
+    icon: '▤',
+    create: (): RepeatingTableElement => {
+      // Schema'daki ilk array alanını bul ve sütunları otomatik doldur
+      const arrays = schemaStore.arrayFields
+      const firstArray = arrays[0]
+      let dataPath = ''
+      let columns: TableColumn[] = []
+
+      if (firstArray) {
+        dataPath = firstArray.path
+        const itemFields = schemaStore.getArrayItemFields(firstArray.path)
+        columns = itemFields.map(field => ({
+          id: nextId('col'),
+          field: field.key,
+          title: field.title,
+          width: sz.auto(),
+          align: defaultAlignForSchema(field),
+          format: schemaFormatToFormatType(field.format),
+        }))
+      }
+
+      return {
+        id: nextId('tbl'),
+        type: 'repeating_table',
+        position: { type: 'flow' },
+        size: { width: sz.fr(1), height: sz.auto() },
+        dataSource: { type: 'array', path: dataPath },
+        columns,
+        style: {
+          headerBg: '#f0f0f0',
+          headerColor: '#000000',
+          fontSize: 10,
+          headerFontSize: 10,
+        },
+      }
+    },
+  },
+  {
+    label: 'Gorsel',
+    icon: '🖼',
+    create: (): ImageElement => ({
+      id: nextId('img'),
+      type: 'image',
+      position: { type: 'flow' },
+      size: { width: sz.fixed(40), height: sz.fixed(30) },
+      style: { objectFit: 'contain' },
+    }),
+  },
+  {
+    label: 'Sayfa No',
+    icon: '#',
+    create: (): PageNumberElement => ({
+      id: nextId('pgn'),
+      type: 'page_number',
+      position: { type: 'flow' },
+      size: { width: sz.auto(), height: sz.auto() },
+      style: { fontSize: 10, color: '#666666', align: 'center' },
+      format: '{current} / {total}',
+    }),
+  },
+  {
+    label: 'Barkod',
+    icon: '⣿',
+    create: (): BarcodeElement => ({
+      id: nextId('bc'),
+      type: 'barcode',
+      position: { type: 'flow' },
+      size: { width: sz.fixed(30), height: sz.auto() },
+      format: 'qr',
+      value: 'https://example.com',
+      style: {},
     }),
   },
 ]

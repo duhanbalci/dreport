@@ -9,13 +9,13 @@ import InteractionOverlay from './InteractionOverlay.vue'
 
 const templateStore = useTemplateStore()
 const editorStore = useEditorStore()
-const { typstMarkup } = storeToRefs(templateStore)
+const { template, mockData } = storeToRefs(templateStore)
 
 const containerRef = ref<HTMLElement | null>(null)
 const containerWidth = ref(800)
 
-// Typst compiler
-const { svg, error, compiling, layout, dispose } = useTypstCompiler(typstMarkup)
+// Typst compiler — template + data'yı worker'a gönderir, WASM ile derlenir
+const { svg, error, compiling, layout, dispose } = useTypstCompiler(template, mockData)
 
 // mm → px dönüşüm katsayısı
 const scale = computed(() => {
@@ -37,6 +37,24 @@ const pageStyle = computed(() => {
   }
 })
 
+// Pan transform — sayfa container'ına uygulanacak
+const panTransform = computed(() => {
+  if (editorStore.panX === 0 && editorStore.panY === 0) return undefined
+  return `translate(${editorStore.panX}px, ${editorStore.panY}px)`
+})
+
+// Pan: Space+drag veya orta fare tuşu
+const isPanning = ref(false)
+const panStart = ref({ x: 0, y: 0 })
+const spaceHeld = ref(false)
+
+// Pan cursor style
+const canvasCursor = computed(() => {
+  if (isPanning.value) return 'grabbing'
+  if (spaceHeld.value) return 'grab'
+  return 'default'
+})
+
 // Container boyutunu izle
 let resizeObserver: ResizeObserver | null = null
 
@@ -48,11 +66,15 @@ onMounted(() => {
     })
     resizeObserver.observe(containerRef.value)
   }
+  window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('keyup', onKeyUp)
 })
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   dispose()
+  window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('keyup', onKeyUp)
 })
 
 // Zoom
@@ -63,27 +85,68 @@ function onWheel(e: WheelEvent) {
     editorStore.setZoom(editorStore.zoom + delta)
   }
 }
+
+function onKeyDown(e: KeyboardEvent) {
+  if (e.code === 'Space' && !e.repeat && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement)) {
+    e.preventDefault()
+    spaceHeld.value = true
+  }
+}
+
+function onKeyUp(e: KeyboardEvent) {
+  if (e.code === 'Space') {
+    spaceHeld.value = false
+  }
+}
+
+function onPointerDown(e: PointerEvent) {
+  if (e.button === 1 || (e.button === 0 && spaceHeld.value)) {
+    e.preventDefault()
+    isPanning.value = true
+    panStart.value = { x: e.clientX - editorStore.panX, y: e.clientY - editorStore.panY }
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  }
+}
+
+function onPointerMove(e: PointerEvent) {
+  if (!isPanning.value) return
+  editorStore.setPan(e.clientX - panStart.value.x, e.clientY - panStart.value.y)
+}
+
+function onPointerUp(e: PointerEvent) {
+  if (isPanning.value) {
+    isPanning.value = false
+    ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
+  }
+}
 </script>
 
 <template>
-  <div class="editor-canvas" ref="containerRef" @wheel="onWheel">
-    <!-- Hata banner -->
+  <div class="editor-canvas-wrapper">
+    <!-- Scroll alanı -->
+    <div
+      class="editor-canvas"
+      ref="containerRef"
+      :style="{ cursor: canvasCursor }"
+      @wheel="onWheel"
+      @pointerdown="onPointerDown"
+      @pointermove="onPointerMove"
+      @pointerup="onPointerUp"
+    >
+      <!-- Sayfa -->
+      <div class="editor-canvas__page" :style="[pageStyle, panTransform ? { transform: panTransform } : {}]">
+        <TypstSvgLayer :svg="svg" />
+        <InteractionOverlay :scale="scale" :layout="layout" :page-width-pt="templateStore.template.page.width * 2.8346" />
+      </div>
+    </div>
+
+    <!-- Sabit overlay'ler — scroll dışında -->
     <div v-if="error" class="editor-canvas__error">
       {{ error }}
     </div>
-
-    <!-- Derleme göstergesi -->
     <div v-if="compiling" class="editor-canvas__compiling">
       Derleniyor...
     </div>
-
-    <!-- Sayfa -->
-    <div class="editor-canvas__page" :style="pageStyle">
-      <TypstSvgLayer :svg="svg" />
-      <InteractionOverlay :scale="scale" :layout="layout" :page-width-pt="templateStore.template.page.width * 2.8346" />
-    </div>
-
-    <!-- Zoom göstergesi -->
     <div class="editor-canvas__zoom">
       %{{ editorStore.zoomPercent }}
     </div>
@@ -91,16 +154,21 @@ function onWheel(e: WheelEvent) {
 </template>
 
 <style scoped>
-.editor-canvas {
+.editor-canvas-wrapper {
   flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.editor-canvas {
+  width: 100%;
+  height: 100%;
   overflow: auto;
   background: #e5e7eb;
   display: flex;
   align-items: flex-start;
   justify-content: center;
   padding: 40px;
-  position: relative;
-  min-height: 0;
 }
 
 .editor-canvas__page {

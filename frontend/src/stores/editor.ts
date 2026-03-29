@@ -27,6 +27,16 @@ export const useEditorStore = defineStore('editor', () => {
     zoom.value = Math.max(0.25, Math.min(4, value))
   }
 
+  function setPan(x: number, y: number) {
+    panX.value = x
+    panY.value = y
+  }
+
+  function resetPan() {
+    panX.value = 0
+    panY.value = 0
+  }
+
   function setDragging(value: boolean) {
     isDragging.value = value
   }
@@ -57,6 +67,8 @@ export const useEditorStore = defineStore('editor', () => {
     selectElement,
     clearSelection,
     setZoom,
+    setPan,
+    resetPan,
     setDragging,
     startDragNewElement,
     setDropTargetContainer,

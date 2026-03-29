@@ -115,19 +115,22 @@ function findDeepestContainer(mouseX: number, mouseY: number, excludeId?: string
 }
 
 /** Container içinde drop index hesapla */
-function computeDropIndex(container: ContainerElement, mouseY: number, excludeId?: string) {
+function computeDropIndex(container: ContainerElement, mouseX: number, mouseY: number, excludeId?: string) {
   const s = ptToPx.value
   const flowChildren = container.children.filter(c => c.position.type !== 'absolute' && c.id !== excludeId)
+  const isRow = container.direction === 'row'
 
   let visualIdx = flowChildren.length
 
   for (let i = 0; i < flowChildren.length; i++) {
     const l = props.layout[flowChildren[i].id]
     if (!l) continue
-    const centerY = l.y * s + (l.height * s) / 2
-    if (mouseY < centerY) {
-      visualIdx = i
-      break
+    if (isRow) {
+      const centerX = l.x * s + (l.width * s) / 2
+      if (mouseX < centerX) { visualIdx = i; break }
+    } else {
+      const centerY = l.y * s + (l.height * s) / 2
+      if (mouseY < centerY) { visualIdx = i; break }
     }
   }
 
@@ -161,7 +164,7 @@ function updateDropFromMouse(mouseX: number, mouseY: number, excludeId?: string)
   const container = findDeepestContainer(mouseX, mouseY, excludeId)
   dropTargetContainerId.value = container.id
 
-  const { visualIdx, logicalIdx } = computeDropIndex(container, mouseY, excludeId)
+  const { visualIdx, logicalIdx } = computeDropIndex(container, mouseX, mouseY, excludeId)
   dropVisualIndex.value = visualIdx
   dropLogicalIndex.value = logicalIdx
 }
@@ -183,24 +186,67 @@ const dropIndicatorStyle = computed(() => {
 
   const s = ptToPx.value
   const idx = dropVisualIndex.value
+  const isRow = container.direction === 'row'
 
   // Sürüklenen elemanı çıkar
   const dragId = dragElementId.value
   const flowChildren = container.children.filter(c => c.position.type !== 'absolute' && c.id !== dragId)
 
-  // Gap'in ortasına yerleştir: üstteki elemanın alt kenarı ile alttaki elemanın üst kenarı arası
+  const cl = props.layout[container.id]
+  if (!cl) return { display: 'none' }
+
+  if (isRow) {
+    // Row container: dikey gösterge çizgisi
+    let x = 0
+    if (idx === 0 && flowChildren.length > 0) {
+      const l = props.layout[flowChildren[0].id]
+      if (l) x = (cl.x * s + l.x * s) / 2
+      else x = cl.x * s
+    } else if (idx < flowChildren.length && idx > 0) {
+      const left = props.layout[flowChildren[idx - 1].id]
+      const right = props.layout[flowChildren[idx].id]
+      if (left && right) {
+        const leftEnd = (left.x + left.width) * s
+        const rightStart = right.x * s
+        x = (leftEnd + rightStart) / 2
+      }
+    } else if (idx === 0 && flowChildren.length === 0) {
+      x = cl.x * s + 8
+    } else if (flowChildren.length > 0) {
+      const last = flowChildren[flowChildren.length - 1]
+      const l = props.layout[last.id]
+      if (l) {
+        const gapPx = container.gap * props.scale
+        x = (l.x + l.width) * s + gapPx / 2
+      }
+    }
+
+    const top = cl.y * s
+    const height = cl.height * s
+
+    return {
+      position: 'absolute' as const,
+      left: `${x}px`,
+      top: `${top}px`,
+      width: '2px',
+      height: `${height}px`,
+      background: 'rgb(59, 130, 246)',
+      borderRadius: '1px',
+      zIndex: 1000,
+      pointerEvents: 'none' as const,
+    }
+  }
+
+  // Column container: yatay gösterge çizgisi
   let y = 0
   if (idx === 0 && flowChildren.length > 0) {
-    // İlk pozisyon: ilk elemanın üst kenarı ile container üst kenarı arası
     const l = props.layout[flowChildren[0].id]
-    const cl = props.layout[container.id]
-    if (l && cl) {
-      y = (cl.y * s + l.y * s) / 2  // container top ile eleman top arası
-    } else if (l) {
-      y = l.y * s - 4
+    if (l) {
+      y = (cl.y * s + l.y * s) / 2
+    } else {
+      y = cl.y * s - 4
     }
   } else if (idx < flowChildren.length && idx > 0) {
-    // Ortada: üstteki elemanın altı ile alttaki elemanın üstü arası
     const above = props.layout[flowChildren[idx - 1].id]
     const below = props.layout[flowChildren[idx].id]
     if (above && below) {
@@ -209,11 +255,8 @@ const dropIndicatorStyle = computed(() => {
       y = (aboveBottom + belowTop) / 2
     }
   } else if (idx === 0 && flowChildren.length === 0) {
-    // Boş container
-    const cl = props.layout[container.id]
-    if (cl) y = cl.y * s + 8
+    y = cl.y * s + 8
   } else if (flowChildren.length > 0) {
-    // Son pozisyon: son elemanın altından gap kadar aşağıda
     const last = flowChildren[flowChildren.length - 1]
     const l = props.layout[last.id]
     if (l) {
@@ -222,9 +265,8 @@ const dropIndicatorStyle = computed(() => {
     }
   }
 
-  const cl = props.layout[container.id]
-  const x = cl ? cl.x * s : 0
-  const width = cl ? cl.width * s : 100
+  const x = cl.x * s
+  const width = cl.width * s
 
   return {
     position: 'absolute' as const,
@@ -392,6 +434,7 @@ const resizeHandle = ref('')
 const resizeStart = ref({ mouseX: 0, mouseY: 0, x: 0, y: 0, width: 0, height: 0 })
 const resizeGhost = ref({ x: 0, y: 0, width: 0, height: 0 })
 const resizeFinalMm = ref({ width: 0, height: 0 })
+const resizeAspectRatio = ref(0) // > 0 ise aspect ratio korunur (width / height)
 
 function onResizeStart(e: PointerEvent, elId: string, handle: string) {
   e.stopPropagation()
@@ -406,6 +449,10 @@ function onResizeStart(e: PointerEvent, elId: string, handle: string) {
 
   const s = ptToPx.value
   const ptToMm = 1 / 2.8346
+
+  // Barkod elemanları için aspect ratio'yu kaydet
+  const el = flatElements.value.find(e => e.id === elId)
+  resizeAspectRatio.value = (el?.type === 'barcode' && l.height > 0) ? l.width / l.height : 0
 
   resizeStart.value = {
     mouseX: e.clientX, mouseY: e.clientY,
@@ -426,6 +473,7 @@ function onResizeMove(e: PointerEvent) {
   const dy = e.clientY - resizeStart.value.mouseY
   const handle = resizeHandle.value
   const pxToMm = 1 / props.scale
+  const ar = resizeAspectRatio.value
 
   let gx = resizeStart.value.x, gy = resizeStart.value.y
   let gw = resizeStart.value.width, gh = resizeStart.value.height
@@ -434,6 +482,11 @@ function onResizeMove(e: PointerEvent) {
   if (handle.includes('w')) { gw = Math.max(20, resizeStart.value.width - dx); gx = resizeStart.value.x + dx }
   if (handle.includes('s')) gh = Math.max(10, resizeStart.value.height + dy)
   if (handle.includes('n')) { gh = Math.max(10, resizeStart.value.height - dy); gy = resizeStart.value.y + dy }
+
+  // Aspect ratio koruma (barkod)
+  if (ar > 0) {
+    gh = gw / ar
+  }
 
   resizeGhost.value = { x: gx, y: gy, width: gw, height: gh }
 
@@ -444,6 +497,10 @@ function onResizeMove(e: PointerEvent) {
   if (handle.includes('w')) wMm = Math.max(5, startWMm - dx * pxToMm)
   if (handle.includes('s')) hMm = Math.max(3, startHMm + dy * pxToMm)
   if (handle.includes('n')) hMm = Math.max(3, startHMm - dy * pxToMm)
+
+  if (ar > 0) {
+    hMm = wMm / ar
+  }
 
   resizeFinalMm.value = { width: Math.round(wMm * 10) / 10, height: Math.round(hMm * 10) / 10 }
 }
@@ -485,7 +542,7 @@ function onToolboxDragLeave() {
   clearDropTarget()
 }
 
-function onToolboxDrop(e: DragEvent) {
+function onToolboxDrop(_e: DragEvent) {
   const newEl = editorStore.draggedNewElement
   if (!newEl) return
 
@@ -532,10 +589,17 @@ const isAnyDragActive = computed(() =>
 
       <!-- Resize handles -->
       <template v-if="editorStore.selectedElementId === el.id && !isResizing">
-        <div class="resize-handle resize-handle--se" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'se')" />
-        <div class="resize-handle resize-handle--sw" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'sw')" />
-        <div class="resize-handle resize-handle--ne" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'ne')" />
-        <div class="resize-handle resize-handle--nw" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'nw')" />
+        <template v-if="el.type === 'barcode'">
+          <!-- Barkod: sadece yatay resize (aspect ratio korunur) -->
+          <div class="resize-handle resize-handle--e" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'e')" />
+          <div class="resize-handle resize-handle--w" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'w')" />
+        </template>
+        <template v-else>
+          <div class="resize-handle resize-handle--se" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'se')" />
+          <div class="resize-handle resize-handle--sw" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'sw')" />
+          <div class="resize-handle resize-handle--ne" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'ne')" />
+          <div class="resize-handle resize-handle--nw" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'nw')" />
+        </template>
       </template>
     </div>
 
@@ -627,6 +691,8 @@ const isAnyDragActive = computed(() =>
 .resize-handle--sw { left: -3px; bottom: -3px; cursor: sw-resize; }
 .resize-handle--ne { right: -3px; top: -3px; cursor: ne-resize; }
 .resize-handle--nw { left: -3px; top: -3px; cursor: nw-resize; }
+.resize-handle--e { right: -3px; top: calc(50% - 3px); cursor: e-resize; }
+.resize-handle--w { left: -3px; top: calc(50% - 3px); cursor: w-resize; }
 
 /* Drag ghost */
 .drag-ghost {

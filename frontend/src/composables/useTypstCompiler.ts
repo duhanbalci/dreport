@@ -1,7 +1,11 @@
 import { ref, watch, type Ref } from 'vue'
 import type { ElementLayout } from '../core/template-to-typst'
+import type { Template } from '../core/types'
 
-export function useTypstCompiler(markup: Ref<string>) {
+export function useTypstCompiler(
+  template: Ref<Template>,
+  data: Ref<Record<string, unknown>>,
+) {
   const svg = ref<string | null>(null)
   const error = ref<string | null>(null)
   const compiling = ref(false)
@@ -45,22 +49,28 @@ export function useTypstCompiler(markup: Ref<string>) {
     }
   }
 
-  function compile(typstMarkup: string) {
+  function compile() {
     if (!worker) initWorker()
     requestId++
     compiling.value = true
-    worker!.postMessage({ type: 'compile', markup: typstMarkup, id: requestId })
+    worker!.postMessage({
+      type: 'compile',
+      templateJson: JSON.stringify(template.value),
+      dataJson: JSON.stringify(data.value),
+      id: requestId,
+    })
   }
 
+  // template veya data değiştiğinde yeniden derle
   watch(
-    markup,
-    (newMarkup) => {
+    [template, data],
+    () => {
       if (debounceTimer) clearTimeout(debounceTimer)
       debounceTimer = setTimeout(() => {
-        compile(newMarkup)
+        compile()
       }, 200)
     },
-    { immediate: true }
+    { immediate: true, deep: true }
   )
 
   function dispose() {
@@ -74,7 +84,7 @@ export function useTypstCompiler(markup: Ref<string>) {
     error,
     compiling,
     layout,
-    compile: () => compile(markup.value),
+    compile,
     dispose,
   }
 }

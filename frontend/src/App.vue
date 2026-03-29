@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import EditorCanvas from './components/editor/EditorCanvas.vue'
 import ToolboxPanel from './components/panels/ToolboxPanel.vue'
 import PropertiesPanel from './components/panels/PropertiesPanel.vue'
@@ -8,6 +8,70 @@ import { useEditorStore } from './stores/editor'
 
 const templateStore = useTemplateStore()
 const editorStore = useEditorStore()
+
+const pdfLoading = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+function exportTemplate() {
+  const json = templateStore.exportTemplate()
+  const blob = new Blob([json], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${templateStore.template.name || 'sablon'}.json`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+function triggerImport() {
+  fileInputRef.value?.click()
+}
+
+function onImportFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = () => {
+    try {
+      templateStore.importTemplate(reader.result as string)
+    } catch {
+      alert('Gecersiz sablon dosyasi')
+    }
+  }
+  reader.readAsText(file)
+  input.value = ''
+}
+
+async function downloadPdf() {
+  pdfLoading.value = true
+  try {
+    const res = await fetch('http://localhost:3001/api/render', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        template: templateStore.template,
+        data: templateStore.mockData,
+      }),
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      alert('PDF olusturulamadi: ' + text)
+      return
+    }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${templateStore.template.name || 'belge'}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    alert('Backend baglantisi kurulamadi. Sunucu calisiyor mu?')
+  } finally {
+    pdfLoading.value = false
+  }
+}
 
 function onKeyDown(e: KeyboardEvent) {
   // Delete / Backspace — seçili elemanı sil
@@ -51,6 +115,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown))
     <header class="app-header">
       <h1>dreport</h1>
       <span class="app-header__subtitle">Belge Tasarim Araci</span>
+      <div style="flex: 1"></div>
+      <input ref="fileInputRef" type="file" accept=".json" style="display: none" @change="onImportFile" />
+      <button class="header-btn header-btn--secondary" @click="triggerImport">Yukle</button>
+      <button class="header-btn header-btn--secondary" @click="exportTemplate">Kaydet</button>
+      <button class="header-btn" :disabled="pdfLoading" @click="downloadPdf">
+        {{ pdfLoading ? 'Hazirlaniyor...' : 'PDF Indir' }}
+      </button>
     </header>
     <main class="app-main">
       <aside class="app-sidebar app-sidebar--left">
@@ -92,6 +163,38 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeyDown))
 .app-header__subtitle {
   font-size: 13px;
   color: #94a3b8;
+}
+
+.header-btn {
+  padding: 6px 16px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.header-btn:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.header-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.header-btn--secondary {
+  background: transparent;
+  border: 1px solid #475569;
+  color: #cbd5e1;
+}
+
+.header-btn--secondary:hover {
+  background: #334155;
+  color: white;
 }
 
 .app-main {

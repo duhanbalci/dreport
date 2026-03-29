@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Template, TemplateElement, ContainerElement, SizeConstraint, PositionMode } from '../core/types'
 import { findElementById, findParent, isContainer, sz } from '../core/types'
-import { templateToTypst } from '../core/template-to-typst'
+import { generateMockData } from '../core/mock-data-generator'
 import { useUndoRedo } from '../composables/useUndoRedo'
 
 function createDefaultTemplate(): Template {
@@ -47,7 +47,7 @@ function createDefaultTemplate(): Template {
 export const useTemplateStore = defineStore('template', () => {
   const template = ref<Template>(createDefaultTemplate())
 
-  const typstMarkup = computed(() => templateToTypst(template.value))
+  const mockData = computed(() => generateMockData(template.value))
 
   // Undo / Redo
   const { undo, redo, canUndo, canRedo } = useUndoRedo(template)
@@ -117,9 +117,25 @@ export const useTemplateStore = defineStore('template', () => {
     parent.children.splice(toIndex, 0, moved)
   }
 
+  /** Şablonu JSON olarak dışa aktar */
+  function exportTemplate(): string {
+    return JSON.stringify(template.value, null, 2)
+  }
+
+  /** JSON'dan şablon yükle */
+  function importTemplate(json: string) {
+    const parsed = JSON.parse(json) as Template
+    template.value = parsed
+  }
+
+  /** Yeni boş şablon oluştur */
+  function resetTemplate() {
+    template.value = createDefaultTemplate()
+  }
+
   return {
     template,
-    typstMarkup,
+    mockData,
     getElementById,
     getParent,
     addChild,
@@ -129,6 +145,9 @@ export const useTemplateStore = defineStore('template', () => {
     updateElementSize,
     updateElement,
     reorderChild,
+    exportTemplate,
+    importTemplate,
+    resetTemplate,
     undo,
     redo,
     canUndo,

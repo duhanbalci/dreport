@@ -1,9 +1,11 @@
 /// Typst WASM Web Worker
-/// Ana thread'i bloklamadan Typst markup → SVG derleme yapar.
+/// Template JSON + Data JSON → (dreport-core WASM ile) Typst markup → (typst.ts WASM ile) SVG
 
 import { $typst, TypstSnippet } from '@myriaddreamin/typst.ts/dist/esm/contrib/snippet.mjs'
+import initCore, { templateToTypstEditor } from '../core/wasm/dreport_core.js'
 
-let initialized = false
+let typstInitialized = false
+let coreInitialized = false
 
 const FONT_FILES = [
   '/fonts/NotoSans-Regular.ttf',
@@ -14,14 +16,19 @@ const FONT_FILES = [
 ]
 
 async function ensureInit() {
-  if (initialized) return
+  if (!coreInitialized) {
+    console.log('[typst-worker] dreport-core WASM başlatılıyor...')
+    await initCore({ module_or_path: '/wasm/dreport_core_bg.wasm' })
+    coreInitialized = true
+    console.log('[typst-worker] dreport-core WASM hazır')
+  }
 
-  console.log('[typst-worker] Başlatılıyor...')
+  if (!typstInitialized) {
+    console.log('[typst-worker] Typst WASM başlatılıyor...')
 
-  try {
-    // Fontları URL olarak preload et (init öncesinde)
     const fontUrls = FONT_FILES.map(f => new URL(f, self.location.origin).href)
     $typst.use(TypstSnippet.preloadFonts(fontUrls))
+    $typst.use(TypstSnippet.fetchPackageRegistry())
 
     await $typst.setCompilerInitOptions({
       getModule: () =>
@@ -38,21 +45,47 @@ async function ensureInit() {
         }),
     })
 
-    initialized = true
-    console.log('[typst-worker] Başlatma tamamlandı')
-  } catch (initErr) {
-    console.error('[typst-worker] Başlatma hatası:', initErr)
-    throw initErr
+    typstInitialized = true
+    console.log('[typst-worker] Typst WASM hazır')
   }
 }
 
-self.onmessage = async (e: MessageEvent<{ type: string; markup: string; id: number }>) => {
-  const { type, markup, id } = e.data
+interface CompileMessage {
+  type: 'compile'
+  templateJson: string
+  dataJson: string
+  id: number
+}
+
+// Geriye uyumluluk için eski markup tabanlı mesaj desteği
+interface LegacyCompileMessage {
+  type: 'compile'
+  markup: string
+  id: number
+}
+
+type WorkerMessage = CompileMessage | LegacyCompileMessage
+
+self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
+  const { type, id } = e.data
 
   if (type === 'compile') {
     console.log(`[typst-worker] Derleme başladı (id: ${id})`)
     try {
       await ensureInit()
+
+      let markup: string
+
+      if ('templateJson' in e.data) {
+        // Yeni yol: Template JSON → Typst markup (dreport-core WASM)
+        markup = templateToTypstEditor(e.data.templateJson, e.data.dataJson)
+        console.log('[typst-worker] Generated Typst markup:\n', markup)
+      } else {
+        // Eski yol: doğrudan markup (geriye uyumluluk)
+        markup = (e.data as LegacyCompileMessage).markup
+      }
+
+      // Typst markup → SVG
       const svg = await $typst.svg({ mainContent: markup })
 
       // SVG'den layout bilgisini parse et
