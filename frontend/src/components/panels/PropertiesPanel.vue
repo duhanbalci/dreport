@@ -4,6 +4,7 @@ import { useTemplateStore } from '../../stores/template'
 import { useEditorStore } from '../../stores/editor'
 import { useSchemaStore } from '../../stores/schema'
 import { isContainer, sz } from '../../core/types'
+import PaddingBox from '../properties/PaddingBox.vue'
 import { schemaFormatToFormatType, defaultAlignForSchema } from '../../core/schema-parser'
 import type {
   TemplateElement,
@@ -580,32 +581,13 @@ function deleteElement() {
 
         <!-- Padding -->
         <div class="prop-section__subtitle">Padding (mm)</div>
-        <div class="prop-row-grid">
-          <div class="prop-row">
-            <label class="prop-label">Üst</label>
-            <input class="prop-input" type="number" step="1" min="0"
-              :value="(selectedElement as ContainerElement).padding.top"
-              @input="(e) => update({ padding: { ...(selectedElement as ContainerElement).padding, top: parseFloat((e.target as HTMLInputElement).value) || 0 } } as any)" />
-          </div>
-          <div class="prop-row">
-            <label class="prop-label">Sag</label>
-            <input class="prop-input" type="number" step="1" min="0"
-              :value="(selectedElement as ContainerElement).padding.right"
-              @input="(e) => update({ padding: { ...(selectedElement as ContainerElement).padding, right: parseFloat((e.target as HTMLInputElement).value) || 0 } } as any)" />
-          </div>
-          <div class="prop-row">
-            <label class="prop-label">Alt</label>
-            <input class="prop-input" type="number" step="1" min="0"
-              :value="(selectedElement as ContainerElement).padding.bottom"
-              @input="(e) => update({ padding: { ...(selectedElement as ContainerElement).padding, bottom: parseFloat((e.target as HTMLInputElement).value) || 0 } } as any)" />
-          </div>
-          <div class="prop-row">
-            <label class="prop-label">Sol</label>
-            <input class="prop-input" type="number" step="1" min="0"
-              :value="(selectedElement as ContainerElement).padding.left"
-              @input="(e) => update({ padding: { ...(selectedElement as ContainerElement).padding, left: parseFloat((e.target as HTMLInputElement).value) || 0 } } as any)" />
-          </div>
-        </div>
+        <PaddingBox
+          :top="(selectedElement as ContainerElement).padding.top"
+          :right="(selectedElement as ContainerElement).padding.right"
+          :bottom="(selectedElement as ContainerElement).padding.bottom"
+          :left="(selectedElement as ContainerElement).padding.left"
+          @update="(side, value) => update({ padding: { ...(selectedElement as ContainerElement).padding, [side]: value } } as any)"
+        />
 
         <!-- Container Style -->
         <div class="prop-section__subtitle">Stil</div>

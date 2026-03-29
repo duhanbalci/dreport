@@ -5,6 +5,7 @@ import { useEditorStore } from '../../stores/editor'
 import type { ElementLayout } from '../../core/layout-types'
 import type { TemplateElement, SizeValue, ContainerElement } from '../../core/types'
 import { isContainer, sz } from '../../core/types'
+import ElementToolbar from './ElementToolbar.vue'
 
 const props = defineProps<{
   scale: number
@@ -627,6 +628,13 @@ const isAnyDragActive = computed(() =>
 
     <!-- Drop indicator (ortak — hem eleman hem toolbox sürükleme) -->
     <div v-if="isAnyDragActive" :style="dropIndicatorStyle" />
+
+    <!-- Element toolbar — seçili elemanın üstünde -->
+    <ElementToolbar
+      v-if="!isDragging && !isResizing"
+      :scale="scale"
+      :layout-map="layoutMap"
+    />
   </div>
 </template>
 
