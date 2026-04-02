@@ -70,6 +70,16 @@ function updateStyle(key: string, value: unknown) {
       @update="(side, value) => update({ padding: { ...element.padding, [side]: value } } as any)"
     />
 
+    <div class="prop-row">
+      <label class="prop-label">Sayfa Bolme</label>
+      <select class="prop-input prop-select"
+        :value="element.breakInside ?? 'auto'"
+        @change="(e) => update({ breakInside: (e.target as HTMLSelectElement).value } as any)">
+        <option value="auto">Izin Ver</option>
+        <option value="avoid">Bolme</option>
+      </select>
+    </div>
+
     <div class="prop-section__subtitle">Stil</div>
     <div class="prop-row">
       <label class="prop-label">Arka plan</label>

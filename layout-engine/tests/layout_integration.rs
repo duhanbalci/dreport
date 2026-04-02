@@ -49,6 +49,8 @@ fn simple_template() -> Template {
             height: 297.0,
         },
         fonts: vec!["Noto Sans".to_string()],
+        header: None,
+        footer: None,
         root: ContainerElement {
             id: "root".to_string(),
             position: PositionMode::Flow,
@@ -64,6 +66,7 @@ fn simple_template() -> Template {
             align: "stretch".to_string(),
             justify: "start".to_string(),
             style: ContainerStyle::default(),
+            break_inside: "auto".to_string(),
             children: vec![TemplateElement::StaticText(StaticTextElement {
                 id: "title".to_string(),
                 position: PositionMode::Flow,
@@ -188,6 +191,8 @@ fn test_compute_layout_with_data_binding() {
             height: 297.0,
         },
         fonts: vec!["Noto Sans".to_string()],
+        header: None,
+        footer: None,
         root: ContainerElement {
             id: "root".to_string(),
             position: PositionMode::Flow,
@@ -203,6 +208,7 @@ fn test_compute_layout_with_data_binding() {
             align: "stretch".to_string(),
             justify: "start".to_string(),
             style: ContainerStyle::default(),
+            break_inside: "auto".to_string(),
             children: vec![TemplateElement::Text(TextElement {
                 id: "bound_text".to_string(),
                 position: PositionMode::Flow,
@@ -254,6 +260,8 @@ fn test_compute_layout_multiple_children_ordering() {
             height: 297.0,
         },
         fonts: vec!["Noto Sans".to_string()],
+        header: None,
+        footer: None,
         root: ContainerElement {
             id: "root".to_string(),
             position: PositionMode::Flow,
@@ -269,6 +277,7 @@ fn test_compute_layout_multiple_children_ordering() {
             align: "stretch".to_string(),
             justify: "start".to_string(),
             style: ContainerStyle::default(),
+            break_inside: "auto".to_string(),
             children: vec![
                 TemplateElement::StaticText(StaticTextElement {
                     id: "first".to_string(),

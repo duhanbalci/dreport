@@ -3,6 +3,8 @@ pub mod text_measure;
 pub mod data_resolve;
 pub mod table_layout;
 pub mod tree;
+pub mod page_break;
+pub mod expr_eval;
 
 #[cfg(target_arch = "wasm32")]
 pub mod wasm_api;
@@ -56,12 +58,28 @@ pub enum ResolvedContent {
     Barcode { format: String, value: String },
     #[serde(rename = "page_number")]
     PageNumber { current: usize, total: usize },
+    #[serde(rename = "shape")]
+    Shape { shape_type: String },
+    #[serde(rename = "checkbox")]
+    Checkbox { checked: bool },
+    #[serde(rename = "rich_text")]
+    RichText { spans: Vec<ResolvedRichSpan> },
     #[serde(rename = "table")]
     Table {
         headers: Vec<TableHeaderCell>,
         rows: Vec<Vec<TableCell>>,
         column_widths_mm: Vec<f64>,
     },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResolvedRichSpan {
+    pub text: String,
+    pub font_size: Option<f64>,
+    pub font_weight: Option<String>,
+    pub font_family: Option<String>,
+    pub color: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

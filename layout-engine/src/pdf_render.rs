@@ -208,6 +208,12 @@ fn render_element(
         render_container_bg(surface, x, y, w, h, &el.style);
     }
 
+    // Shape background/border (same visual as container bg but as leaf)
+    if el.element_type == "shape" {
+        render_shape(surface, x, y, w, h, &el.style, &el.content);
+        return;
+    }
+
     let Some(ref content) = el.content else {
         return;
     };
@@ -230,10 +236,158 @@ fn render_element(
             // Tablolar expand edilerek container + text olarak render edilir.
             // Bu branch'e normalde düşmemeli.
         }
+        ResolvedContent::Shape { .. } => {
+            // Shape zaten yukarıda render_shape() ile çizildi, buraya düşmemeli
+        }
+        ResolvedContent::Checkbox { checked } => {
+            render_checkbox(surface, x, y, w, h, *checked, &el.style);
+        }
         ResolvedContent::Barcode { format, value } => {
             render_barcode(surface, x, y, w, h, format, value, &el.style, font_data);
         }
+        ResolvedContent::RichText { spans } => {
+            render_rich_text(surface, x, y, w, h, spans, &el.style, fonts, measurer);
+        }
     }
+}
+
+fn render_shape(
+    surface: &mut krilla::surface::Surface<'_>,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    style: &ResolvedStyle,
+    content: &Option<ResolvedContent>,
+) {
+    let has_bg = style.background_color.is_some();
+    let has_border = style.border_color.is_some() && style.border_width.unwrap_or(0.0) > 0.0;
+
+    if !has_bg && !has_border {
+        return;
+    }
+
+    if let Some(ref bg) = style.background_color {
+        surface.set_fill(Some(fill_from_color(parse_color(bg))));
+    } else {
+        surface.set_fill(None);
+    }
+
+    if has_border {
+        let border_color = parse_color(style.border_color.as_deref().unwrap_or("#000000"));
+        let border_width = mm(style.border_width.unwrap_or(0.5));
+        surface.set_stroke(Some(Stroke {
+            paint: border_color.into(),
+            width: border_width,
+            opacity: NormalizedF32::ONE,
+            ..Default::default()
+        }));
+    } else {
+        surface.set_stroke(None);
+    }
+
+    let shape_type = match content {
+        Some(ResolvedContent::Shape { shape_type }) => shape_type.as_str(),
+        _ => "rectangle",
+    };
+
+    let path = match shape_type {
+        "ellipse" => {
+            let mut pb = PathBuilder::new();
+            let cx = x + w / 2.0;
+            let cy = y + h / 2.0;
+            let rx = w / 2.0;
+            let ry = h / 2.0;
+            // Approximate ellipse with 4 cubic bezier curves
+            let kx = rx * 0.5522848;
+            let ky = ry * 0.5522848;
+            pb.move_to(cx, cy - ry);
+            pb.cubic_to(cx + kx, cy - ry, cx + rx, cy - ky, cx + rx, cy);
+            pb.cubic_to(cx + rx, cy + ky, cx + kx, cy + ry, cx, cy + ry);
+            pb.cubic_to(cx - kx, cy + ry, cx - rx, cy + ky, cx - rx, cy);
+            pb.cubic_to(cx - rx, cy - ky, cx - kx, cy - ry, cx, cy - ry);
+            pb.close();
+            pb.finish()
+        }
+        _ => {
+            // rectangle / rounded_rectangle
+            let mut pb = PathBuilder::new();
+            if let Some(rect) = krilla::geom::Rect::from_xywh(x, y, w, h) {
+                pb.push_rect(rect);
+            }
+            pb.finish()
+        }
+    };
+
+    if let Some(p) = path {
+        surface.draw_path(&p);
+    }
+
+    surface.set_fill(None);
+    surface.set_stroke(None);
+}
+
+fn render_checkbox(
+    surface: &mut krilla::surface::Surface<'_>,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    checked: bool,
+    style: &ResolvedStyle,
+) {
+    let border_color = parse_color(style.border_color.as_deref().unwrap_or("#333333"));
+    let border_width = mm(style.border_width.unwrap_or(0.3));
+
+    // Draw box outline
+    surface.set_fill(None);
+    surface.set_stroke(Some(Stroke {
+        paint: border_color.into(),
+        width: border_width,
+        opacity: NormalizedF32::ONE,
+        ..Default::default()
+    }));
+
+    let rect_path = {
+        let mut pb = PathBuilder::new();
+        if let Some(rect) = krilla::geom::Rect::from_xywh(x, y, w, h) {
+            pb.push_rect(rect);
+        }
+        pb.finish()
+    };
+    if let Some(p) = rect_path {
+        surface.draw_path(&p);
+    }
+
+    // Draw checkmark if checked
+    if checked {
+        let check_color = parse_color(style.color.as_deref().unwrap_or("#000000"));
+        let stroke_w = w.min(h) * 0.12;
+        surface.set_fill(None);
+        surface.set_stroke(Some(Stroke {
+            paint: check_color.into(),
+            width: stroke_w,
+            opacity: NormalizedF32::ONE,
+            ..Default::default()
+        }));
+
+        // Checkmark: two lines forming a "✓"
+        let check_path = {
+            let mut pb = PathBuilder::new();
+            let mx = w * 0.2;
+            let my = h * 0.5;
+            pb.move_to(x + mx, y + my);
+            pb.line_to(x + w * 0.4, y + h * 0.75);
+            pb.line_to(x + w * 0.8, y + h * 0.25);
+            pb.finish()
+        };
+        if let Some(p) = check_path {
+            surface.draw_path(&p);
+        }
+    }
+
+    surface.set_fill(None);
+    surface.set_stroke(None);
 }
 
 fn render_container_bg(
@@ -352,6 +506,92 @@ fn render_text(
         false,
         TextDirection::Auto,
     );
+}
+
+fn render_rich_text(
+    surface: &mut krilla::surface::Surface<'_>,
+    x: f32,
+    y: f32,
+    w: f32,
+    _h: f32,
+    spans: &[crate::ResolvedRichSpan],
+    style: &ResolvedStyle,
+    fonts: &FontCollection,
+    measurer: &mut TextMeasurer,
+) {
+    if spans.is_empty() {
+        return;
+    }
+
+    // Varsayılan stil
+    let default_font_size = style.font_size.unwrap_or(11.0) as f32;
+    let default_color = style.color.as_deref().unwrap_or("#000000");
+    let default_weight = style.font_weight.as_deref();
+    let default_family = style.font_family.as_deref();
+
+    // Hizalama için toplam genişliği hesapla
+    let total_width = {
+        let mut tw = 0.0f32;
+        for span in spans {
+            let fs = span.font_size.map(|f| f as f32).unwrap_or(default_font_size);
+            let fw = span.font_weight.as_deref().or(default_weight);
+            let ff = span.font_family.as_deref().or(default_family);
+            let (sw, _) = measurer.measure(&span.text, ff, fs, fw, None);
+            tw += sw;
+        }
+        tw
+    };
+
+    let line_start_x = match style.text_align.as_deref() {
+        Some("center") => x + (w - total_width) / 2.0,
+        Some("right") => x + w - total_width,
+        _ => x,
+    };
+
+    // Max font size for baseline
+    let max_font_size = spans
+        .iter()
+        .map(|s| s.font_size.map(|f| f as f32).unwrap_or(default_font_size))
+        .fold(0.0f32, f32::max);
+    let baseline_y = y + max_font_size * 0.8;
+
+    let mut cursor_x = line_start_x;
+
+    for span in spans {
+        if span.text.is_empty() {
+            continue;
+        }
+
+        let font_size = span.font_size.map(|f| f as f32).unwrap_or(default_font_size);
+        let color_str = span.color.as_deref().unwrap_or(default_color);
+        let weight = span.font_weight.as_deref().or(default_weight);
+        let family = span.font_family.as_deref().or(default_family);
+
+        let color = parse_color(color_str);
+
+        let Some(font) = fonts.get(family, weight) else {
+            continue;
+        };
+
+        surface.set_fill(Some(fill_from_color(color)));
+        surface.set_stroke(None);
+
+        // Span'ın baseline'ı — farklı font boyutları için ayarla
+        let span_baseline = baseline_y + (max_font_size - font_size) * 0.2;
+
+        surface.draw_text(
+            Point::from_xy(cursor_x, span_baseline),
+            font.clone(),
+            font_size,
+            &span.text,
+            false,
+            TextDirection::Auto,
+        );
+
+        // Sonraki span'ın x pozisyonunu hesapla
+        let (span_width, _) = measurer.measure(&span.text, family, font_size, weight, None);
+        cursor_x += span_width;
+    }
 }
 
 fn render_line(
@@ -595,6 +835,8 @@ mod tests {
             name: "Test".to_string(),
             page: PageSettings { width: 210.0, height: 297.0 },
             fonts: vec!["Noto Sans".to_string()],
+            header: None,
+            footer: None,
             root: ContainerElement {
                 id: "root".to_string(),
                 position: PositionMode::Flow,
@@ -609,6 +851,7 @@ mod tests {
                 align: "stretch".to_string(),
                 justify: "start".to_string(),
                 style: ContainerStyle::default(),
+                break_inside: "auto".to_string(),
                 children: vec![
                     TemplateElement::StaticText(StaticTextElement {
                         id: "title".to_string(),

@@ -4,6 +4,15 @@ use std::hash::Hash;
 use crate::FontData;
 use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, Weight};
 
+/// Rich text span — ölçüm için gerekli bilgiler
+#[derive(Clone)]
+pub struct RichSpanMeasure {
+    pub text: String,
+    pub font_family: Option<String>,
+    pub font_size_pt: f32,
+    pub font_weight: Option<String>,
+}
+
 /// Opak text ölçüm cache'i. `TextMeasurer` call'ları arasında taşınarak
 /// aynı parametrelerle yapılan ölçümlerin yeniden hesaplanmasını önler.
 #[derive(Default)]
@@ -169,6 +178,83 @@ impl TextMeasurer {
         // bu fark zoom değişimlerinde text wrap sınırında flickering'e yol açar.
         // 0.5pt baskıda görünmez ama wrapping dengesizliğini önler.
         let width_pt = width_pt + 0.5;
+
+        (width_pt, height_pt)
+    }
+
+    /// Rich text ölç — birden fazla span, her biri farklı font/boyut/kalınlık.
+    /// cosmic-text set_rich_text() ile attributed text ölçümü yapar.
+    pub fn measure_rich_text(
+        &mut self,
+        spans: &[RichSpanMeasure],
+        available_width_pt: Option<f32>,
+    ) -> (f32, f32) {
+        if spans.is_empty() {
+            return (0.0, 0.0);
+        }
+
+        // En büyük font boyutunu bul — line height buna göre belirlenir
+        let max_font_size_pt = spans
+            .iter()
+            .map(|s| s.font_size_pt)
+            .fold(0.0f32, f32::max);
+
+        if max_font_size_pt <= 0.0 {
+            return (0.0, 0.0);
+        }
+
+        let max_font_size_px = max_font_size_pt * PT_TO_PX;
+        let line_height_px = max_font_size_px * 1.2;
+        let metrics = Metrics::new(max_font_size_px, line_height_px);
+
+        let mut buffer = Buffer::new(&mut self.font_system, metrics);
+
+        let width_px = available_width_pt.map(|w| w * PT_TO_PX);
+        buffer.set_size(&mut self.font_system, width_px, None);
+
+        // Her span için (text, Attrs) pair oluştur
+        let rich_spans: Vec<(&str, Attrs)> = spans
+            .iter()
+            .map(|span| {
+                let weight = match span.font_weight.as_deref() {
+                    Some("bold") => Weight::BOLD,
+                    _ => Weight::NORMAL,
+                };
+                let family_name = span.font_family.as_deref().unwrap_or("Noto Sans");
+                let font_size_px = span.font_size_pt * PT_TO_PX;
+                let attrs = Attrs::new()
+                    .family(Family::Name(family_name))
+                    .weight(weight)
+                    .metrics(Metrics::new(font_size_px, font_size_px * 1.2));
+                (span.text.as_str(), attrs)
+            })
+            .collect();
+
+        buffer.set_rich_text(
+            &mut self.font_system,
+            rich_spans,
+            &Attrs::new(),
+            Shaping::Advanced,
+            None,
+        );
+        buffer.shape_until_scroll(&mut self.font_system, false);
+
+        let mut max_width: f32 = 0.0;
+        let mut total_height: f32 = 0.0;
+
+        for run in buffer.layout_runs() {
+            if run.line_w > max_width {
+                max_width = run.line_w;
+            }
+            total_height = run.line_top + line_height_px;
+        }
+
+        if total_height == 0.0 {
+            total_height = line_height_px;
+        }
+
+        let width_pt = max_width / PT_TO_PX + 0.5;
+        let height_pt = total_height / PT_TO_PX;
 
         (width_pt, height_pt)
     }

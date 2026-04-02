@@ -2,15 +2,19 @@
 import { computed, ref } from 'vue'
 import { useTemplateStore } from '../../stores/template'
 import { useEditorStore } from '../../stores/editor'
-import type { ElementLayout } from '../../core/layout-types'
+import type { LayoutMapEntry } from '../../core/layout-types'
 import type { TemplateElement, SizeValue, ContainerElement } from '../../core/types'
 import { isContainer, sz } from '../../core/types'
 import ElementToolbar from './ElementToolbar.vue'
 import { useSnapGuides } from '../../composables/useSnapGuides'
 
+const PAGE_GAP_PX = 24
+
 const props = defineProps<{
   scale: number
-  layoutMap: Record<string, ElementLayout>
+  layoutMap: Record<string, LayoutMapEntry>
+  pageCount?: number
+  pageHeightPx?: number
 }>()
 
 const templateStore = useTemplateStore()
@@ -28,7 +32,16 @@ const flatElements = computed(() => {
       }
     }
   }
+  // Header ve footer container'larını ve elemanlarını dahil et
+  if (templateStore.template.header) {
+    result.push(templateStore.template.header as unknown as TemplateElement)
+    walk(templateStore.template.header as unknown as TemplateElement)
+  }
   walk(templateStore.template.root)
+  if (templateStore.template.footer) {
+    result.push(templateStore.template.footer as unknown as TemplateElement)
+    walk(templateStore.template.footer as unknown as TemplateElement)
+  }
   return result
 })
 
@@ -41,9 +54,24 @@ const allContainers = computed(() => {
       for (const child of el.children) walk(child)
     }
   }
+  if (templateStore.template.header) {
+    result.push(templateStore.template.header)
+    for (const child of templateStore.template.header.children) walk(child)
+  }
   for (const child of templateStore.template.root.children) walk(child)
+  if (templateStore.template.footer) {
+    result.push(templateStore.template.footer)
+    for (const child of templateStore.template.footer.children) walk(child)
+  }
   return result
 })
+
+/** Sayfa index'ine göre y offset hesapla (sayfalar arası gap dahil) */
+function pageYOffset(pageIndex: number): number {
+  if (pageIndex <= 0) return 0
+  const pageH = props.pageHeightPx ?? (templateStore.template.page.height * props.scale)
+  return pageIndex * (pageH + PAGE_GAP_PX)
+}
 
 function getElementStyle(el: TemplateElement) {
   const l = props.layoutMap[el.id]
@@ -53,12 +81,13 @@ function getElementStyle(el: TemplateElement) {
   const h = l.height_mm * s
   const minH = 8
   const actualH = Math.max(h, minH)
-  const yOffset = h < minH ? (minH - h) / 2 : 0
+  const yOff = h < minH ? (minH - h) / 2 : 0
+  const pYOff = pageYOffset(l.pageIndex)
 
   return {
     position: 'absolute' as const,
     left: `${l.x_mm * s}px`,
-    top: `${l.y_mm * s - yOffset}px`,
+    top: `${l.y_mm * s - yOff + pYOff}px`,
     width: `${l.width_mm * s}px`,
     height: `${actualH}px`,
   }
@@ -113,7 +142,7 @@ function findDeepestContainer(mouseX: number, mouseY: number, excludeId?: string
 /** Container içinde drop index hesapla */
 function computeDropIndex(container: ContainerElement, mouseX: number, mouseY: number, excludeId?: string) {
   const s = props.scale
-  const flowChildren = container.children.filter(c => c.position.type !== 'absolute' && c.id !== excludeId)
+  const flowChildren = container.children.filter(c => c.type !== 'page_break' && c.position.type !== 'absolute' && c.id !== excludeId)
   const isRow = container.direction === 'row'
 
   let visualIdx = flowChildren.length
@@ -133,7 +162,7 @@ function computeDropIndex(container: ContainerElement, mouseX: number, mouseY: n
   // Mantıksal index: excludeId aynı container'daysa offset hesapla
   let logicalIdx = visualIdx
   if (excludeId) {
-    const allFlow = container.children.filter(c => c.position.type !== 'absolute')
+    const allFlow = container.children.filter(c => c.type !== 'page_break' && c.position.type !== 'absolute')
     const currentIdx = allFlow.findIndex(c => c.id === excludeId)
     if (currentIdx >= 0) {
       // visualIdx, excludeId çıkarılmış listede. Gerçek listedeki pozisyona çevir.
@@ -186,7 +215,7 @@ const dropIndicatorStyle = computed(() => {
 
   // Sürüklenen elemanı çıkar
   const dragId = dragElementId.value
-  const flowChildren = container.children.filter(c => c.position.type !== 'absolute' && c.id !== dragId)
+  const flowChildren = container.children.filter(c => c.type !== 'page_break' && c.position.type !== 'absolute' && c.id !== dragId)
 
   const cl = props.layoutMap[container.id]
   if (!cl) return { display: 'none' }
@@ -288,6 +317,7 @@ const dragOffset = ref({ x: 0, y: 0 })
 const dragGhost = ref({ x: 0, y: 0, width: 0, height: 0 })
 
 function onDragStart(e: PointerEvent, el: TemplateElement) {
+  if (el.type === 'page_break') return
   if (el.position.type === 'absolute') {
     onAbsoluteDragStart(e, el)
     return
@@ -617,7 +647,7 @@ const isAnyDragActive = computed(() =>
       <div v-if="editorStore.selectedElementId === el.id" class="selection-border" />
 
       <!-- Resize handles -->
-      <template v-if="editorStore.selectedElementId === el.id && !isResizing">
+      <template v-if="editorStore.selectedElementId === el.id && !isResizing && el.type !== 'page_break'">
         <template v-if="el.type === 'barcode' || el.type === 'image'">
           <!-- Barkod/Görsel: sadece yatay resize (aspect ratio korunur) -->
           <div class="resize-handle resize-handle--e" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'e')" />

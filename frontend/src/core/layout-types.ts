@@ -23,12 +23,27 @@ export interface ElementLayout {
   children: string[]
 }
 
+export interface LayoutMapEntry extends ElementLayout {
+  pageIndex: number
+}
+
+export interface ResolvedRichSpan {
+  text: string
+  fontSize?: number
+  fontWeight?: string
+  fontFamily?: string
+  color?: string
+}
+
 export type ResolvedContent =
   | { type: 'text'; value: string }
   | { type: 'image'; src: string }
   | { type: 'line' }
   | { type: 'barcode'; format: string; value: string }
   | { type: 'page_number'; current: number; total: number }
+  | { type: 'shape'; shapeType: string }
+  | { type: 'checkbox'; checked: boolean }
+  | { type: 'rich_text'; spans: ResolvedRichSpan[] }
   | { type: 'table'; headers: TableHeaderCell[]; rows: TableCell[][]; column_widths_mm: number[] }
 
 export interface TableHeaderCell {

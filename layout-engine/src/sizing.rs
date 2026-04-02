@@ -326,6 +326,7 @@ mod tests {
             justify: "space-between".to_string(),
             style: ContainerStyle::default(),
             children: vec![],
+            break_inside: "auto".to_string(),
         };
         let style = container_to_style(&el, None);
         assert_eq!(style.flex_direction, FlexDirection::Row);
@@ -346,6 +347,7 @@ mod tests {
             justify: "start".to_string(),
             style: ContainerStyle::default(),
             children: vec![],
+            break_inside: "auto".to_string(),
         };
         let style = container_to_style(&el, None);
         assert_eq!(style.position, Position::Absolute);

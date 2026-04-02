@@ -193,6 +193,17 @@ const tableItemFields = computed(() => {
     </div>
   </div>
 
+  <!-- Sayfa bölme ayarları -->
+  <div class="prop-section">
+    <div class="prop-section__title">Sayfa Bolme</div>
+    <div class="prop-row">
+      <label class="prop-label">Header tekrarla</label>
+      <input type="checkbox"
+        :checked="element.repeatHeader !== false"
+        @change="(e) => update({ repeatHeader: (e.target as HTMLInputElement).checked } as any)" />
+    </div>
+  </div>
+
   <!-- Table style -->
   <div class="prop-section">
     <div class="prop-section__title">Tablo Stili</div>

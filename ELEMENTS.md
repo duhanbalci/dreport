@@ -81,7 +81,7 @@ Cok sayfali belgelerde otomatik sayfa numarasi. Format sablonu destekler (or: "S
 
 ## Planlanmis Elemanlar
 
-### `rich_text` — Zengin Metin [Henuz implemente edilmedi]
+### `rich_text` — Zengin Metin [Yapildi]
 
 Tek bir metin blogu icinde karisik formatlama destekleyen eleman. Kalin, italik, farkli font boyutu, renk gibi stilleri ayni paragraf icinde kullanmayi saglar.
 
@@ -103,7 +103,7 @@ Tek bir metin blogu icinde karisik formatlama destekleyen eleman. Kalin, italik,
 
 ---
 
-### `shape` — Sekil (Dikdortgen / Elips) [Henuz implemente edilmedi]
+### `shape` — Sekil (Dikdortgen / Elips) [Yapildi]
 
 Cocuk eleman barindirmayan sade gorsel element. Vurgu kutulari, dekoratif cerceveler, arka plan alanlari icin kullanilir. Container'dan farki: layout'a katilmaz, sadece gorsel amaclidir.
 
@@ -128,7 +128,7 @@ Cocuk eleman barindirmayan sade gorsel element. Vurgu kutulari, dekoratif cercev
 
 ---
 
-### `checkbox` — Onay Kutusu [Henuz implemente edilmedi]
+### `checkbox` — Onay Kutusu [Yapildi]
 
 Boolean deger gosteren isaret kutusu. Isaretsiz kare veya isaretli (checkmark) kare olarak render edilir. Veri baglantisi ile dinamik calisan veya statik olarak kullanilabilen basit bir element.
 
@@ -147,7 +147,7 @@ Boolean deger gosteren isaret kutusu. Isaretsiz kare veya isaretli (checkmark) k
 
 ---
 
-### `calculated_text` — Hesaplanmis Alan [Henuz implemente edilmedi]
+### `calculated_text` — Hesaplanmis Alan [Yapildi]
 
 Basit ifadeler (expression) ile hesaplanmis deger gosteren metin elemani. Aritmetik islemler, string birlestirme ve kosullu metin destekler.
 
@@ -168,7 +168,7 @@ Basit ifadeler (expression) ile hesaplanmis deger gosteren metin elemani. Aritme
 
 ---
 
-### `current_date` — Tarih / Zaman [Henuz implemente edilmedi]
+### `current_date` — Tarih / Zaman [Yapildi]
 
 Belgenin basilma/render anindaki tarihi otomatik gosteren element. `page_number` gibi otomatik deger uretir, veri baglantisi gerektirmez.
 
@@ -188,7 +188,7 @@ Belgenin basilma/render anindaki tarihi otomatik gosteren element. `page_number`
 
 ---
 
-### `page_break` — Sayfa Sonu [Henuz implemente edilmedi]
+### `page_break` — Sayfa Sonu [Yapildi]
 
 Kullanicinin belirli bir noktada yeni sayfaya gecmesini saglayan kontrol elemani. Otomatik sayfa sonu (page_break.rs) zaten mevcut, bu element manuel kontrol saglar.
 
@@ -236,22 +236,22 @@ Veri gorselIestirme icin basit grafik elemani. Rapor ciktilari icin degerli, fat
 Toolbar
 ├── Duzen
 │   ├── Container             (mevcut)
-│   └── Page Break            (planlanmis)
+│   └── Page Break            (mevcut)
 ├── Metin
 │   ├── Statik Metin          (mevcut)
-│   ├── Rich Text             (planlanmis)
-│   └── Hesaplanmis Alan      (planlanmis)
+│   ├── Rich Text             (mevcut)
+│   └── Hesaplanmis Alan      (mevcut)
 ├── Veri
 │   ├── Tekrarlayan Tablo     (mevcut)
-│   └── Checkbox              (planlanmis)
+│   └── Checkbox              (mevcut)
 ├── Gorsel
 │   ├── Gorsel                (mevcut)
 │   ├── Cizgi                 (mevcut)
-│   ├── Sekil                 (planlanmis)
+│   ├── Sekil                 (mevcut)
 │   └── Barkod / QR           (mevcut)
 ├── Otomatik
 │   ├── Sayfa No              (mevcut)
-│   └── Tarih                 (planlanmis)
+│   └── Tarih                 (mevcut)
 └── Rapor
     └── Grafik                (planlanmis)
 ```
@@ -260,12 +260,12 @@ Toolbar
 
 ## Oncelik Sirasi
 
-| Oncelik | Element | Gerekce |
-|---------|---------|---------|
-| 1 | `rich_text` | Karisik formatlama en cok talep edilen ozellik, cosmic-text uyumlu |
-| 2 | `shape` | Basit implementasyon, gorsel zenginlik katiyor |
-| 3 | `checkbox` | Boolean gosterim, form/irsaliye icin onemli |
-| 4 | `calculated_text` | Hesaplama ihtiyaci fatura/rapor icin kritik |
-| 5 | `current_date` | Kucuk ama kullanisli, hizli implemente edilir |
-| 6 | `page_break` | Manuel sayfa kontrolu, rapor senaryolari icin |
-| 7 | `chart` | En karmasik, rapor fazinda ele alinabilir |
+| Oncelik | Element | Gerekce | Durum |
+|---------|---------|---------|-------|
+| 1 | `rich_text` | Karisik formatlama en cok talep edilen ozellik, cosmic-text uyumlu | Yapildi |
+| 2 | `shape` | Basit implementasyon, gorsel zenginlik katiyor | Yapildi |
+| 3 | `checkbox` | Boolean gosterim, form/irsaliye icin onemli | Yapildi |
+| 4 | `calculated_text` | Hesaplama ihtiyaci fatura/rapor icin kritik | Yapildi |
+| 5 | `current_date` | Kucuk ama kullanisli, hizli implemente edilir | Yapildi |
+| 6 | `page_break` | Manuel sayfa kontrolu, rapor senaryolari icin | Yapildi |
+| 7 | `chart` | En karmasik, rapor fazinda ele alinabilir | |

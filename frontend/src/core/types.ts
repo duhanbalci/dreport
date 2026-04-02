@@ -163,6 +163,56 @@ export interface BarcodeElement extends BaseElement {
   style: BarcodeStyle
 }
 
+export interface CurrentDateElement extends BaseElement {
+  type: 'current_date'
+  style: TextStyle
+  format?: string // ör: "DD.MM.YYYY", "DD MMMM YYYY", "DD.MM.YYYY HH:mm"
+}
+
+export interface ShapeElement extends BaseElement {
+  type: 'shape'
+  shapeType: 'rectangle' | 'ellipse' | 'rounded_rectangle'
+  style: ContainerStyle
+}
+
+export interface CheckboxStyle {
+  size?: number       // mm — kare boyutu
+  checkColor?: string // checkmark rengi
+  borderColor?: string
+  borderWidth?: number
+}
+
+export interface CheckboxElement extends BaseElement {
+  type: 'checkbox'
+  checked?: boolean
+  binding?: ScalarBinding
+  style: CheckboxStyle
+}
+
+export interface CalculatedTextElement extends BaseElement {
+  type: 'calculated_text'
+  expression: string
+  format?: FormatType
+  style: TextStyle
+}
+
+export interface RichTextSpan {
+  text?: string
+  binding?: ScalarBinding
+  style: TextStyle
+}
+
+export interface RichTextElement extends BaseElement {
+  type: 'rich_text'
+  content: RichTextSpan[]
+  style: TextStyle // varsayılan stil
+}
+
+export interface PageBreakElement {
+  type: 'page_break'
+  id: string
+}
+
 export interface ContainerElement extends BaseElement {
   type: 'container'
   direction: 'row' | 'column'
@@ -170,6 +220,7 @@ export interface ContainerElement extends BaseElement {
   padding: Padding
   align: 'start' | 'center' | 'end' | 'stretch'
   justify: 'start' | 'center' | 'end' | 'space-between'
+  breakInside?: 'auto' | 'avoid'
   style: ContainerStyle
   children: TemplateElement[]
 }
@@ -179,9 +230,10 @@ export interface RepeatingTableElement extends BaseElement {
   dataSource: ArrayBinding
   columns: TableColumn[]
   style: TableStyle
+  repeatHeader?: boolean
 }
 
-export type LeafElement = StaticTextElement | TextElement | LineElement | RepeatingTableElement | ImageElement | PageNumberElement | BarcodeElement
+export type LeafElement = StaticTextElement | TextElement | LineElement | RepeatingTableElement | ImageElement | PageNumberElement | BarcodeElement | PageBreakElement | CurrentDateElement | ShapeElement | CheckboxElement | CalculatedTextElement | RichTextElement
 export type TemplateElement = LeafElement | ContainerElement
 
 // --- Template ---
@@ -193,6 +245,8 @@ export interface Template {
   page: PageSettings
   fonts: string[]
   root: ContainerElement // kök container = sayfa
+  header?: ContainerElement
+  footer?: ContainerElement
 }
 
 // --- Editor state ---

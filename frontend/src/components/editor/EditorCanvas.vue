@@ -37,14 +37,24 @@ const scale = computed(() => {
   return (containerWidth.value / templateStore.template.page.width) * editorStore.zoom
 })
 
-// Sayfa boyutu px cinsinden + margin CSS variables
-const pageStyle = computed(() => {
+// Layout sayfaları
+const layoutPages = computed(() => layout.value?.pages ?? [])
+
+// Sayfa yüksekliği px cinsinden
+const pageHeightPx = computed(() => templateStore.template.page.height * scale.value)
+
+// Sayfalar container stili — tüm sayfaları kapsayan dış kutu
+const pagesContainerStyle = computed(() => {
   const w = templateStore.template.page.width * scale.value
-  const h = templateStore.template.page.height * scale.value
   const m = templateStore.template.root.padding
+  const pageCount = Math.max(1, layoutPages.value.length)
+  const pageGap = 24
+  const totalH = pageHeightPx.value * pageCount + pageGap * (pageCount - 1)
   return {
     width: `${w}px`,
-    height: `${h}px`,
+    height: `${totalH}px`,
+    position: 'relative' as const,
+    flexShrink: 0,
     '--page-margin-top': `${m.top * scale.value}px`,
     '--page-margin-right': `${m.right * scale.value}px`,
     '--page-margin-bottom': `${m.bottom * scale.value}px`,
@@ -204,10 +214,10 @@ function onPointerUp(e: PointerEvent) {
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
     >
-      <!-- Sayfa -->
-      <div ref="pageRef" class="editor-canvas__page" :style="[pageStyle, panTransform ? { transform: panTransform } : {}]">
+      <!-- Sayfalar -->
+      <div ref="pageRef" class="editor-canvas__pages" :style="[pagesContainerStyle, panTransform ? { transform: panTransform } : {}]">
         <LayoutRenderer :layout="layout" :scale="scale" />
-        <InteractionOverlay :scale="scale" :layout-map="layoutMap" />
+        <InteractionOverlay :scale="scale" :layout-map="layoutMap" :page-count="layoutPages.length" :page-height-px="pageHeightPx" />
       </div>
     </div>
 
@@ -244,9 +254,7 @@ function onPointerUp(e: PointerEvent) {
   padding: 40px;
 }
 
-.editor-canvas__page {
-  background: white;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+.editor-canvas__pages {
   position: relative;
   flex-shrink: 0;
 }

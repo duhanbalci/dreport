@@ -145,6 +145,19 @@ pub struct BarcodeStyle {
     pub include_text: Option<bool>,
 }
 
+// --- Rich Text ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RichTextSpan {
+    #[serde(default)]
+    pub text: Option<String>,
+    #[serde(default)]
+    pub binding: Option<ScalarBinding>,
+    #[serde(default)]
+    pub style: TextStyle,
+}
+
 // --- Element tipleri ---
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -172,6 +185,18 @@ pub enum TemplateElement {
     PageNumber(PageNumberElement),
     #[serde(rename = "barcode")]
     Barcode(BarcodeElement),
+    #[serde(rename = "page_break")]
+    PageBreak(PageBreakElement),
+    #[serde(rename = "current_date")]
+    CurrentDate(CurrentDateElement),
+    #[serde(rename = "shape")]
+    Shape(ShapeElement),
+    #[serde(rename = "checkbox")]
+    Checkbox(CheckboxElement),
+    #[serde(rename = "calculated_text")]
+    CalculatedText(CalculatedTextElement),
+    #[serde(rename = "rich_text")]
+    RichText(RichTextElement),
 }
 
 impl TemplateElement {
@@ -185,6 +210,12 @@ impl TemplateElement {
             Self::Image(e) => &e.id,
             Self::PageNumber(e) => &e.id,
             Self::Barcode(e) => &e.id,
+            Self::PageBreak(e) => &e.id,
+            Self::CurrentDate(e) => &e.id,
+            Self::Shape(e) => &e.id,
+            Self::Checkbox(e) => &e.id,
+            Self::CalculatedText(e) => &e.id,
+            Self::RichText(e) => &e.id,
         }
     }
 
@@ -198,10 +229,24 @@ impl TemplateElement {
             Self::Image(e) => &e.position,
             Self::PageNumber(e) => &e.position,
             Self::Barcode(e) => &e.position,
+            Self::PageBreak(_) => &PositionMode::Flow,
+            Self::CurrentDate(e) => &e.position,
+            Self::Shape(e) => &e.position,
+            Self::Checkbox(e) => &e.position,
+            Self::CalculatedText(e) => &e.position,
+            Self::RichText(e) => &e.position,
         }
     }
 
     pub fn size(&self) -> &SizeConstraint {
+        static DEFAULT_SIZE: SizeConstraint = SizeConstraint {
+            width: SizeValue::Auto,
+            height: SizeValue::Auto,
+            min_width: None,
+            min_height: None,
+            max_width: None,
+            max_height: None,
+        };
         match self {
             Self::Container(e) => &e.size,
             Self::StaticText(e) => &e.size,
@@ -211,8 +256,25 @@ impl TemplateElement {
             Self::Image(e) => &e.size,
             Self::PageNumber(e) => &e.size,
             Self::Barcode(e) => &e.size,
+            Self::PageBreak(_) => &DEFAULT_SIZE,
+            Self::CurrentDate(e) => &e.size,
+            Self::Shape(e) => &e.size,
+            Self::Checkbox(e) => &e.size,
+            Self::CalculatedText(e) => &e.size,
+            Self::RichText(e) => &e.size,
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RichTextElement {
+    pub id: String,
+    pub position: PositionMode,
+    pub size: SizeConstraint,
+    #[serde(default)]
+    pub style: TextStyle, // varsayilan stil (span'lar override edebilir)
+    pub content: Vec<RichTextSpan>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -237,7 +299,11 @@ pub struct ContainerElement {
     pub style: ContainerStyle,
     #[serde(default)]
     pub children: Vec<TemplateElement>,
+    #[serde(default = "default_auto")]
+    pub break_inside: String,
 }
+
+fn default_auto() -> String { "auto".to_string() }
 
 fn default_column() -> String { "column".to_string() }
 fn default_stretch() -> String { "stretch".to_string() }
@@ -315,6 +381,67 @@ pub struct RepeatingTableElement {
     pub data_source: ArrayBinding,
     pub columns: Vec<TableColumn>,
     pub style: TableStyle,
+    #[serde(default = "default_true")]
+    pub repeat_header: Option<bool>,
+}
+
+fn default_true() -> Option<bool> { Some(true) }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PageBreakElement {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurrentDateElement {
+    pub id: String,
+    pub position: PositionMode,
+    pub size: SizeConstraint,
+    pub style: TextStyle,
+    pub format: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShapeElement {
+    pub id: String,
+    pub position: PositionMode,
+    pub size: SizeConstraint,
+    pub shape_type: String, // rectangle, ellipse, rounded_rectangle
+    pub style: ContainerStyle,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct CheckboxStyle {
+    pub size: Option<f64>,          // mm — kare boyutu
+    pub check_color: Option<String>,  // checkmark rengi
+    pub border_color: Option<String>, // kare kenar rengi
+    pub border_width: Option<f64>,    // kenar kalınlığı
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckboxElement {
+    pub id: String,
+    pub position: PositionMode,
+    pub size: SizeConstraint,
+    pub checked: Option<bool>,           // statik değer
+    pub binding: Option<ScalarBinding>,  // dinamik boolean binding
+    pub style: CheckboxStyle,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CalculatedTextElement {
+    pub id: String,
+    pub position: PositionMode,
+    pub size: SizeConstraint,
+    pub style: TextStyle,
+    pub expression: String,
+    pub format: Option<String>,
 }
 
 // --- Template ---
@@ -325,5 +452,9 @@ pub struct Template {
     pub name: String,
     pub page: PageSettings,
     pub fonts: Vec<String>,
+    #[serde(default)]
+    pub header: Option<ContainerElement>,
+    #[serde(default)]
+    pub footer: Option<ContainerElement>,
     pub root: ContainerElement,
 }

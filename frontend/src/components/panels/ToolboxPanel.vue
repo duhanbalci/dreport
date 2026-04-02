@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useEditorStore } from '../../stores/editor'
 import { useSchemaStore } from '../../stores/schema'
-import type { TemplateElement, RepeatingTableElement, TableColumn, ImageElement, PageNumberElement, BarcodeElement } from '../../core/types'
+import type { TemplateElement, RepeatingTableElement, TableColumn, ImageElement, PageNumberElement, BarcodeElement, PageBreakElement, CurrentDateElement, ShapeElement, CheckboxElement, CalculatedTextElement, RichTextElement } from '../../core/types'
 import { sz } from '../../core/types'
 import { schemaFormatToFormatType, defaultAlignForSchema } from '../../core/schema-parser'
 
@@ -30,6 +30,21 @@ const tools: ToolItem[] = [
       size: { width: sz.auto(), height: sz.auto() },
       style: { fontSize: 11, color: '#000000' },
       content: 'Yeni metin',
+    }),
+  },
+  {
+    label: 'Zengin Metin',
+    icon: 'R',
+    create: (): RichTextElement => ({
+      id: nextId('rt'),
+      type: 'rich_text',
+      position: { type: 'flow' },
+      size: { width: sz.auto(), height: sz.auto() },
+      style: { fontSize: 11, color: '#000000' },
+      content: [
+        { text: 'Zengin ', style: {} },
+        { text: 'metin', style: { fontWeight: 'bold' } },
+      ],
     }),
   },
   {
@@ -96,6 +111,7 @@ const tools: ToolItem[] = [
           fontSize: 10,
           headerFontSize: 10,
         },
+        repeatHeader: true,
       }
     },
   },
@@ -133,6 +149,62 @@ const tools: ToolItem[] = [
       format: 'qr',
       value: 'https://example.com',
       style: {},
+    }),
+  },
+  {
+    label: 'Onay Kutusu',
+    icon: '☑',
+    create: (): CheckboxElement => ({
+      id: nextId('cb'),
+      type: 'checkbox',
+      position: { type: 'flow' },
+      size: { width: sz.auto(), height: sz.auto() },
+      checked: false,
+      style: { size: 4, checkColor: '#000000', borderColor: '#333333', borderWidth: 0.3 },
+    }),
+  },
+  {
+    label: 'Sekil',
+    icon: '⬜',
+    create: (): ShapeElement => ({
+      id: nextId('shp'),
+      type: 'shape',
+      position: { type: 'flow' },
+      size: { width: sz.fr(1), height: sz.fixed(20) },
+      shapeType: 'rectangle',
+      style: { backgroundColor: '#f0f0f0', borderColor: '#333333', borderWidth: 0.5 },
+    }),
+  },
+  {
+    label: 'Hesaplanan',
+    icon: 'ƒ',
+    create: (): CalculatedTextElement => ({
+      id: nextId('calc'),
+      type: 'calculated_text',
+      position: { type: 'flow' },
+      size: { width: sz.auto(), height: sz.auto() },
+      expression: '0',
+      style: { fontSize: 11, color: '#000000' },
+    }),
+  },
+  {
+    label: 'Tarih',
+    icon: '📅',
+    create: (): CurrentDateElement => ({
+      id: nextId('dt'),
+      type: 'current_date',
+      position: { type: 'flow' },
+      size: { width: sz.auto(), height: sz.auto() },
+      style: { fontSize: 10, color: '#666666' },
+      format: 'DD.MM.YYYY',
+    }),
+  },
+  {
+    label: 'Sayfa Sonu',
+    icon: '⏎',
+    create: (): PageBreakElement => ({
+      id: nextId('pb'),
+      type: 'page_break',
     }),
   },
 ]

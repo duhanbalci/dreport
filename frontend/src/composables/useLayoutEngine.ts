@@ -1,8 +1,8 @@
 import { ref, watch, type Ref } from 'vue'
 import type { Template } from '../core/types'
-import type { LayoutResult, ElementLayout } from '../core/layout-types'
+import type { LayoutResult, LayoutMapEntry } from '../core/layout-types'
 
-export type { ElementLayout }
+export type { LayoutMapEntry }
 
 export function useLayoutEngine(
   template: Ref<Template>,
@@ -14,7 +14,7 @@ export function useLayoutEngine(
   const computing = ref(false)
 
   // Uyumluluk: InteractionOverlay'ın beklediği flat layout map (id → ElementLayout)
-  const layoutMap = ref<Record<string, ElementLayout>>({})
+  const layoutMap = ref<Record<string, LayoutMapEntry>>({})
 
   let worker: Worker | null = null
   let requestId = 0
@@ -40,11 +40,13 @@ export function useLayoutEngine(
         layout.value = msg.layout
         error.value = null
 
-        // Flat map oluştur: id → ElementLayout
-        const map: Record<string, ElementLayout> = {}
+        // Flat map oluştur: id → LayoutMapEntry (pageIndex dahil)
+        const map: Record<string, LayoutMapEntry> = {}
         for (const page of msg.layout.pages) {
           for (const el of page.elements) {
-            map[el.id] = el
+            if (!map[el.id]) {
+              map[el.id] = { ...el, pageIndex: page.page_index }
+            }
           }
         }
         layoutMap.value = map

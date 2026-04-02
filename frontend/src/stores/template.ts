@@ -86,11 +86,34 @@ export const useTemplateStore = defineStore('template', () => {
   // --- Element CRUD ---
 
   function getElementById(id: string): TemplateElement | undefined {
-    return findElementById(template.value.root, id)
+    const inRoot = findElementById(template.value.root, id)
+    if (inRoot) return inRoot
+    if (template.value.header) {
+      const inHeader = findElementById(template.value.header, id)
+      if (inHeader) return inHeader
+    }
+    if (template.value.footer) {
+      const inFooter = findElementById(template.value.footer, id)
+      if (inFooter) return inFooter
+    }
+    return undefined
   }
 
   function getParent(id: string): ContainerElement | undefined {
-    return findParent(template.value.root, id)
+    const inRoot = findParent(template.value.root, id)
+    if (inRoot) return inRoot
+    if (template.value.header) {
+      // Check if the header itself is the target element's parent
+      if (template.value.header.id === id) return undefined
+      const inHeader = findParent(template.value.header, id)
+      if (inHeader) return inHeader
+    }
+    if (template.value.footer) {
+      if (template.value.footer.id === id) return undefined
+      const inFooter = findParent(template.value.footer, id)
+      if (inFooter) return inFooter
+    }
+    return undefined
   }
 
   /** Bir container'a çocuk ekle */
@@ -180,6 +203,58 @@ export const useTemplateStore = defineStore('template', () => {
     bumpLayoutVersion()
   }
 
+  /** Header container'ı etkinleştir */
+  function enableHeader() {
+    if (template.value.header) return
+    template.value.header = {
+      id: 'header',
+      type: 'container',
+      position: { type: 'flow' },
+      size: { width: sz.auto(), height: sz.fixed(10), minHeight: 10 },
+      direction: 'row',
+      gap: 0,
+      padding: { top: 2, right: 5, bottom: 2, left: 5 },
+      align: 'stretch',
+      justify: 'start',
+      style: {},
+      children: [],
+    }
+    bumpLayoutVersion()
+  }
+
+  /** Header container'ı kaldır */
+  function disableHeader() {
+    if (!template.value.header) return
+    template.value.header = undefined
+    bumpLayoutVersion()
+  }
+
+  /** Footer container'ı etkinleştir */
+  function enableFooter() {
+    if (template.value.footer) return
+    template.value.footer = {
+      id: 'footer',
+      type: 'container',
+      position: { type: 'flow' },
+      size: { width: sz.auto(), height: sz.fixed(10), minHeight: 10 },
+      direction: 'row',
+      gap: 0,
+      padding: { top: 2, right: 5, bottom: 2, left: 5 },
+      align: 'stretch',
+      justify: 'start',
+      style: {},
+      children: [],
+    }
+    bumpLayoutVersion()
+  }
+
+  /** Footer container'ı kaldır */
+  function disableFooter() {
+    if (!template.value.footer) return
+    template.value.footer = undefined
+    bumpLayoutVersion()
+  }
+
   return {
     template,
     mockData,
@@ -202,5 +277,9 @@ export const useTemplateStore = defineStore('template', () => {
     redo,
     canUndo,
     canRedo,
+    enableHeader,
+    disableHeader,
+    enableFooter,
+    disableFooter,
   }
 })

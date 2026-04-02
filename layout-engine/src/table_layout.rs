@@ -73,6 +73,7 @@ pub fn expand_table(
             ..Default::default()
         },
         children: header_cells,
+        break_inside: "auto".to_string(),
     }));
 
     // Header altına ayırıcı çizgi
@@ -163,6 +164,7 @@ pub fn expand_table(
                 ..Default::default()
             },
             children: cells,
+            break_inside: "auto".to_string(),
         }));
     }
 
@@ -187,6 +189,7 @@ pub fn expand_table(
             ..Default::default()
         },
         children,
+        break_inside: "auto".to_string(),
     }
 }
 
@@ -219,6 +222,7 @@ mod tests {
             data_source: ArrayBinding { path: "items".to_string() },
             columns,
             style: TableStyle::default(),
+            repeat_header: Some(true),
         }
     }
 
@@ -230,6 +234,8 @@ mod tests {
             tables,
             barcodes: HashMap::new(),
             images: HashMap::new(),
+            page_number_formats: HashMap::new(),
+            rich_texts: HashMap::new(),
         }
     }
 

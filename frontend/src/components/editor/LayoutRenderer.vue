@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, inject, watch, nextTick } from 'vue'
-import type { ElementLayout, LayoutResult } from '../../core/layout-types'
+import { inject, watch, nextTick } from 'vue'
+import type { ElementLayout, PageLayout, LayoutResult } from '../../core/layout-types'
 
 const props = defineProps<{
   layout: LayoutResult | null
@@ -10,10 +10,14 @@ const props = defineProps<{
 // WASM barcode üretme fonksiyonu (EditorCanvas'tan provide edilir)
 const generateBarcode = inject<(format: string, value: string, width: number, height: number, includeText: boolean) => Promise<{ width: number; height: number; rgba: ArrayBuffer } | null>>('generateBarcode')
 
-const pageElements = computed(() => {
-  if (!props.layout || props.layout.pages.length === 0) return []
-  return props.layout.pages[0].elements
-})
+function pageContainerStyle(page: PageLayout): Record<string, string> {
+  const s = props.scale
+  return {
+    position: 'relative',
+    width: `${page.width_mm * s}px`,
+    height: `${page.height_mm * s}px`,
+  }
+}
 
 function elStyle(el: ElementLayout): Record<string, string> {
   const s = props.scale
@@ -54,6 +58,25 @@ function containerStyle(el: ElementLayout): Record<string, string> {
     result.border = `${st.borderWidth * props.scale}px ${st.borderStyle ?? 'solid'} ${st.borderColor}`
   }
   if (st.borderRadius) result.borderRadius = `${st.borderRadius * props.scale}px`
+
+  return result
+}
+
+function shapeStyle(el: ElementLayout): Record<string, string> {
+  const st = el.style
+  const result: Record<string, string> = {}
+
+  if (st.backgroundColor) result.backgroundColor = st.backgroundColor
+  if (st.borderColor && st.borderWidth) {
+    result.border = `${st.borderWidth * props.scale}px ${st.borderStyle ?? 'solid'} ${st.borderColor}`
+  }
+  if (st.borderRadius) result.borderRadius = `${st.borderRadius * props.scale}px`
+
+  // Ellipse: CSS border-radius 50%
+  const shapeType = el.content?.type === 'shape' ? el.content.shapeType : 'rectangle'
+  if (shapeType === 'ellipse') {
+    result.borderRadius = '50%'
+  }
 
   return result
 }
@@ -146,70 +169,140 @@ watch(
 
 <template>
   <div class="layout-renderer" v-if="layout">
-    <template v-for="el in pageElements" :key="el.id">
-      <!-- Container -->
-      <div
-        v-if="el.element_type === 'container'"
-        class="layout-el layout-el--container"
-        :style="{ ...elStyle(el), ...containerStyle(el) }"
-      />
-
-      <!-- Static text / Text / Page number -->
-      <div
-        v-else-if="el.element_type === 'static_text' || el.element_type === 'text' || el.element_type === 'page_number'"
-        class="layout-el layout-el--text"
-        :style="{ ...elStyle(el), ...textStyle(el) }"
-      >
-        {{ el.content?.type === 'text' ? el.content.value : '' }}
-      </div>
-
-      <!-- Line -->
-      <div
-        v-else-if="el.element_type === 'line'"
-        class="layout-el layout-el--line"
-        :style="elStyle(el)"
-      >
-        <div :style="lineStyle(el)" />
-      </div>
-
-      <!-- Image -->
-      <div
-        v-else-if="el.element_type === 'image'"
-        class="layout-el layout-el--image"
-        :style="elStyle(el)"
-      >
-        <img
-          v-if="el.content?.type === 'image' && el.content.src"
-          :src="el.content.src"
-          :style="{
-            width: '100%',
-            height: '100%',
-            objectFit: 'fill',
-          }"
-        />
-        <div v-else class="layout-el__placeholder">Görsel</div>
-      </div>
-
-      <!-- Barcode -->
-      <div
-        v-else-if="el.element_type === 'barcode'"
-        class="layout-el layout-el--barcode"
-        :style="elStyle(el)"
-      >
-        <canvas
-          v-if="el.content?.type === 'barcode' && el.content.value"
-          :ref="(ref) => onBarcodeCanvasMounted(ref as HTMLCanvasElement)"
-          data-barcode
-          :data-format="el.content.format"
-          :data-value="el.content.value"
-          :data-include-text="el.style.barcodeIncludeText ?? (el.content.format === 'ean13' || el.content.format === 'ean8')"
-          :style="{ width: '100%', height: '100%', display: 'block' }"
-        />
-        <div v-else class="layout-el__placeholder">
-          {{ el.content?.type === 'barcode' ? `[${el.content.format}]` : '[barcode]' }}
+    <div
+      v-for="(page, pageIdx) in layout.pages"
+      :key="pageIdx"
+      class="layout-page"
+      :style="pageContainerStyle(page)"
+    >
+      <template v-for="el in page.elements" :key="el.id">
+        <!-- Page break: dashed horizontal line -->
+        <div
+          v-if="el.element_type === 'page_break'"
+          class="layout-el layout-el--page-break"
+          :style="elStyle(el)"
+        >
+          <div style="border-top: 1px dashed #9ca3af; width: 100%; height: 0;" />
         </div>
-      </div>
-    </template>
+
+        <!-- Container -->
+        <div
+          v-else-if="el.element_type === 'container'"
+          class="layout-el layout-el--container"
+          :class="{
+            'layout-el--header': el.id === 'header' || el.id.startsWith('header_p'),
+            'layout-el--footer': el.id === 'footer' || el.id.startsWith('footer_p'),
+          }"
+          :style="{ ...elStyle(el), ...containerStyle(el) }"
+        >
+          <span v-if="el.id === 'header' || el.id.startsWith('header_p')" class="layout-el__section-label">Üst Bilgi</span>
+          <span v-else-if="el.id === 'footer' || el.id.startsWith('footer_p')" class="layout-el__section-label">Alt Bilgi</span>
+        </div>
+
+        <!-- Static text / Text / Page number -->
+        <div
+          v-else-if="el.element_type === 'static_text' || el.element_type === 'text' || el.element_type === 'page_number' || el.element_type === 'current_date' || el.element_type === 'calculated_text'"
+          class="layout-el layout-el--text"
+          :style="{ ...elStyle(el), ...textStyle(el) }"
+        >
+          {{ el.content?.type === 'text' ? el.content.value : '' }}
+        </div>
+
+        <!-- Line -->
+        <div
+          v-else-if="el.element_type === 'line'"
+          class="layout-el layout-el--line"
+          :style="elStyle(el)"
+        >
+          <div :style="lineStyle(el)" />
+        </div>
+
+        <!-- Image -->
+        <div
+          v-else-if="el.element_type === 'image'"
+          class="layout-el layout-el--image"
+          :style="elStyle(el)"
+        >
+          <img
+            v-if="el.content?.type === 'image' && el.content.src"
+            :src="el.content.src"
+            :style="{
+              width: '100%',
+              height: '100%',
+              objectFit: 'fill',
+            }"
+          />
+          <div v-else class="layout-el__placeholder">Görsel</div>
+        </div>
+
+        <!-- Barcode -->
+        <div
+          v-else-if="el.element_type === 'barcode'"
+          class="layout-el layout-el--barcode"
+          :style="elStyle(el)"
+        >
+          <canvas
+            v-if="el.content?.type === 'barcode' && el.content.value"
+            :ref="(ref) => onBarcodeCanvasMounted(ref as HTMLCanvasElement)"
+            data-barcode
+            :data-format="el.content.format"
+            :data-value="el.content.value"
+            :data-include-text="el.style.barcodeIncludeText ?? (el.content.format === 'ean13' || el.content.format === 'ean8')"
+            :style="{ width: '100%', height: '100%', display: 'block' }"
+          />
+          <div v-else class="layout-el__placeholder">
+            {{ el.content?.type === 'barcode' ? `[${el.content.format}]` : '[barcode]' }}
+          </div>
+        </div>
+        <!-- Checkbox -->
+        <div
+          v-else-if="el.element_type === 'checkbox'"
+          class="layout-el layout-el--checkbox"
+          :style="elStyle(el)"
+        >
+          <svg viewBox="0 0 20 20" :style="{ width: '100%', height: '100%' }">
+            <rect x="1" y="1" width="18" height="18" fill="none"
+              :stroke="el.style.borderColor ?? '#333'"
+              :stroke-width="el.style.borderWidth ? el.style.borderWidth * 3 : 1.5" />
+            <path v-if="el.content?.type === 'checkbox' && el.content.checked"
+              d="M4 10 L8 15 L16 5"
+              fill="none"
+              :stroke="el.style.color ?? '#000'"
+              stroke-width="2.5"
+              stroke-linecap="round"
+              stroke-linejoin="round" />
+          </svg>
+        </div>
+
+        <!-- Rich Text -->
+        <div
+          v-else-if="el.element_type === 'rich_text'"
+          class="layout-el layout-el--text layout-el--rich-text"
+          :style="{ ...elStyle(el), ...textStyle(el) }"
+        >
+          <template v-if="el.content?.type === 'rich_text'">
+            <span
+              v-for="(span, idx) in el.content.spans"
+              :key="idx"
+              :style="{
+                fontSize: span.fontSize ? `${span.fontSize * 0.3528 * scale}px` : undefined,
+                fontWeight: span.fontWeight || undefined,
+                fontFamily: span.fontFamily || undefined,
+                color: span.color || undefined,
+              }"
+            >{{ span.text }}</span>
+          </template>
+        </div>
+
+        <!-- Shape -->
+        <div
+          v-else-if="el.element_type === 'shape'"
+          class="layout-el layout-el--shape"
+          :style="{ ...elStyle(el), ...shapeStyle(el) }"
+        />
+
+      </template>
+    </div>
   </div>
 
   <div class="layout-renderer layout-renderer--empty" v-else>
@@ -219,10 +312,18 @@ watch(
 
 <style scoped>
 .layout-renderer {
-  position: absolute;
-  inset: 0;
   pointer-events: none;
   user-select: none;
+}
+
+.layout-page {
+  overflow: hidden;
+  background: white;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+}
+
+.layout-page + .layout-page {
+  margin-top: 24px;
 }
 
 .layout-renderer--empty {
@@ -245,6 +346,27 @@ watch(
 .layout-el--line {
   display: flex;
   align-items: center;
+}
+
+.layout-el--page-break {
+  display: flex;
+  align-items: center;
+}
+
+.layout-el--header,
+.layout-el--footer {
+  border: 1px dashed #94a3b8;
+  background: rgba(148, 163, 184, 0.05);
+}
+
+.layout-el__section-label {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 9px;
+  color: #94a3b8;
+  pointer-events: none;
+  user-select: none;
 }
 
 .layout-el__placeholder {
