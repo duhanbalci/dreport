@@ -166,6 +166,95 @@ pub struct RichTextSpan {
     pub style: TextStyle,
 }
 
+// --- Chart ---
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChartType {
+    Bar,
+    Line,
+    Pie,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GroupMode {
+    Grouped,
+    Stacked,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ChartTitle {
+    pub text: String,
+    pub font_size: Option<f64>,
+    pub color: Option<String>,
+    pub align: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ChartLegend {
+    pub show: bool,
+    pub position: Option<String>,
+    pub font_size: Option<f64>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ChartLabels {
+    pub show: bool,
+    pub font_size: Option<f64>,
+    pub color: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ChartAxis {
+    pub x_label: Option<String>,
+    pub y_label: Option<String>,
+    pub show_grid: Option<bool>,
+    pub grid_color: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ChartStyle {
+    pub colors: Option<Vec<String>>,
+    pub background_color: Option<String>,
+    pub bar_gap: Option<f64>,
+    pub line_width: Option<f64>,
+    pub show_points: Option<bool>,
+    pub curve_type: Option<String>,
+    pub inner_radius: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChartElement {
+    pub id: String,
+    pub position: PositionMode,
+    pub size: SizeConstraint,
+    pub chart_type: ChartType,
+    pub data_source: ArrayBinding,
+    pub category_field: String,
+    pub value_field: String,
+    #[serde(default)]
+    pub group_field: Option<String>,
+    #[serde(default)]
+    pub group_mode: Option<GroupMode>,
+    #[serde(default)]
+    pub title: Option<ChartTitle>,
+    #[serde(default)]
+    pub legend: Option<ChartLegend>,
+    #[serde(default)]
+    pub labels: Option<ChartLabels>,
+    #[serde(default)]
+    pub axis: Option<ChartAxis>,
+    #[serde(default)]
+    pub style: ChartStyle,
+}
+
 // --- Element tipleri ---
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -205,6 +294,8 @@ pub enum TemplateElement {
     CalculatedText(CalculatedTextElement),
     #[serde(rename = "rich_text")]
     RichText(RichTextElement),
+    #[serde(rename = "chart")]
+    Chart(ChartElement),
 }
 
 impl TemplateElement {
@@ -224,6 +315,7 @@ impl TemplateElement {
             Self::Checkbox(e) => &e.id,
             Self::CalculatedText(e) => &e.id,
             Self::RichText(e) => &e.id,
+            Self::Chart(e) => &e.id,
         }
     }
 
@@ -243,6 +335,7 @@ impl TemplateElement {
             Self::Checkbox(e) => &e.position,
             Self::CalculatedText(e) => &e.position,
             Self::RichText(e) => &e.position,
+            Self::Chart(e) => &e.position,
         }
     }
 
@@ -270,6 +363,7 @@ impl TemplateElement {
             Self::Checkbox(e) => &e.size,
             Self::CalculatedText(e) => &e.size,
             Self::RichText(e) => &e.size,
+            Self::Chart(e) => &e.size,
         }
     }
 }

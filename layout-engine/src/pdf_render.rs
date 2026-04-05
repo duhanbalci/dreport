@@ -21,6 +21,11 @@ fn mm(v: f64) -> f32 {
     v as f32 * MM_TO_PT
 }
 
+/// f64 mm degerini f32 pt'ye cevir (chart render icin)
+fn pt(mm_val: f64) -> f32 {
+    mm_val as f32 * MM_TO_PT
+}
+
 /// Hex renk (#RRGGBB veya #RGB) → rgb::Color
 fn parse_color(hex: &str) -> rgb::Color {
     let hex = hex.trim_start_matches('#');
@@ -247,6 +252,9 @@ fn render_element(
         }
         ResolvedContent::RichText { spans } => {
             render_rich_text(surface, x, y, w, h, spans, &el.style, fonts, measurer);
+        }
+        ResolvedContent::Chart { chart_data, .. } => {
+            render_chart(surface, x, y, w, h, chart_data, fonts, measurer);
         }
     }
 }
@@ -738,6 +746,388 @@ fn embed_png(
     surface.push_transform(&Transform::from_translate(x, y));
     surface.draw_image(img, size);
     surface.pop();
+}
+
+fn render_chart(
+    surface: &mut krilla::surface::Surface<'_>,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    data: &crate::ChartRenderData,
+    fonts: &FontCollection,
+    measurer: &mut TextMeasurer,
+) {
+    // Tum hesaplar mm cinsinden yapilir, cizim pt'ye cevrilir
+    // base_x_mm, base_y_mm: element'in sayfa uzerindeki mm pozisyonu
+    let base_x_mm: f64 = (x / MM_TO_PT) as f64;
+    let base_y_mm: f64 = (y / MM_TO_PT) as f64;
+    let w_mm: f64 = (w / MM_TO_PT) as f64;
+    let h_mm: f64 = (h / MM_TO_PT) as f64;
+
+    // Background
+    chart_rect(surface, base_x_mm, base_y_mm, w_mm, h_mm,
+        parse_color(data.background_color.as_deref().unwrap_or("#FFFFFF")));
+
+    // Margin'ler (SVG renderer ile ayni mantik)
+    let mut mt = 2.0_f64;
+    let mut mb = 4.0_f64;
+    let ml = 14.0_f64;
+    let mr = 4.0_f64;
+
+    // Title
+    if let Some(ref title) = data.title_text {
+        if !title.is_empty() {
+            let fs = data.title_font_size.unwrap_or(4.0);
+            mt += fs * 0.4 + 2.0;
+            let color = parse_color(data.title_color.as_deref().unwrap_or("#333333"));
+            let font = fonts.get(None, Some("bold"));
+            if let Some(f) = font {
+                surface.set_fill(Some(fill_from_color(color)));
+                surface.set_stroke(None);
+                let fs_pt = fs as f32;
+                let (tw, _) = measurer.measure(title, None, fs_pt, Some("bold"), None);
+                let tx = pt(base_x_mm + w_mm / 2.0) - tw / 2.0;
+                let ty = pt(base_y_mm + mt - 1.0);
+                surface.draw_text(
+                    Point::from_xy(tx, ty),
+                    f.clone(), fs_pt, title, false, TextDirection::Auto,
+                );
+            }
+        }
+    }
+
+    let is_pie = matches!(data.chart_type, dreport_core::models::ChartType::Pie);
+
+    if !is_pie {
+        let max_label_len = data.categories.iter().map(|c| c.len()).max().unwrap_or(0);
+        if max_label_len > 6 { mb += 10.0; } else { mb += 4.0; }
+        mb += 4.0;
+    }
+
+    let plot_x = base_x_mm + ml;
+    let plot_y = base_y_mm + mt;
+    let plot_w = (w_mm - ml - mr).max(1.0);
+    let plot_h = (h_mm - mt - mb).max(1.0);
+
+    use dreport_core::models::ChartType;
+    match data.chart_type {
+        ChartType::Bar => render_chart_bar(surface, data, plot_x, plot_y, plot_w, plot_h),
+        ChartType::Line => render_chart_line(surface, data, plot_x, plot_y, plot_w, plot_h),
+        ChartType::Pie => render_chart_pie(surface, data, plot_x, plot_y, plot_w, plot_h),
+    }
+}
+
+/// mm degerlerini pt'ye cevirip rect ciz
+fn chart_rect(surface: &mut krilla::surface::Surface<'_>, rx: f64, ry: f64, rw: f64, rh: f64, color: rgb::Color) {
+    let (rx, ry, rw, rh) = (pt(rx), pt(ry), pt(rw), pt(rh));
+    surface.set_fill(Some(fill_from_color(color)));
+    surface.set_stroke(None);
+    let path = {
+        let mut pb = PathBuilder::new();
+        if let Some(r) = krilla::geom::Rect::from_xywh(rx, ry, rw, rh) {
+            pb.push_rect(r);
+        }
+        pb.finish()
+    };
+    if let Some(p) = path {
+        surface.draw_path(&p);
+    }
+}
+
+fn chart_line_seg(surface: &mut krilla::surface::Surface<'_>, x1: f64, y1: f64, x2: f64, y2: f64, color: rgb::Color, width: f32) {
+    let (x1, y1, x2, y2) = (pt(x1), pt(y1), pt(x2), pt(y2));
+    surface.set_fill(None);
+    surface.set_stroke(Some(Stroke {
+        paint: color.into(),
+        width,
+        opacity: NormalizedF32::ONE,
+        ..Default::default()
+    }));
+    let path = {
+        let mut pb = PathBuilder::new();
+        pb.move_to(x1, y1);
+        pb.line_to(x2, y2);
+        pb.finish()
+    };
+    if let Some(p) = path {
+        surface.draw_path(&p);
+    }
+}
+
+/// Bar chart — tum koordinatlar mm cinsinden (mutlak sayfa pozisyonu)
+fn render_chart_bar(
+    surface: &mut krilla::surface::Surface<'_>,
+    data: &crate::ChartRenderData,
+    px: f64, py: f64, pw: f64, ph: f64,
+) {
+    if data.categories.is_empty() || data.series.is_empty() { return; }
+
+    let (min_val, max_val) = chart_value_range(data);
+    let range = if (max_val - min_val).abs() < 1e-10 { 1.0 } else { max_val - min_val };
+
+    let n_cats = data.categories.len();
+    let n_series = data.series.len();
+    let cat_width = pw / n_cats as f64;
+    let bar_gap = data.bar_gap.unwrap_or(0.2).clamp(0.0, 0.8);
+    let group_width = cat_width * (1.0 - bar_gap);
+
+    // Grid
+    if data.show_grid {
+        let gc = parse_color(data.grid_color.as_deref().unwrap_or("#E5E7EB"));
+        for i in 0..=5 {
+            let frac = i as f64 / 5.0;
+            let gy = py + ph - frac * ph;
+            chart_line_seg(surface, px, gy, px + pw, gy, gc, 0.4);
+        }
+    }
+
+    // Axis lines
+    let ac = parse_color("#9CA3AF");
+    chart_line_seg(surface, px, py + ph, px + pw, py + ph, ac, 0.8);
+    chart_line_seg(surface, px, py, px, py + ph, ac, 0.8);
+
+    // Bars
+    if data.stacked {
+        for ci in 0..n_cats {
+            let mut y_off = 0.0_f64;
+            for (si, series) in data.series.iter().enumerate() {
+                let val = series.values.get(ci).copied().unwrap_or(0.0);
+                let bh = (val / range) * ph;
+                let by = py + ph - y_off - bh;
+                let bx = px + ci as f64 * cat_width + cat_width * bar_gap / 2.0;
+                let color = parse_color(data.colors.get(si).map(|s| s.as_str()).unwrap_or("#4F46E5"));
+                chart_rect(surface, bx, by, group_width, bh.max(0.0), color);
+                y_off += bh;
+            }
+        }
+    } else {
+        let bar_w = group_width / n_series as f64;
+        for ci in 0..n_cats {
+            for (si, series) in data.series.iter().enumerate() {
+                let val = series.values.get(ci).copied().unwrap_or(0.0);
+                let bh = ((val - min_val) / range) * ph;
+                let bx = px + ci as f64 * cat_width + cat_width * bar_gap / 2.0 + si as f64 * bar_w;
+                let by = py + ph - bh;
+                let color = parse_color(data.colors.get(si).map(|s| s.as_str()).unwrap_or("#4F46E5"));
+                chart_rect(surface, bx, by, bar_w.max(0.1), bh.max(0.0), color);
+            }
+        }
+    }
+}
+
+/// Line chart — tum koordinatlar mm cinsinden (mutlak sayfa pozisyonu)
+fn render_chart_line(
+    surface: &mut krilla::surface::Surface<'_>,
+    data: &crate::ChartRenderData,
+    px: f64, py: f64, pw: f64, ph: f64,
+) {
+    if data.categories.is_empty() || data.series.is_empty() { return; }
+
+    let (min_val, max_val) = chart_value_range(data);
+    let range = if (max_val - min_val).abs() < 1e-10 { 1.0 } else { max_val - min_val };
+    let n_cats = data.categories.len();
+    let line_w = data.line_width.unwrap_or(0.5);
+    let show_points = data.show_points.unwrap_or(true);
+
+    // Grid
+    if data.show_grid {
+        let gc = parse_color(data.grid_color.as_deref().unwrap_or("#E5E7EB"));
+        for i in 0..=5 {
+            let frac = i as f64 / 5.0;
+            let gy = py + ph - frac * ph;
+            chart_line_seg(surface, px, gy, px + pw, gy, gc, 0.4);
+        }
+    }
+
+    // Axis
+    let ac = parse_color("#9CA3AF");
+    chart_line_seg(surface, px, py + ph, px + pw, py + ph, ac, 0.8);
+
+    for (si, series) in data.series.iter().enumerate() {
+        let color = parse_color(data.colors.get(si).map(|s| s.as_str()).unwrap_or("#4F46E5"));
+
+        let points: Vec<(f64, f64)> = series.values.iter().enumerate().map(|(ci, val)| {
+            let xp = if n_cats == 1 { px + pw / 2.0 } else { px + ci as f64 * pw / (n_cats - 1) as f64 };
+            let yp = py + ph - ((val - min_val) / range) * ph;
+            (xp, yp)
+        }).collect();
+
+        // Polyline
+        surface.set_fill(None);
+        surface.set_stroke(Some(Stroke {
+            paint: color.into(),
+            width: pt(line_w),
+            opacity: NormalizedF32::ONE,
+            ..Default::default()
+        }));
+        let path = {
+            let mut pb = PathBuilder::new();
+            for (i, (lx, ly)) in points.iter().enumerate() {
+                if i == 0 { pb.move_to(pt(*lx), pt(*ly)); }
+                else { pb.line_to(pt(*lx), pt(*ly)); }
+            }
+            pb.finish()
+        };
+        if let Some(p) = path { surface.draw_path(&p); }
+
+        // Points
+        if show_points {
+            for (lx, ly) in &points {
+                let r = pt(0.8);
+                let cx = pt(*lx);
+                let cy = pt(*ly);
+                surface.set_fill(Some(fill_from_color(color)));
+                surface.set_stroke(None);
+                let circle = {
+                    let mut pb = PathBuilder::new();
+                    let k = r * 0.5522848;
+                    pb.move_to(cx, cy - r);
+                    pb.cubic_to(cx + k, cy - r, cx + r, cy - k, cx + r, cy);
+                    pb.cubic_to(cx + r, cy + k, cx + k, cy + r, cx, cy + r);
+                    pb.cubic_to(cx - k, cy + r, cx - r, cy + k, cx - r, cy);
+                    pb.cubic_to(cx - r, cy - k, cx - k, cy - r, cx, cy - r);
+                    pb.close();
+                    pb.finish()
+                };
+                if let Some(p) = circle { surface.draw_path(&p); }
+            }
+        }
+    }
+}
+
+/// Pie/donut chart — tum koordinatlar mm cinsinden
+fn render_chart_pie(
+    surface: &mut krilla::surface::Surface<'_>,
+    data: &crate::ChartRenderData,
+    px: f64, py: f64, pw: f64, ph: f64,
+) {
+    let values: Vec<f64> = if data.series.len() == 1 {
+        data.series[0].values.clone()
+    } else {
+        data.categories.iter().enumerate().map(|(ci, _)| {
+            data.series.iter().map(|s| s.values.get(ci).copied().unwrap_or(0.0)).sum()
+        }).collect()
+    };
+
+    let total: f64 = values.iter().sum();
+    if total <= 0.0 { return; }
+
+    let cx = px + pw / 2.0;
+    let cy = py + ph / 2.0;
+    let radius = pw.min(ph) / 2.0 * 0.9;
+    let inner_frac = data.inner_radius.unwrap_or(0.0).clamp(0.0, 0.9);
+    let inner_r = radius * inner_frac;
+
+    let mut start_angle = -std::f64::consts::FRAC_PI_2;
+
+    for (i, val) in values.iter().enumerate() {
+        if *val <= 0.0 { continue; }
+        let sweep = (val / total) * std::f64::consts::TAU;
+        let end_angle = start_angle + sweep;
+        let color = parse_color(data.colors.get(i).map(|s| s.as_str()).unwrap_or("#4F46E5"));
+
+        surface.set_fill(Some(fill_from_color(color)));
+        surface.set_stroke(Some(Stroke {
+            paint: rgb::Color::new(255, 255, 255).into(),
+            width: 0.8,
+            opacity: NormalizedF32::ONE,
+            ..Default::default()
+        }));
+
+        let path = build_arc_path(cx, cy, radius, inner_r, start_angle, end_angle);
+        if let Some(p) = path { surface.draw_path(&p); }
+
+        start_angle = end_angle;
+    }
+}
+
+/// Arc path olustur — pie/donut dilimi (mm cinsinden, pt'ye cevrilir)
+fn build_arc_path(
+    cx: f64, cy: f64,
+    radius: f64, inner_r: f64,
+    start: f64, end: f64,
+) -> Option<krilla::geom::Path> {
+    let mut pb = PathBuilder::new();
+
+    let sx = pt(cx + radius * start.cos());
+    let sy = pt(cy + radius * start.sin());
+
+    if inner_r > 0.0 {
+        pb.move_to(sx, sy);
+        approximate_arc(&mut pb, cx, cy, radius, start, end);
+        let ix = pt(cx + inner_r * end.cos());
+        let iy = pt(cy + inner_r * end.sin());
+        pb.line_to(ix, iy);
+        approximate_arc(&mut pb, cx, cy, inner_r, end, start);
+        pb.close();
+    } else {
+        pb.move_to(pt(cx), pt(cy));
+        pb.line_to(sx, sy);
+        approximate_arc(&mut pb, cx, cy, radius, start, end);
+        pb.close();
+    }
+
+    pb.finish()
+}
+
+/// Arc'i cubic bezier segmentleriyle yaklasik ciz (her segment ≤ 90°)
+fn approximate_arc(
+    pb: &mut PathBuilder,
+    cx: f64, cy: f64,
+    r: f64,
+    start: f64, end: f64,
+) {
+    let sweep = end - start;
+    let n_segs = ((sweep.abs() / std::f64::consts::FRAC_PI_2).ceil() as usize).max(1);
+    let seg_sweep = sweep / n_segs as f64;
+
+    for i in 0..n_segs {
+        let a1 = start + i as f64 * seg_sweep;
+        let a2 = a1 + seg_sweep;
+        let alpha = seg_sweep / 2.0;
+        let cos_a = alpha.cos();
+        let k = (4.0 / 3.0) * (1.0 - cos_a) / alpha.sin();
+
+        let p2x = cx + r * a2.cos();
+        let p2y = cy + r * a2.sin();
+        let p1x = cx + r * a1.cos();
+        let p1y = cy + r * a1.sin();
+
+        let c1x = p1x - k * r * a1.sin();
+        let c1y = p1y + k * r * a1.cos();
+        let c2x = p2x + k * r * a2.sin();
+        let c2y = p2y - k * r * a2.cos();
+
+        pb.cubic_to(pt(c1x), pt(c1y), pt(c2x), pt(c2y), pt(p2x), pt(p2y));
+    }
+}
+
+fn chart_value_range(data: &crate::ChartRenderData) -> (f64, f64) {
+    if data.series.is_empty() {
+        return (0.0, 1.0);
+    }
+    if data.stacked {
+        let n = data.categories.len();
+        let mut max_stack = 0.0_f64;
+        for ci in 0..n {
+            let sum: f64 = data.series.iter().map(|s| s.values.get(ci).copied().unwrap_or(0.0)).sum();
+            max_stack = max_stack.max(sum);
+        }
+        (0.0, max_stack * 1.05)
+    } else {
+        let mut min_v = f64::MAX;
+        let mut max_v = f64::MIN;
+        for series in &data.series {
+            for val in &series.values {
+                min_v = min_v.min(*val);
+                max_v = max_v.max(*val);
+            }
+        }
+        if min_v > 0.0 { min_v = 0.0; }
+        max_v *= 1.05;
+        (min_v, max_v)
+    }
 }
 
 #[cfg(test)]

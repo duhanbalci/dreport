@@ -386,6 +386,22 @@ const defaultInvoiceTemplate: Template = {
           borderWidth: 0.5,
         },
       },
+      // --- Kalem Tutarlari Grafik ---
+      {
+        id: 'el_chart_bar',
+        type: 'chart',
+        position: { type: 'flow' },
+        size: { width: sz.fr(), height: sz.fixed(60) },
+        chartType: 'bar',
+        dataSource: { type: 'array', path: 'kalemler' },
+        categoryField: 'adi',
+        valueField: 'tutar',
+        title: { text: 'Kalem Tutarlari', fontSize: 3.5, color: '#1e293b', align: 'center' },
+        legend: { show: false },
+        labels: { show: true, fontSize: 2.2, color: '#333' },
+        axis: { showGrid: true },
+        style: { colors: ['#4F46E5', '#10B981', '#F59E0B', '#EF4444'] },
+      },
       // --- Toplamlar ---
       {
         id: 'c_toplamlar_row',

@@ -435,6 +435,7 @@ mod tests {
             images: HashMap::new(),
             page_number_formats: HashMap::new(),
             rich_texts: HashMap::new(),
+            charts: HashMap::new(),
         }
     }
 

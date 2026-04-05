@@ -301,6 +301,22 @@ watch(
           :style="{ ...elStyle(el), ...shapeStyle(el) }"
         />
 
+        <!-- Chart -->
+        <div
+          v-else-if="el.element_type === 'chart'"
+          class="layout-el layout-el--chart"
+          :style="elStyle(el)"
+        >
+          <div
+            v-if="el.content?.type === 'chart' && el.content.svg"
+            v-html="el.content.svg"
+            style="width: 100%; height: 100%;"
+          />
+          <div v-else class="layout-el__placeholder" :style="{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: '#94a3b8', fontSize: '12px' }">
+            Grafik
+          </div>
+        </div>
+
       </template>
     </div>
   </div>

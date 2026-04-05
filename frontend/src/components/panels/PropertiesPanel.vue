@@ -15,6 +15,7 @@ import type {
   CheckboxElement,
   CalculatedTextElement,
   RichTextElement,
+  ChartElement,
 } from '../../core/types'
 import PositioningProperties from '../properties/PositioningProperties.vue'
 import SizeProperties from '../properties/SizeProperties.vue'
@@ -30,6 +31,7 @@ import CalculatedTextProperties from '../properties/CalculatedTextProperties.vue
 import RichTextProperties from '../properties/RichTextProperties.vue'
 import ContainerProperties from '../properties/ContainerProperties.vue'
 import RepeatingTableProperties from '../properties/RepeatingTableProperties.vue'
+import ChartProperties from '../properties/ChartProperties.vue'
 import '../../styles/properties.css'
 
 const templateStore = useTemplateStore()
@@ -62,6 +64,7 @@ const elementTypeLabel = computed(() => {
     case 'calculated_text': return 'Hesaplanan Metin'
     case 'rich_text': return 'Zengin Metin'
     case 'page_break': return 'Sayfa Sonu'
+    case 'chart': return 'Grafik'
     default: return 'Eleman'
   }
 })
@@ -159,6 +162,10 @@ function deleteElement() {
         <RepeatingTableProperties
           v-if="selectedElement.type === 'repeating_table'"
           :element="(selectedElement as RepeatingTableElement)" />
+
+        <ChartProperties
+          v-if="selectedElement.type === 'chart'"
+          :element="(selectedElement as ChartElement)" />
 
         <!-- Header/Footer toggles for root element -->
         <div v-if="selectedElement.id === 'root'" class="prop-section">

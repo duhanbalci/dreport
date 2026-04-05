@@ -10,11 +10,12 @@ pub mod expr_eval;
 pub mod wasm_api;
 
 pub mod barcode_gen;
+pub mod chart_render;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod pdf_render;
 
-use dreport_core::models::Template;
+use dreport_core::models::{ChartType, Template};
 use serde::{Deserialize, Serialize};
 
 // --- Layout sonuç tipleri ---
@@ -73,6 +74,56 @@ pub enum ResolvedContent {
         rows: Vec<Vec<TableCell>>,
         column_widths_mm: Vec<f64>,
     },
+    #[serde(rename = "chart")]
+    Chart {
+        svg: String,
+        /// PDF render icin chart verisi (frontend bunu kullanmaz)
+        #[serde(flatten)]
+        chart_data: ChartRenderData,
+    },
+}
+
+/// PDF renderer icin chart verisi — ResolvedContent::Chart icinde tasınır
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChartRenderData {
+    pub chart_type: ChartType,
+    pub categories: Vec<String>,
+    pub series: Vec<ChartSeriesData>,
+    #[serde(default)]
+    pub title_text: Option<String>,
+    #[serde(default)]
+    pub title_font_size: Option<f64>,
+    #[serde(default)]
+    pub title_color: Option<String>,
+    #[serde(default)]
+    pub colors: Vec<String>,
+    #[serde(default)]
+    pub show_labels: bool,
+    #[serde(default)]
+    pub label_font_size: Option<f64>,
+    #[serde(default)]
+    pub show_grid: bool,
+    #[serde(default)]
+    pub grid_color: Option<String>,
+    #[serde(default)]
+    pub bar_gap: Option<f64>,
+    #[serde(default)]
+    pub stacked: bool,
+    #[serde(default)]
+    pub inner_radius: Option<f64>,
+    #[serde(default)]
+    pub show_points: Option<bool>,
+    #[serde(default)]
+    pub line_width: Option<f64>,
+    #[serde(default)]
+    pub background_color: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChartSeriesData {
+    pub name: String,
+    pub values: Vec<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

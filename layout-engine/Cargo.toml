@@ -9,7 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 dreport-core = { path = "../core" }
-dexpr = { path = "../../rust-expr" }
+dexpr = { version = "0.1.0", registry = "gitea" }
 taffy = "0.9"
 cosmic-text = { version = "0.18", default-features = false, features = ["std", "swash"] }
 serde = { version = "1", features = ["derive"] }

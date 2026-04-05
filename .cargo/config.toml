@@ -1,0 +1,2 @@
+[registries.gitea]
+index = "sparse+https://gitea.duhanbalci.com/api/packages/duhanbalci/cargo/"

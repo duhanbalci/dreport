@@ -68,6 +68,26 @@ pub struct ResolvedRichSpan {
     pub color: Option<String>,
 }
 
+/// Çözümlenmiş chart verisi
+#[derive(Debug, Clone)]
+pub struct ResolvedChartData {
+    pub chart_type: ChartType,
+    pub categories: Vec<String>,
+    pub series: Vec<ChartSeries>,
+    pub title: Option<ChartTitle>,
+    pub legend: Option<ChartLegend>,
+    pub labels: Option<ChartLabels>,
+    pub axis: Option<ChartAxis>,
+    pub style: ChartStyle,
+    pub group_mode: Option<GroupMode>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ChartSeries {
+    pub name: String,
+    pub values: Vec<f64>,
+}
+
 /// Her element ID'si için çözümlenmiş text içeriğini tutar.
 /// Table ve barcode gibi özel tipler de burada çözülür.
 #[derive(Debug, Clone)]
@@ -84,6 +104,8 @@ pub struct ResolvedData {
     pub page_number_formats: HashMap<String, String>,
     /// element_id → çözümlenmiş rich text span listesi
     pub rich_texts: HashMap<String, Vec<ResolvedRichSpan>>,
+    /// element_id → çözümlenmiş chart verisi
+    pub charts: HashMap<String, ResolvedChartData>,
 }
 
 #[derive(Debug, Clone)]
@@ -123,6 +145,7 @@ pub fn resolve_template(template: &Template, data: &Value) -> ResolvedData {
         images: HashMap::new(),
         page_number_formats: HashMap::new(),
         rich_texts: HashMap::new(),
+        charts: HashMap::new(),
     };
     if let Some(ref header) = template.header {
         resolve_element(&TemplateElement::Container(header.clone()), data, &mut resolved);
@@ -248,9 +271,107 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
                 .collect();
             resolved.rich_texts.insert(e.id.clone(), spans);
         }
+        TemplateElement::Chart(e) => {
+            let array = resolve_path(data, &e.data_source.path);
+            let chart_data = match array {
+                Value::Array(items) if !items.is_empty() => {
+                    resolve_chart_data(e, items)
+                }
+                _ => ResolvedChartData {
+                    chart_type: e.chart_type.clone(),
+                    categories: vec![],
+                    series: vec![],
+                    title: e.title.clone(),
+                    legend: e.legend.clone(),
+                    labels: e.labels.clone(),
+                    axis: e.axis.clone(),
+                    style: e.style.clone(),
+                    group_mode: e.group_mode.clone(),
+                },
+            };
+            resolved.charts.insert(e.id.clone(), chart_data);
+        }
         TemplateElement::Line(_) => {}
         TemplateElement::Shape(_) => {}
         TemplateElement::PageBreak(_) => {}
+    }
+}
+
+fn resolve_chart_data(e: &ChartElement, items: &[Value]) -> ResolvedChartData {
+    let (categories, series) = if let Some(ref group_field) = e.group_field {
+        // Grouped: her distinct group değeri bir seri olur
+        let mut category_order: Vec<String> = Vec::new();
+        let mut category_set = std::collections::HashSet::new();
+        let mut group_order: Vec<String> = Vec::new();
+        let mut group_set = std::collections::HashSet::new();
+        // group_name → (category → value) (birden fazla aynı group+category olursa topla)
+        let mut group_data: HashMap<String, HashMap<String, f64>> = HashMap::new();
+
+        for item in items {
+            let cat = value_to_string(resolve_path(item, &e.category_field));
+            let val = resolve_path(item, &e.value_field)
+                .as_f64()
+                .unwrap_or(0.0);
+            let grp = value_to_string(resolve_path(item, group_field));
+
+            if category_set.insert(cat.clone()) {
+                category_order.push(cat.clone());
+            }
+            if group_set.insert(grp.clone()) {
+                group_order.push(grp.clone());
+            }
+            *group_data
+                .entry(grp)
+                .or_default()
+                .entry(cat)
+                .or_insert(0.0) += val;
+        }
+
+        let series = group_order
+            .iter()
+            .map(|grp| {
+                let grp_map = group_data.get(grp).unwrap();
+                let values = category_order
+                    .iter()
+                    .map(|cat| *grp_map.get(cat).unwrap_or(&0.0))
+                    .collect();
+                ChartSeries {
+                    name: grp.clone(),
+                    values,
+                }
+            })
+            .collect();
+
+        (category_order, series)
+    } else {
+        // Tek seri
+        let mut categories = Vec::new();
+        let mut values = Vec::new();
+        for item in items {
+            categories.push(value_to_string(resolve_path(item, &e.category_field)));
+            values.push(
+                resolve_path(item, &e.value_field)
+                    .as_f64()
+                    .unwrap_or(0.0),
+            );
+        }
+        let series = vec![ChartSeries {
+            name: e.value_field.clone(),
+            values,
+        }];
+        (categories, series)
+    };
+
+    ResolvedChartData {
+        chart_type: e.chart_type.clone(),
+        categories,
+        series,
+        title: e.title.clone(),
+        legend: e.legend.clone(),
+        labels: e.labels.clone(),
+        axis: e.axis.clone(),
+        style: e.style.clone(),
+        group_mode: e.group_mode.clone(),
     }
 }
 

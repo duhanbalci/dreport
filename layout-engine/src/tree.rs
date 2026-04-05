@@ -92,7 +92,7 @@ pub fn compute(
         )
         .unwrap();
 
-    let body_elements = collect_layout(&taffy, root_node, &node_map, 0.0, 0.0);
+    let body_elements = collect_layout(&taffy, root_node, &node_map, resolved, 0.0, 0.0);
 
     // --- 4. Container break modlarını topla ---
     let break_modes = collect_break_modes(&template.root);
@@ -155,7 +155,7 @@ fn compute_section(
         )
         .unwrap();
 
-    let elements = collect_layout(&taffy, section_node, &node_map, 0.0, 0.0);
+    let elements = collect_layout(&taffy, section_node, &node_map, resolved, 0.0, 0.0);
 
     // Section yüksekliği
     let section_layout = taffy.layout(section_node).unwrap();
@@ -553,6 +553,28 @@ fn build_element(
             );
             node
         }
+        TemplateElement::Chart(e) => {
+            let mut style = sizing::leaf_style(&e.size, &e.position, parent_direction);
+            // Default minimum boyut — Auto ise chart cok kucuk olmasin
+            if matches!(e.size.width, SizeValue::Auto) {
+                style.min_size.width = Dimension::length(mm_to_pt(80.0));
+            }
+            if matches!(e.size.height, SizeValue::Auto) {
+                style.min_size.height = Dimension::length(mm_to_pt(60.0));
+            }
+            let node = taffy.new_leaf(style).unwrap();
+            node_map.insert(
+                node,
+                NodeInfo {
+                    element_id: e.id.clone(),
+                    element_type: "chart".to_string(),
+                    content: None, // SVG collect_layout'ta uretilecek
+                    style: ResolvedStyle::default(),
+                    children_ids: vec![],
+                },
+            );
+            node
+        }
         TemplateElement::PageBreak(e) => {
             // Küçük yükseklik — editörde görünür olması için (0.5mm ≈ 1.4pt)
             let style = Style {
@@ -694,6 +716,7 @@ fn collect_layout(
     taffy: &TaffyTree<MeasureContext>,
     node: NodeId,
     node_map: &HashMap<NodeId, NodeInfo>,
+    resolved: &ResolvedData,
     parent_x_mm: f64,
     parent_y_mm: f64,
 ) -> Vec<ElementLayout> {
@@ -709,6 +732,52 @@ fn collect_layout(
     let w_mm = pt_to_mm(layout.size.width);
     let h_mm = pt_to_mm(layout.size.height);
 
+    // Chart elementleri icin SVG uret (boyutlar artik belli)
+    let content = if info.element_type == "chart" {
+        resolved.charts.get(&info.element_id).map(|cd| {
+            use crate::{ChartRenderData, ChartSeriesData};
+            use crate::chart_render::DEFAULT_COLORS;
+
+            // Renk paleti olustur
+            let n_colors = cd.categories.len().max(cd.series.len()).max(1);
+            let colors: Vec<String> = (0..n_colors)
+                .map(|i| {
+                    cd.style.colors.as_ref()
+                        .and_then(|c| c.get(i).cloned())
+                        .unwrap_or_else(|| DEFAULT_COLORS[i % DEFAULT_COLORS.len()].to_string())
+                })
+                .collect();
+
+            ResolvedContent::Chart {
+                svg: crate::chart_render::render_svg(cd, w_mm, h_mm),
+                chart_data: ChartRenderData {
+                    chart_type: cd.chart_type.clone(),
+                    categories: cd.categories.clone(),
+                    series: cd.series.iter().map(|s| ChartSeriesData {
+                        name: s.name.clone(),
+                        values: s.values.clone(),
+                    }).collect(),
+                    title_text: cd.title.as_ref().map(|t| t.text.clone()),
+                    title_font_size: cd.title.as_ref().and_then(|t| t.font_size),
+                    title_color: cd.title.as_ref().and_then(|t| t.color.clone()),
+                    colors,
+                    show_labels: cd.labels.as_ref().is_some_and(|l| l.show),
+                    label_font_size: cd.labels.as_ref().and_then(|l| l.font_size),
+                    show_grid: cd.axis.as_ref().and_then(|a| a.show_grid).unwrap_or(true),
+                    grid_color: cd.axis.as_ref().and_then(|a| a.grid_color.clone()),
+                    bar_gap: cd.style.bar_gap,
+                    stacked: matches!(cd.group_mode, Some(dreport_core::models::GroupMode::Stacked)),
+                    inner_radius: cd.style.inner_radius,
+                    show_points: cd.style.show_points,
+                    line_width: cd.style.line_width,
+                    background_color: cd.style.background_color.clone(),
+                },
+            }
+        })
+    } else {
+        info.content.clone()
+    };
+
     elements.push(ElementLayout {
         id: info.element_id.clone(),
         x_mm,
@@ -716,7 +785,7 @@ fn collect_layout(
         width_mm: w_mm,
         height_mm: h_mm,
         element_type: info.element_type.clone(),
-        content: info.content.clone(),
+        content,
         style: info.style.clone(),
         children: info.children_ids.clone(),
     });
@@ -724,7 +793,7 @@ fn collect_layout(
     // Child node'ları da topla
     let children = taffy.children(node).unwrap();
     for child_node in children {
-        let child_elements = collect_layout(taffy, child_node, node_map, x_mm, y_mm);
+        let child_elements = collect_layout(taffy, child_node, node_map, resolved, x_mm, y_mm);
         elements.extend(child_elements);
     }
 

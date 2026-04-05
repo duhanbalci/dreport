@@ -217,6 +217,62 @@ export interface PageBreakElement extends BaseElement {
   style: Record<string, never>
 }
 
+// --- Chart ---
+
+export type ChartType = 'bar' | 'line' | 'pie'
+export type GroupMode = 'grouped' | 'stacked'
+
+export interface ChartTitle {
+  text: string
+  fontSize?: number
+  color?: string
+  align?: 'left' | 'center' | 'right'
+}
+
+export interface ChartLegend {
+  show: boolean
+  position?: 'top' | 'bottom' | 'right'
+  fontSize?: number
+}
+
+export interface ChartLabels {
+  show: boolean
+  fontSize?: number
+  color?: string
+}
+
+export interface ChartAxis {
+  xLabel?: string
+  yLabel?: string
+  showGrid?: boolean
+  gridColor?: string
+}
+
+export interface ChartStyle {
+  colors?: string[]
+  backgroundColor?: string
+  barGap?: number         // 0.0-1.0
+  lineWidth?: number      // mm
+  showPoints?: boolean
+  curveType?: 'linear' | 'smooth'
+  innerRadius?: number    // 0=pie, >0=donut (0-0.9)
+}
+
+export interface ChartElement extends BaseElement {
+  type: 'chart'
+  chartType: ChartType
+  dataSource: ArrayBinding
+  categoryField: string
+  valueField: string
+  groupField?: string
+  groupMode?: GroupMode
+  title?: ChartTitle
+  legend?: ChartLegend
+  labels?: ChartLabels
+  axis?: ChartAxis
+  style: ChartStyle
+}
+
 export interface ContainerElement extends BaseElement {
   type: 'container'
   direction: 'row' | 'column'
@@ -237,7 +293,7 @@ export interface RepeatingTableElement extends BaseElement {
   repeatHeader?: boolean
 }
 
-export type LeafElement = StaticTextElement | TextElement | LineElement | RepeatingTableElement | ImageElement | PageNumberElement | BarcodeElement | PageBreakElement | CurrentDateElement | ShapeElement | CheckboxElement | CalculatedTextElement | RichTextElement
+export type LeafElement = StaticTextElement | TextElement | LineElement | RepeatingTableElement | ImageElement | PageNumberElement | BarcodeElement | PageBreakElement | CurrentDateElement | ShapeElement | CheckboxElement | CalculatedTextElement | RichTextElement | ChartElement
 export type TemplateElement = LeafElement | ContainerElement
 
 // --- Template ---

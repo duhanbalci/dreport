@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useEditorStore } from '../../stores/editor'
 import { useSchemaStore } from '../../stores/schema'
-import type { TemplateElement, RepeatingTableElement, TableColumn, ImageElement, PageNumberElement, BarcodeElement, PageBreakElement, CurrentDateElement, ShapeElement, CheckboxElement, CalculatedTextElement, RichTextElement } from '../../core/types'
+import type { TemplateElement, RepeatingTableElement, TableColumn, ImageElement, PageNumberElement, BarcodeElement, PageBreakElement, CurrentDateElement, ShapeElement, CheckboxElement, CalculatedTextElement, RichTextElement, ChartElement } from '../../core/types'
 import { sz } from '../../core/types'
 import { schemaFormatToFormatType, defaultAlignForSchema } from '../../core/schema-parser'
 
@@ -198,6 +198,38 @@ const tools: ToolItem[] = [
       style: { fontSize: 10, color: '#666666' },
       format: 'DD.MM.YYYY',
     }),
+  },
+  {
+    label: 'Grafik',
+    icon: '◩',
+    create: (): ChartElement => {
+      const arrays = schemaStore.arrayFields
+      const firstArray = arrays[0]
+      let dataPath = ''
+      let categoryField = ''
+      let valueField = ''
+
+      if (firstArray) {
+        dataPath = firstArray.path
+        const itemFields = schemaStore.getArrayItemFields(firstArray.path)
+        const stringField = itemFields.find(f => f.type === 'string')
+        const numberField = itemFields.find(f => f.type === 'number' || f.type === 'integer')
+        categoryField = stringField?.key ?? itemFields[0]?.key ?? ''
+        valueField = numberField?.key ?? itemFields[1]?.key ?? ''
+      }
+
+      return {
+        id: nextId('chart'),
+        type: 'chart',
+        position: { type: 'flow' },
+        size: { width: sz.fr(1), height: sz.fixed(80) },
+        chartType: 'bar',
+        dataSource: { type: 'array', path: dataPath },
+        categoryField,
+        valueField,
+        style: {},
+      }
+    },
   },
   {
     label: 'Sayfa Sonu',
