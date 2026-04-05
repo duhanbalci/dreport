@@ -205,6 +205,9 @@ const tools: ToolItem[] = [
     create: (): PageBreakElement => ({
       id: nextId('pb'),
       type: 'page_break',
+      position: { type: 'flow' },
+      size: { width: sz.fr(1), height: sz.auto() },
+      style: {},
     }),
   },
 ]

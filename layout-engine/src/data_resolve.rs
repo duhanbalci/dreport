@@ -219,7 +219,9 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
         TemplateElement::CalculatedText(e) => {
             let result = crate::expr_eval::evaluate_expression(&e.expression, data);
             let formatted = crate::expr_eval::apply_format(&result, e.format.as_deref());
-            resolved.texts.insert(e.id.clone(), formatted);
+            // Bos ifade veya hata durumunda placeholder goster — element 0 yukseklige dusmesin
+            let text = if formatted.is_empty() { " ".to_string() } else { formatted };
+            resolved.texts.insert(e.id.clone(), text);
         }
         TemplateElement::RichText(e) => {
             let spans: Vec<ResolvedRichSpan> = e

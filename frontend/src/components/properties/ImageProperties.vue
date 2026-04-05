@@ -33,22 +33,22 @@ function onImageFileSelect(e: Event) {
 <template>
   <div class="prop-section">
     <div class="prop-section__title">Gorsel</div>
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Gorsel dosyasi secin (PNG, JPG, SVG)">
       <label class="prop-label">Kaynak</label>
       <label class="prop-file-btn">
         Dosya Sec
         <input type="file" accept="image/*" style="display: none" @change="onImageFileSelect" />
       </label>
     </div>
-    <div v-if="element.src" class="prop-row">
+    <div v-if="element.src" class="prop-row" data-tip="Yuklenen gorsel onizlemesi">
       <label class="prop-label">Onizleme</label>
       <img :src="element.src" class="prop-image-preview" />
     </div>
-    <div v-if="element.src" class="prop-row">
+    <div v-if="element.src" class="prop-row" data-tip="Gorseli kaldirmak icin tiklayin">
       <label class="prop-label"></label>
       <button class="prop-clear" @click="update({ src: undefined } as any)">Gorseli kaldir</button>
     </div>
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Gorselin alana sigdirma modu">
       <label class="prop-label">Sigdirma</label>
       <select class="prop-input prop-select"
         :value="element.style.objectFit ?? 'contain'"

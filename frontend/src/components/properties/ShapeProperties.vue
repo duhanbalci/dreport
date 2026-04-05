@@ -22,7 +22,7 @@ function updateStyle(key: string, value: unknown) {
 <template>
   <div class="prop-section">
     <div class="prop-section__title">Sekil</div>
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Sekil tipi">
       <label class="prop-label">Tip</label>
       <select class="prop-input prop-select"
         :value="element.shapeType"
@@ -32,25 +32,25 @@ function updateStyle(key: string, value: unknown) {
         <option value="ellipse">Elips</option>
       </select>
     </div>
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Sekil arka plan rengi">
       <label class="prop-label">Arka Plan</label>
       <input class="prop-input prop-color" type="color"
         :value="element.style.backgroundColor ?? '#f0f0f0'"
         @input="(e) => updateStyle('backgroundColor', (e.target as HTMLInputElement).value)" />
     </div>
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Kenarlik cizgisi rengi">
       <label class="prop-label">Kenar Rengi</label>
       <input class="prop-input prop-color" type="color"
         :value="element.style.borderColor ?? '#333333'"
         @input="(e) => updateStyle('borderColor', (e.target as HTMLInputElement).value)" />
     </div>
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Kenarlik cizgi kalinligi (mm)">
       <label class="prop-label">Kenar Kalinligi</label>
       <input class="prop-input" type="number" step="0.25" min="0"
         :value="element.style.borderWidth ?? 0.5"
         @input="(e) => updateStyle('borderWidth', parseFloat((e.target as HTMLInputElement).value) || 0)" />
     </div>
-    <div v-if="element.shapeType === 'rounded_rectangle'" class="prop-row">
+    <div v-if="element.shapeType === 'rounded_rectangle'" class="prop-row" data-tip="Kose yuvarlakligi (mm)">
       <label class="prop-label">Kose Yuvarlakligi</label>
       <input class="prop-input" type="number" step="0.5" min="0"
         :value="element.style.borderRadius ?? 2"

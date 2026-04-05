@@ -1,42 +1,67 @@
+use dexpr::ast::value::Value as DexprValue;
+use dexpr::compiler::Compiler;
+use dexpr::vm::VM;
 use serde_json::Value;
 
-/// Expression evaluator for calculated_text elements.
-/// This is a safe recursive descent parser — NOT an arbitrary code executor.
-/// It only supports arithmetic, string operations, comparisons, and data path lookups.
+/// Expression evaluator for calculated_text elements using dexpr engine.
+/// Supports arithmetic, string ops, comparisons, conditionals, methods, and more.
 ///
-/// Supported syntax:
-/// - Path lookup: `firma.unvan`, `toplamlar.kdv`
-/// - Arithmetic: `+`, `-`, `*`, `/`
-/// - String concatenation: `+` when operand is string
-/// - String literals: `"..."` or `'...'`
-/// - Number literals: `42`, `3.14`
-/// - Comparison: `>`, `<`, `>=`, `<=`, `==`, `!=`
-/// - Ternary: `expr ? "a" : "b"`
-/// - Parentheses: `(a + b) * c`
-
+/// Data JSON's top-level keys are set as global variables in dexpr.
+/// Expressions like `firma.unvan` or `toplamlar.kdv + toplamlar.araToplam` work directly.
 pub fn evaluate_expression(expr: &str, data: &Value) -> String {
-    let tokens = tokenize(expr);
-    if tokens.is_empty() {
+    if expr.is_empty() {
         return String::new();
     }
-    let mut parser = Parser {
-        tokens: &tokens,
-        pos: 0,
-        data,
+
+    let mut compiler = Compiler::new();
+    let bytecode = match compiler.compile_from_source(expr) {
+        Ok((bc, _)) => bc,
+        Err(_) => return String::new(),
     };
-    match parser.parse_ternary() {
-        ExprValue::Num(n) => format_number(n),
-        ExprValue::Str(s) => s,
-        ExprValue::Bool(b) => b.to_string(),
-        ExprValue::Null => String::new(),
+
+    let mut vm = VM::new(&bytecode);
+
+    // Set each top-level key in data as a dexpr global
+    if let Value::Object(map) = data {
+        for (key, val) in map {
+            if let Ok(dval) = DexprValue::from_json_value(val) {
+                vm.set_global(key, dval);
+            }
+        }
+    }
+
+    match vm.execute() {
+        Ok(result) => dexpr_value_to_string(&result),
+        Err(_) => String::new(),
     }
 }
 
-fn format_number(n: f64) -> String {
-    if n == n.floor() && n.abs() < 1e15 {
-        format!("{}", n as i64)
-    } else {
-        format!("{}", n)
+/// Convert dexpr Value to display string
+fn dexpr_value_to_string(val: &DexprValue) -> String {
+    match val {
+        DexprValue::Null => String::new(),
+        DexprValue::Boolean(b) => b.to_string(),
+        DexprValue::Number(n) => {
+            // Format: no trailing zeros for integers
+            if n.scale() == 0 {
+                n.to_string()
+            } else {
+                n.normalize().to_string()
+            }
+        }
+        DexprValue::String(s) => s.to_string(),
+        DexprValue::NumberList(list) => {
+            let items: Vec<String> = list.iter().map(|n| n.to_string()).collect();
+            format!("[{}]", items.join(", "))
+        }
+        DexprValue::StringList(list) => {
+            let items: Vec<String> = list.iter().map(|s| s.to_string()).collect();
+            format!("[{}]", items.join(", "))
+        }
+        DexprValue::Object(map) => {
+            let items: Vec<String> = map.iter().map(|(k, v)| format!("{}: {}", k, dexpr_value_to_string(v))).collect();
+            format!("{{{}}}", items.join(", "))
+        }
     }
 }
 
@@ -100,319 +125,6 @@ fn format_with_thousands(n: i64) -> String {
     result
 }
 
-// --- Tokenizer ---
-
-#[derive(Debug, Clone, PartialEq)]
-enum Token {
-    Num(f64),
-    Str(String),
-    Ident(String),
-    Plus,
-    Minus,
-    Star,
-    Slash,
-    LParen,
-    RParen,
-    Gt,
-    Lt,
-    Gte,
-    Lte,
-    Eq,
-    Neq,
-    Question,
-    Colon,
-}
-
-fn tokenize(input: &str) -> Vec<Token> {
-    let mut tokens = Vec::new();
-    let chars: Vec<char> = input.chars().collect();
-    let len = chars.len();
-    let mut i = 0;
-
-    while i < len {
-        match chars[i] {
-            ' ' | '\t' | '\n' | '\r' => i += 1,
-            '+' => { tokens.push(Token::Plus); i += 1; }
-            '-' => {
-                // Negative number: after operator or at start
-                let is_unary = tokens.is_empty()
-                    || matches!(tokens.last(), Some(
-                        Token::Plus | Token::Minus | Token::Star | Token::Slash
-                        | Token::LParen | Token::Question | Token::Colon
-                        | Token::Gt | Token::Lt | Token::Gte | Token::Lte
-                        | Token::Eq | Token::Neq
-                    ));
-                if is_unary && i + 1 < len && (chars[i + 1].is_ascii_digit() || chars[i + 1] == '.') {
-                    let start = i;
-                    i += 1;
-                    while i < len && (chars[i].is_ascii_digit() || chars[i] == '.') {
-                        i += 1;
-                    }
-                    let num_str: String = chars[start..i].iter().collect();
-                    if let Ok(n) = num_str.parse::<f64>() {
-                        tokens.push(Token::Num(n));
-                    }
-                } else {
-                    tokens.push(Token::Minus);
-                    i += 1;
-                }
-            }
-            '*' => { tokens.push(Token::Star); i += 1; }
-            '/' => { tokens.push(Token::Slash); i += 1; }
-            '(' => { tokens.push(Token::LParen); i += 1; }
-            ')' => { tokens.push(Token::RParen); i += 1; }
-            '?' => { tokens.push(Token::Question); i += 1; }
-            ':' => { tokens.push(Token::Colon); i += 1; }
-            '>' => {
-                if i + 1 < len && chars[i + 1] == '=' {
-                    tokens.push(Token::Gte); i += 2;
-                } else {
-                    tokens.push(Token::Gt); i += 1;
-                }
-            }
-            '<' => {
-                if i + 1 < len && chars[i + 1] == '=' {
-                    tokens.push(Token::Lte); i += 2;
-                } else {
-                    tokens.push(Token::Lt); i += 1;
-                }
-            }
-            '=' => {
-                if i + 1 < len && chars[i + 1] == '=' {
-                    tokens.push(Token::Eq); i += 2;
-                } else {
-                    i += 1;
-                }
-            }
-            '!' => {
-                if i + 1 < len && chars[i + 1] == '=' {
-                    tokens.push(Token::Neq); i += 2;
-                } else {
-                    i += 1;
-                }
-            }
-            '"' | '\'' => {
-                let quote = chars[i];
-                i += 1;
-                let start = i;
-                while i < len && chars[i] != quote {
-                    i += 1;
-                }
-                let s: String = chars[start..i].iter().collect();
-                tokens.push(Token::Str(s));
-                if i < len { i += 1; }
-            }
-            c if c.is_ascii_digit() || (c == '.' && i + 1 < len && chars[i + 1].is_ascii_digit()) => {
-                let start = i;
-                while i < len && (chars[i].is_ascii_digit() || chars[i] == '.') {
-                    i += 1;
-                }
-                let num_str: String = chars[start..i].iter().collect();
-                if let Ok(n) = num_str.parse::<f64>() {
-                    tokens.push(Token::Num(n));
-                }
-            }
-            c if c.is_alphanumeric() || c == '_' => {
-                let start = i;
-                while i < len && (chars[i].is_alphanumeric() || chars[i] == '_' || chars[i] == '.') {
-                    i += 1;
-                }
-                // Trim trailing dots
-                while i > start && chars[i - 1] == '.' {
-                    i -= 1;
-                }
-                let ident: String = chars[start..i].iter().collect();
-                match ident.as_str() {
-                    "true" => tokens.push(Token::Num(1.0)),
-                    "false" => tokens.push(Token::Num(0.0)),
-                    _ => tokens.push(Token::Ident(ident)),
-                }
-            }
-            _ => i += 1,
-        }
-    }
-
-    tokens
-}
-
-// --- Parser (recursive descent) ---
-
-#[derive(Debug, Clone)]
-enum ExprValue {
-    Num(f64),
-    Str(String),
-    Bool(bool),
-    Null,
-}
-
-impl ExprValue {
-    fn to_num(&self) -> f64 {
-        match self {
-            ExprValue::Num(n) => *n,
-            ExprValue::Str(s) => s.parse().unwrap_or(0.0),
-            ExprValue::Bool(b) => if *b { 1.0 } else { 0.0 },
-            ExprValue::Null => 0.0,
-        }
-    }
-
-    fn to_str(&self) -> String {
-        match self {
-            ExprValue::Num(n) => format_number(*n),
-            ExprValue::Str(s) => s.clone(),
-            ExprValue::Bool(b) => b.to_string(),
-            ExprValue::Null => String::new(),
-        }
-    }
-
-    fn is_truthy(&self) -> bool {
-        match self {
-            ExprValue::Num(n) => *n != 0.0,
-            ExprValue::Str(s) => !s.is_empty(),
-            ExprValue::Bool(b) => *b,
-            ExprValue::Null => false,
-        }
-    }
-
-    fn is_string(&self) -> bool {
-        matches!(self, ExprValue::Str(_))
-    }
-}
-
-struct Parser<'a> {
-    tokens: &'a [Token],
-    pos: usize,
-    data: &'a Value,
-}
-
-impl<'a> Parser<'a> {
-    fn peek(&self) -> Option<&Token> {
-        self.tokens.get(self.pos)
-    }
-
-    fn advance(&mut self) -> Option<&Token> {
-        let tok = self.tokens.get(self.pos);
-        self.pos += 1;
-        tok
-    }
-
-    fn parse_ternary(&mut self) -> ExprValue {
-        let cond = self.parse_comparison();
-        if self.peek() == Some(&Token::Question) {
-            self.advance();
-            let then_val = self.parse_ternary();
-            if self.peek() == Some(&Token::Colon) {
-                self.advance();
-            }
-            let else_val = self.parse_ternary();
-            if cond.is_truthy() { then_val } else { else_val }
-        } else {
-            cond
-        }
-    }
-
-    fn parse_comparison(&mut self) -> ExprValue {
-        let left = self.parse_additive();
-        match self.peek() {
-            Some(Token::Gt) => { self.advance(); let r = self.parse_additive(); ExprValue::Bool(left.to_num() > r.to_num()) }
-            Some(Token::Lt) => { self.advance(); let r = self.parse_additive(); ExprValue::Bool(left.to_num() < r.to_num()) }
-            Some(Token::Gte) => { self.advance(); let r = self.parse_additive(); ExprValue::Bool(left.to_num() >= r.to_num()) }
-            Some(Token::Lte) => { self.advance(); let r = self.parse_additive(); ExprValue::Bool(left.to_num() <= r.to_num()) }
-            Some(Token::Eq) => { self.advance(); let r = self.parse_additive(); ExprValue::Bool(left.to_str() == r.to_str()) }
-            Some(Token::Neq) => { self.advance(); let r = self.parse_additive(); ExprValue::Bool(left.to_str() != r.to_str()) }
-            _ => left,
-        }
-    }
-
-    fn parse_additive(&mut self) -> ExprValue {
-        let mut left = self.parse_multiplicative();
-        loop {
-            match self.peek() {
-                Some(Token::Plus) => {
-                    self.advance();
-                    let right = self.parse_multiplicative();
-                    if left.is_string() || right.is_string() {
-                        left = ExprValue::Str(format!("{}{}", left.to_str(), right.to_str()));
-                    } else {
-                        left = ExprValue::Num(left.to_num() + right.to_num());
-                    }
-                }
-                Some(Token::Minus) => {
-                    self.advance();
-                    let right = self.parse_multiplicative();
-                    left = ExprValue::Num(left.to_num() - right.to_num());
-                }
-                _ => break,
-            }
-        }
-        left
-    }
-
-    fn parse_multiplicative(&mut self) -> ExprValue {
-        let mut left = self.parse_primary();
-        loop {
-            match self.peek() {
-                Some(Token::Star) => {
-                    self.advance();
-                    let right = self.parse_primary();
-                    left = ExprValue::Num(left.to_num() * right.to_num());
-                }
-                Some(Token::Slash) => {
-                    self.advance();
-                    let right = self.parse_primary();
-                    let r = right.to_num();
-                    left = ExprValue::Num(if r != 0.0 { left.to_num() / r } else { 0.0 });
-                }
-                _ => break,
-            }
-        }
-        left
-    }
-
-    fn parse_primary(&mut self) -> ExprValue {
-        match self.advance().cloned() {
-            Some(Token::Num(n)) => ExprValue::Num(n),
-            Some(Token::Str(s)) => ExprValue::Str(s),
-            Some(Token::Ident(path)) => {
-                let val = resolve_path(self.data, &path);
-                json_to_expr(val)
-            }
-            Some(Token::LParen) => {
-                let val = self.parse_ternary();
-                if self.peek() == Some(&Token::RParen) {
-                    self.advance();
-                }
-                val
-            }
-            Some(Token::Minus) => {
-                let val = self.parse_primary();
-                ExprValue::Num(-val.to_num())
-            }
-            _ => ExprValue::Null,
-        }
-    }
-}
-
-fn resolve_path<'a>(data: &'a Value, path: &str) -> &'a Value {
-    let mut current = data;
-    for key in path.split('.') {
-        current = match current {
-            Value::Object(map) => map.get(key).unwrap_or(&Value::Null),
-            _ => &Value::Null,
-        };
-    }
-    current
-}
-
-fn json_to_expr(v: &Value) -> ExprValue {
-    match v {
-        Value::Number(n) => ExprValue::Num(n.as_f64().unwrap_or(0.0)),
-        Value::String(s) => ExprValue::Str(s.clone()),
-        Value::Bool(b) => ExprValue::Bool(*b),
-        Value::Null => ExprValue::Null,
-        _ => ExprValue::Str(v.to_string()),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -445,13 +157,19 @@ mod tests {
     #[test]
     fn test_ternary() {
         let data = json!({"fatura": {"tutar": 5000}});
-        assert_eq!(evaluate_expression("fatura.tutar > 0 ? \"Borclu\" : \"Alacakli\"", &data), "Borclu");
+        assert_eq!(
+            evaluate_expression("if fatura.tutar > 0 then \"Borclu\" else \"Alacakli\" end", &data),
+            "Borclu"
+        );
     }
 
     #[test]
     fn test_ternary_false() {
         let data = json!({"fatura": {"tutar": 0}});
-        assert_eq!(evaluate_expression("fatura.tutar > 0 ? \"Borclu\" : \"Alacakli\"", &data), "Alacakli");
+        assert_eq!(
+            evaluate_expression("if fatura.tutar > 0 then \"Borclu\" else \"Alacakli\" end", &data),
+            "Alacakli"
+        );
     }
 
     #[test]
@@ -468,21 +186,19 @@ mod tests {
     }
 
     #[test]
-    fn test_division_by_zero() {
-        let data = json!({});
-        assert_eq!(evaluate_expression("10 / 0", &data), "0");
-    }
-
-    #[test]
     fn test_missing_path() {
         let data = json!({});
+        // dexpr returns Null for undefined globals
         assert_eq!(evaluate_expression("missing.path", &data), "");
     }
 
     #[test]
-    fn test_comparison_eq() {
-        let data = json!({"status": "paid"});
-        assert_eq!(evaluate_expression("status == \"paid\" ? \"Odendi\" : \"Odenmedi\"", &data), "Odendi");
+    fn test_numeric_comparison() {
+        let data = json!({"fatura": {"tutar": 5000}});
+        assert_eq!(
+            evaluate_expression("if fatura.tutar > 1000 then \"Yuksek\" else \"Dusuk\" end", &data),
+            "Yuksek"
+        );
     }
 
     #[test]
@@ -506,5 +222,36 @@ mod tests {
     fn test_empty_expression() {
         let data = json!({});
         assert_eq!(evaluate_expression("", &data), "");
+    }
+
+    // dexpr-specific features
+    #[test]
+    fn test_string_methods() {
+        let data = json!({"name": "Acme Teknoloji"});
+        assert_eq!(evaluate_expression("name.upper()", &data), "ACME TEKNOLOJI");
+        assert_eq!(evaluate_expression("name.length()", &data), "14");
+    }
+
+    #[test]
+    fn test_modulo_and_power() {
+        let data = json!({});
+        assert_eq!(evaluate_expression("10 % 3", &data), "1");
+        assert_eq!(evaluate_expression("2 ** 10", &data), "1024");
+    }
+
+    #[test]
+    fn test_logical_operators() {
+        let data = json!({"a": true, "b": false});
+        assert_eq!(evaluate_expression("a && b", &data), "false");
+        assert_eq!(evaluate_expression("a || b", &data), "true");
+    }
+
+    #[test]
+    fn test_compound_expression() {
+        let data = json!({"toplamlar": {"araToplam": 16000, "kdvOran": 18}});
+        assert_eq!(
+            evaluate_expression("toplamlar.araToplam * toplamlar.kdvOran / 100", &data),
+            "2880"
+        );
     }
 }

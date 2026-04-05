@@ -8,6 +8,7 @@ import { useEditorStore } from '../stores/editor'
 import EditorCanvas from '../components/editor/EditorCanvas.vue'
 import ToolboxPanel from '../components/panels/ToolboxPanel.vue'
 import SchemaTreePanel from '../components/panels/SchemaTreePanel.vue'
+import { setupTooltips } from '../directives/tip'
 import PropertiesPanel from '../components/panels/PropertiesPanel.vue'
 
 export interface DreportEditorConfig {
@@ -46,6 +47,7 @@ onMounted(() => {
   templateStore.template = JSON.parse(JSON.stringify(props.modelValue))
   nextTick(() => { syncing = false })
   templateStore.setOverrideData(props.data ?? null)
+  setupTooltips()
 })
 
 watch(() => props.schema, (val) => {
@@ -81,8 +83,9 @@ function onCompileError(error: string | null) {
 // --- Keyboard shortcuts ---
 
 function onKeyDown(e: KeyboardEvent) {
-  const tag = (e.target as HTMLElement)?.tagName
-  const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
+  const target = e.target as HTMLElement
+  const tag = target?.tagName
+  const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable
 
   // Delete / Backspace
   if ((e.key === 'Delete' || e.key === 'Backspace') && editorStore.selectedElementId) {

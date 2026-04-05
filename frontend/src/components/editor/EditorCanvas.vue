@@ -168,7 +168,7 @@ function applyZoom(delta: number, clientX: number, clientY: number) {
 }
 
 function onKeyDown(e: KeyboardEvent) {
-  if (e.code === 'Space' && !e.repeat && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement)) {
+  if (e.code === 'Space' && !e.repeat && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement || (e.target as HTMLElement)?.isContentEditable)) {
     e.preventDefault()
     spaceHeld.value = true
   }

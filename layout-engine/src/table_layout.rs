@@ -1,6 +1,142 @@
 use dreport_core::models::*;
 
 use crate::data_resolve::ResolvedData;
+use crate::text_measure::TextMeasurer;
+
+/// Her auto sütun için header + tüm data satırlarındaki en geniş text'i ölç,
+/// doğal genişliklerini Fixed olarak ata.
+/// Fr sütunları olduğu gibi bırak (kalan alanı taffy dağıtır).
+/// Sadece auto sütunlar varsa (fr/fixed yoksa) kalan alanı oransal dağıt.
+fn compute_auto_column_widths(
+    table: &RepeatingTableElement,
+    rows: &[Vec<String>],
+    measurer: &mut TextMeasurer,
+    available_width_mm: f64,
+) -> Vec<SizeValue> {
+    let num_cols = table.columns.len();
+    let font_size = table.style.font_size.unwrap_or(10.0);
+    let header_font_size = table.style.header_font_size.unwrap_or(font_size);
+    let cell_pad_h = table.style.cell_padding_h.unwrap_or(2.0);
+    let header_pad_h = table.style.header_padding_h.unwrap_or(cell_pad_h);
+    // Ölçüme dahil edilecek max yatay padding (header ve cell'den büyük olanı)
+    let max_pad_h = cell_pad_h.max(header_pad_h);
+
+    // Hangi sütunlar auto?
+    let is_auto: Vec<bool> = table.columns.iter().map(|c| matches!(c.width, SizeValue::Auto)).collect();
+
+    // Hiç auto yoksa olduğu gibi dön
+    if !is_auto.iter().any(|&a| a) {
+        return table.columns.iter().map(|c| c.width.clone()).collect();
+    }
+
+    // Fr sütun var mı?
+    let has_fr = table.columns.iter().any(|c| matches!(c.width, SizeValue::Fr { .. }));
+
+    // Her auto sütun için max içerik genişliğini ölç (mm cinsinden)
+    let mut max_widths_mm = vec![0.0_f64; num_cols];
+
+    for (col_idx, col) in table.columns.iter().enumerate() {
+        if !is_auto[col_idx] {
+            continue;
+        }
+
+        // Header text ölçümü (font_size zaten pt cinsinden)
+        let (header_w_pt, _) = measurer.measure(
+            &col.title,
+            None,
+            header_font_size as f32,
+            Some("bold"),
+            None,
+        );
+        let header_w_mm = header_w_pt as f64 / (72.0 / 25.4);
+        max_widths_mm[col_idx] = header_w_mm;
+
+        // Data row text ölçümü
+        for row in rows {
+            let text = row.get(col_idx).map(|s| s.as_str()).unwrap_or("");
+            if text.is_empty() {
+                continue;
+            }
+            let (w_pt, _) = measurer.measure(
+                text,
+                None,
+                font_size as f32,
+                None,
+                None,
+            );
+            let w_mm = w_pt as f64 / (72.0 / 25.4);
+            if w_mm > max_widths_mm[col_idx] {
+                max_widths_mm[col_idx] = w_mm;
+            }
+        }
+
+        // Yatay padding ekle (sol + sağ)
+        max_widths_mm[col_idx] += max_pad_h * 2.0;
+    }
+
+    // Fixed sütunların kapladığı alanı hesapla
+    let mut fixed_total_mm = 0.0_f64;
+    for (col_idx, col) in table.columns.iter().enumerate() {
+        if !is_auto[col_idx] {
+            if let SizeValue::Fixed { value } = &col.width {
+                fixed_total_mm += value;
+            }
+        }
+    }
+
+    // Auto sütunların toplam doğal genişliği
+    let auto_natural_total: f64 = max_widths_mm.iter().sum();
+    let remaining_mm = available_width_mm - fixed_total_mm;
+
+    // Sonuç genişlikleri
+    let mut result: Vec<SizeValue> = Vec::with_capacity(num_cols);
+
+    if has_fr {
+        // Fr sütunlar var — auto sütunlara doğal genişliklerini ver,
+        // kalan alanı Fr sütunlarına bırak (taffy flex ile dağıtır).
+
+        // Fr sütunları için minimum alan ayır (en az padding kadar)
+        let fr_count = table.columns.iter()
+            .filter(|c| matches!(c.width, SizeValue::Fr { .. }))
+            .count();
+        let fr_min_space = fr_count as f64 * max_pad_h * 2.0;
+        let auto_budget = (remaining_mm - fr_min_space).max(0.0);
+
+        for (col_idx, col) in table.columns.iter().enumerate() {
+            if !is_auto[col_idx] {
+                result.push(col.width.clone());
+            } else if auto_natural_total <= auto_budget {
+                // Sığıyor — doğal genişliği kullan
+                result.push(SizeValue::Fixed { value: max_widths_mm[col_idx] });
+            } else if auto_budget > 0.0 && auto_natural_total > 0.0 {
+                // Sığmıyor — budget'a oransal küçült
+                let ratio = max_widths_mm[col_idx] / auto_natural_total;
+                let width_mm = auto_budget * ratio;
+                result.push(SizeValue::Fixed { value: width_mm });
+            } else {
+                result.push(SizeValue::Fixed { value: max_widths_mm[col_idx] });
+            }
+        }
+    } else {
+        // Fr sütun yok — kalan alanı auto sütunlar arasında oransal dağıt
+        for (col_idx, col) in table.columns.iter().enumerate() {
+            if !is_auto[col_idx] {
+                result.push(col.width.clone());
+            } else if auto_natural_total > 0.0 {
+                let ratio = max_widths_mm[col_idx] / auto_natural_total;
+                let width_mm = remaining_mm * ratio;
+                result.push(SizeValue::Fixed { value: width_mm });
+            } else {
+                // Tüm auto sütunlar boş — eşit dağıt
+                let auto_count = is_auto.iter().filter(|&&a| a).count();
+                let width_mm = remaining_mm / auto_count as f64;
+                result.push(SizeValue::Fixed { value: width_mm });
+            }
+        }
+    }
+
+    result
+}
 
 /// RepeatingTable element'ini bir container ağacına expand eder.
 /// Tablo → column container (header row + data rows)
@@ -10,25 +146,36 @@ use crate::data_resolve::ResolvedData;
 pub fn expand_table(
     table: &RepeatingTableElement,
     resolved: &ResolvedData,
+    measurer: &mut TextMeasurer,
+    available_width_mm: f64,
 ) -> ContainerElement {
     let resolved_table = resolved.tables.get(&table.id);
     let rows = resolved_table
         .map(|t| t.rows.as_slice())
         .unwrap_or(&[]);
 
+    // Auto sütunlar için içerik bazlı genişlik hesapla
+    let effective_widths = compute_auto_column_widths(table, rows, measurer, available_width_mm);
+
+    // Padding değerleri (mm)
+    let cell_pad_h = table.style.cell_padding_h.unwrap_or(2.0);
+    let cell_pad_v = table.style.cell_padding_v.unwrap_or(1.0);
+    let header_pad_h = table.style.header_padding_h.unwrap_or(cell_pad_h);
+    let header_pad_v = table.style.header_padding_v.unwrap_or(cell_pad_v);
+
     let mut children: Vec<TemplateElement> = Vec::new();
 
-    // Header row
+    // Header row — her hücre padding container'ı içinde
     let header_cells: Vec<TemplateElement> = table
         .columns
         .iter()
         .enumerate()
         .map(|(i, col)| {
-            TemplateElement::StaticText(StaticTextElement {
+            let text = TemplateElement::StaticText(StaticTextElement {
                 id: format!("{}_hdr_{}", table.id, i),
                 position: PositionMode::Flow,
                 size: SizeConstraint {
-                    width: col.width.clone(),
+                    width: SizeValue::Fr { value: 1.0 },
                     height: SizeValue::Auto,
                     min_width: None,
                     min_height: None,
@@ -43,6 +190,31 @@ pub fn expand_table(
                     align: Some(col.align.clone()),
                 },
                 content: col.title.clone(),
+            });
+            TemplateElement::Container(ContainerElement {
+                id: format!("{}_hdr_{}_wrap", table.id, i),
+                position: PositionMode::Flow,
+                size: SizeConstraint {
+                    width: effective_widths[i].clone(),
+                    height: SizeValue::Auto,
+                    min_width: None,
+                    min_height: None,
+                    max_width: None,
+                    max_height: None,
+                },
+                direction: "column".to_string(),
+                gap: 0.0,
+                padding: Padding {
+                    top: header_pad_v,
+                    right: header_pad_h,
+                    bottom: header_pad_v,
+                    left: header_pad_h,
+                },
+                align: "stretch".to_string(),
+                justify: "start".to_string(),
+                style: ContainerStyle::default(),
+                children: vec![text],
+                break_inside: "auto".to_string(),
             })
         })
         .collect();
@@ -61,12 +233,12 @@ pub fn expand_table(
         direction: "row".to_string(),
         gap: 0.0,
         padding: Padding {
-            top: 1.0,
+            top: 0.0,
             right: 0.0,
-            bottom: 1.0,
+            bottom: 0.0,
             left: 0.0,
         },
-        align: "center".to_string(),
+        align: "stretch".to_string(),
         justify: "start".to_string(),
         style: ContainerStyle {
             background_color: table.style.header_bg.clone(),
@@ -96,23 +268,23 @@ pub fn expand_table(
         }));
     }
 
-    // Data rows
+    // Data rows — her hücre padding container'ı içinde
     for (row_idx, row_data) in rows.iter().enumerate() {
         let cells: Vec<TemplateElement> = table
             .columns
             .iter()
             .enumerate()
             .map(|(col_idx, col)| {
-                let text = row_data
+                let text_content = row_data
                     .get(col_idx)
                     .cloned()
                     .unwrap_or_default();
 
-                TemplateElement::StaticText(StaticTextElement {
+                let text = TemplateElement::StaticText(StaticTextElement {
                     id: format!("{}_r{}c{}", table.id, row_idx, col_idx),
                     position: PositionMode::Flow,
                     size: SizeConstraint {
-                        width: col.width.clone(),
+                        width: SizeValue::Fr { value: 1.0 },
                         height: SizeValue::Auto,
                         min_width: None,
                         min_height: None,
@@ -126,13 +298,38 @@ pub fn expand_table(
                         color: None,
                         align: Some(col.align.clone()),
                     },
-                    content: text,
+                    content: text_content,
+                });
+                TemplateElement::Container(ContainerElement {
+                    id: format!("{}_r{}c{}_wrap", table.id, row_idx, col_idx),
+                    position: PositionMode::Flow,
+                    size: SizeConstraint {
+                        width: effective_widths[col_idx].clone(),
+                        height: SizeValue::Auto,
+                        min_width: None,
+                        min_height: None,
+                        max_width: None,
+                        max_height: None,
+                    },
+                    direction: "column".to_string(),
+                    gap: 0.0,
+                    padding: Padding {
+                        top: cell_pad_v,
+                        right: cell_pad_h,
+                        bottom: cell_pad_v,
+                        left: cell_pad_h,
+                    },
+                    align: "stretch".to_string(),
+                    justify: "start".to_string(),
+                    style: ContainerStyle::default(),
+                    children: vec![text],
+                    break_inside: "auto".to_string(),
                 })
             })
             .collect();
 
-        // row_idx 0-based: 0. satır görsel olarak 1. (tek/odd), 1. satır 2. (çift/even)
-        let bg = if row_idx % 2 == 0 {
+        // row_idx 0-based: çift index (0,2,4) renksiz, tek index (1,3,5) zebra rengi
+        let bg = if row_idx % 2 == 1 {
             table.style.zebra_odd.clone()
         } else {
             table.style.zebra_even.clone()
@@ -152,12 +349,12 @@ pub fn expand_table(
             direction: "row".to_string(),
             gap: 0.0,
             padding: Padding {
-                top: 0.5,
+                top: 0.0,
                 right: 0.0,
-                bottom: 0.5,
+                bottom: 0.0,
                 left: 0.0,
             },
-            align: "center".to_string(),
+            align: "stretch".to_string(),
             justify: "start".to_string(),
             style: ContainerStyle {
                 background_color: bg,
@@ -197,6 +394,8 @@ pub fn expand_table(
 mod tests {
     use super::*;
     use crate::data_resolve::{ResolvedData, ResolvedTable};
+    use crate::text_measure::TextMeasurer;
+    use crate::FontData;
     use std::collections::HashMap;
 
     fn make_table(num_columns: usize) -> RepeatingTableElement {
@@ -239,6 +438,34 @@ mod tests {
         }
     }
 
+    fn make_measurer() -> TextMeasurer {
+        // Font dosyasını yükle
+        let font_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("backend/fonts/NotoSans-Regular.ttf");
+        let font_bytes = std::fs::read(&font_path).expect("Font file not found");
+        let font_data = vec![FontData {
+            family: "Noto Sans".to_string(),
+            data: font_bytes,
+        }];
+        TextMeasurer::new(&font_data)
+    }
+
+    /// Hücre wrapper container'ından içindeki StaticText'i çıkar
+    fn unwrap_cell_text(cell: &TemplateElement) -> &StaticTextElement {
+        match cell {
+            TemplateElement::Container(c) => {
+                assert_eq!(c.children.len(), 1, "Cell wrapper should have exactly 1 child");
+                match &c.children[0] {
+                    TemplateElement::StaticText(t) => t,
+                    _ => panic!("Expected StaticText inside cell wrapper"),
+                }
+            }
+            _ => panic!("Expected Container wrapper for cell"),
+        }
+    }
+
     #[test]
     fn test_expand_table_structure() {
         let table = make_table(2);
@@ -246,8 +473,9 @@ mod tests {
             vec!["A".to_string(), "1".to_string()],
             vec!["B".to_string(), "2".to_string()],
         ]);
+        let mut measurer = make_measurer();
 
-        let container = expand_table(&table, &resolved);
+        let container = expand_table(&table, &resolved, &mut measurer, 180.0);
 
         // Wrapper container properties
         assert_eq!(container.id, "tbl");
@@ -262,11 +490,9 @@ mod tests {
                 assert_eq!(c.id, "tbl_header");
                 assert_eq!(c.direction, "row");
                 assert_eq!(c.children.len(), 2); // 2 columns
-                // Check header cell text
-                match &c.children[0] {
-                    TemplateElement::StaticText(t) => assert_eq!(t.content, "Column 0"),
-                    _ => panic!("Expected StaticText for header cell"),
-                }
+                // Check header cell text (inside wrapper container)
+                let text = unwrap_cell_text(&c.children[0]);
+                assert_eq!(text.content, "Column 0");
             }
             _ => panic!("Expected Container for header row"),
         }
@@ -288,8 +514,9 @@ mod tests {
     fn test_expand_table_empty_data() {
         let table = make_table(3);
         let resolved = make_resolved("tbl", vec![]);
+        let mut measurer = make_measurer();
 
-        let container = expand_table(&table, &resolved);
+        let container = expand_table(&table, &resolved, &mut measurer, 180.0);
 
         // Only header row, no data rows
         assert_eq!(container.children.len(), 1);
@@ -309,8 +536,9 @@ mod tests {
         let resolved = make_resolved("tbl", vec![
             vec!["a".into(), "b".into(), "c".into(), "d".into()],
         ]);
+        let mut measurer = make_measurer();
 
-        let container = expand_table(&table, &resolved);
+        let container = expand_table(&table, &resolved, &mut measurer, 180.0);
 
         // header + 1 data row
         assert_eq!(container.children.len(), 2);
@@ -332,20 +560,17 @@ mod tests {
         let resolved = make_resolved("tbl", vec![
             vec!["Hello".to_string(), "42".to_string()],
         ]);
+        let mut measurer = make_measurer();
 
-        let container = expand_table(&table, &resolved);
+        let container = expand_table(&table, &resolved, &mut measurer, 180.0);
 
-        // Data row cells should contain the resolved text
+        // Data row cells should contain the resolved text (inside wrapper containers)
         match &container.children[1] {
             TemplateElement::Container(c) => {
-                match &c.children[0] {
-                    TemplateElement::StaticText(t) => assert_eq!(t.content, "Hello"),
-                    _ => panic!("Expected StaticText"),
-                }
-                match &c.children[1] {
-                    TemplateElement::StaticText(t) => assert_eq!(t.content, "42"),
-                    _ => panic!("Expected StaticText"),
-                }
+                let t0 = unwrap_cell_text(&c.children[0]);
+                assert_eq!(t0.content, "Hello");
+                let t1 = unwrap_cell_text(&c.children[1]);
+                assert_eq!(t1.content, "42");
             }
             _ => panic!("Expected Container"),
         }
@@ -358,8 +583,9 @@ mod tests {
         let resolved = make_resolved("tbl", vec![
             vec!["A".to_string(), "1".to_string()],
         ]);
+        let mut measurer = make_measurer();
 
-        let container = expand_table(&table, &resolved);
+        let container = expand_table(&table, &resolved, &mut measurer, 180.0);
 
         // header + separator line + 1 data row = 3
         assert_eq!(container.children.len(), 3);
@@ -383,30 +609,101 @@ mod tests {
             vec!["row1".into()],
             vec!["row2".into()],
         ]);
+        let mut measurer = make_measurer();
 
-        let container = expand_table(&table, &resolved);
+        let container = expand_table(&table, &resolved, &mut measurer, 180.0);
 
         // header + 3 data rows
         assert_eq!(container.children.len(), 4);
 
-        // row_0 (even index) => zebra_odd
+        // row_0 (even index) => zebra_even (no stripe)
         match &container.children[1] {
-            TemplateElement::Container(c) => {
-                assert_eq!(c.style.background_color, Some("#f0f0f0".to_string()));
-            }
-            _ => panic!("Expected Container"),
-        }
-        // row_1 (odd index) => zebra_even
-        match &container.children[2] {
             TemplateElement::Container(c) => {
                 assert_eq!(c.style.background_color, Some("#ffffff".to_string()));
             }
             _ => panic!("Expected Container"),
         }
-        // row_2 (even index) => zebra_odd
-        match &container.children[3] {
+        // row_1 (odd index) => zebra_odd (striped)
+        match &container.children[2] {
             TemplateElement::Container(c) => {
                 assert_eq!(c.style.background_color, Some("#f0f0f0".to_string()));
+            }
+            _ => panic!("Expected Container"),
+        }
+        // row_2 (even index) => zebra_even (no stripe)
+        match &container.children[3] {
+            TemplateElement::Container(c) => {
+                assert_eq!(c.style.background_color, Some("#ffffff".to_string()));
+            }
+            _ => panic!("Expected Container"),
+        }
+    }
+
+    #[test]
+    fn test_auto_columns_get_content_based_widths() {
+        // Auto sütunlu tablo: genişlikler içeriğe göre hesaplanmalı
+        let columns = vec![
+            TableColumn {
+                id: "col_0".into(),
+                field: "short".into(),
+                title: "No".into(),
+                width: SizeValue::Auto,
+                align: "right".into(),
+                format: None,
+            },
+            TableColumn {
+                id: "col_1".into(),
+                field: "long".into(),
+                title: "Urun / Hizmet Adi".into(),
+                width: SizeValue::Auto,
+                align: "left".into(),
+                format: None,
+            },
+        ];
+
+        let table = RepeatingTableElement {
+            id: "tbl".to_string(),
+            position: PositionMode::Flow,
+            size: SizeConstraint {
+                width: SizeValue::Fr { value: 1.0 },
+                height: SizeValue::Auto,
+                ..Default::default()
+            },
+            data_source: ArrayBinding { path: "items".to_string() },
+            columns,
+            style: TableStyle::default(),
+            repeat_header: Some(true),
+        };
+
+        let resolved = make_resolved("tbl", vec![
+            vec!["1".into(), "Web Uygulama Gelistirme".into()],
+            vec!["2".into(), "SSL Sertifikasi".into()],
+        ]);
+        let mut measurer = make_measurer();
+
+        let container = expand_table(&table, &resolved, &mut measurer, 180.0);
+
+        // Header row'daki ilk hücre wrapper (kısa: "No") ikinciden (uzun: "Urun / Hizmet Adi") dar olmalı
+        match &container.children[0] {
+            TemplateElement::Container(c) => {
+                let w0 = match &c.children[0] {
+                    TemplateElement::Container(wrap) => match &wrap.size.width {
+                        SizeValue::Fixed { value } => *value,
+                        _ => panic!("Expected Fixed width for auto column wrapper"),
+                    },
+                    _ => panic!("Expected Container wrapper"),
+                };
+                let w1 = match &c.children[1] {
+                    TemplateElement::Container(wrap) => match &wrap.size.width {
+                        SizeValue::Fixed { value } => *value,
+                        _ => panic!("Expected Fixed width for auto column wrapper"),
+                    },
+                    _ => panic!("Expected Container wrapper"),
+                };
+                assert!(w1 > w0, "Long column ({w1}mm) should be wider than short column ({w0}mm)");
+                // Her iki sütun toplamı available_width'e eşit olmalı
+                let total = w0 + w1;
+                assert!((total - 180.0).abs() < 0.1, "Total width ({total}mm) should equal available width (180mm)");
             }
             _ => panic!("Expected Container"),
         }

@@ -14,7 +14,7 @@ function updateSize(axis: 'width' | 'height', sv: SizeValue) {
 <template>
   <div class="prop-section">
     <div class="prop-section__title">Boyut</div>
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Genislik boyutlandirma modu">
       <label class="prop-label">Genislik</label>
       <select class="prop-input prop-select"
         :value="element.size.width.type"
@@ -29,20 +29,20 @@ function updateSize(axis: 'width' | 'height', sv: SizeValue) {
         <option value="fr">Oran (fr)</option>
       </select>
     </div>
-    <div v-if="element.size.width.type === 'fixed'" class="prop-row">
+    <div v-if="element.size.width.type === 'fixed'" class="prop-row" data-tip="Sabit genislik degeri (mm)">
       <label class="prop-label">mm</label>
       <input class="prop-input" type="number" step="1" min="1"
         :value="(element.size.width as any).value"
         @input="(e) => updateSize('width', { type: 'fixed', value: parseFloat((e.target as HTMLInputElement).value) || 10 })" />
     </div>
-    <div v-if="element.size.width.type === 'fr'" class="prop-row">
+    <div v-if="element.size.width.type === 'fr'" class="prop-row" data-tip="Kalan alani oransal doldurma degeri">
       <label class="prop-label">fr</label>
       <input class="prop-input" type="number" step="1" min="1"
         :value="(element.size.width as any).value"
         @input="(e) => updateSize('width', { type: 'fr', value: parseFloat((e.target as HTMLInputElement).value) || 1 })" />
     </div>
 
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Yukseklik boyutlandirma modu">
       <label class="prop-label">Yukseklik</label>
       <select class="prop-input prop-select"
         :value="element.size.height.type"
@@ -57,7 +57,7 @@ function updateSize(axis: 'width' | 'height', sv: SizeValue) {
         <option value="fr">Oran (fr)</option>
       </select>
     </div>
-    <div v-if="element.size.height.type === 'fixed'" class="prop-row">
+    <div v-if="element.size.height.type === 'fixed'" class="prop-row" data-tip="Sabit yukseklik degeri (mm)">
       <label class="prop-label">mm</label>
       <input class="prop-input" type="number" step="1" min="1"
         :value="(element.size.height as any).value"

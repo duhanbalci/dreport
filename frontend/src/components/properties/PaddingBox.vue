@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import '../../styles/properties.css'
+
 const props = defineProps<{
   top: number
   right: number
@@ -20,10 +22,10 @@ function onInput(side: 'top' | 'right' | 'bottom' | 'left', e: Event) {
   <div class="pb">
     <span class="pb__label">Padding</span>
     <div class="pb__box">
-      <input class="pb__in pb__in--t" type="number" step="1" min="0" :value="props.top" @input="(e) => onInput('top', e)" />
-      <input class="pb__in pb__in--r" type="number" step="1" min="0" :value="props.right" @input="(e) => onInput('right', e)" />
-      <input class="pb__in pb__in--b" type="number" step="1" min="0" :value="props.bottom" @input="(e) => onInput('bottom', e)" />
-      <input class="pb__in pb__in--l" type="number" step="1" min="0" :value="props.left" @input="(e) => onInput('left', e)" />
+      <input class="pb__in pb__in--t" type="number" step="1" min="0" :value="props.top" @input="(e) => onInput('top', e)" data-tip="Ust bosluk (mm)" />
+      <input class="pb__in pb__in--r" type="number" step="1" min="0" :value="props.right" @input="(e) => onInput('right', e)" data-tip="Sag bosluk (mm)" />
+      <input class="pb__in pb__in--b" type="number" step="1" min="0" :value="props.bottom" @input="(e) => onInput('bottom', e)" data-tip="Alt bosluk (mm)" />
+      <input class="pb__in pb__in--l" type="number" step="1" min="0" :value="props.left" @input="(e) => onInput('left', e)" data-tip="Sol bosluk (mm)" />
       <div class="pb__center" />
     </div>
   </div>

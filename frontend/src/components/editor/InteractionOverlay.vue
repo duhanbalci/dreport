@@ -124,7 +124,7 @@ function findDeepestContainer(mouseX: number, mouseY: number, excludeId?: string
     if (!l) continue
 
     const cx = l.x_mm * s
-    const cy = l.y_mm * s
+    const cy = l.y_mm * s + pageYOffset(l.pageIndex)
     const cw = l.width_mm * s
     const ch = l.height_mm * s
 
@@ -154,7 +154,7 @@ function computeDropIndex(container: ContainerElement, mouseX: number, mouseY: n
       const centerX = l.x_mm * s + (l.width_mm * s) / 2
       if (mouseX < centerX) { visualIdx = i; break }
     } else {
-      const centerY = l.y_mm * s + (l.height_mm * s) / 2
+      const centerY = l.y_mm * s + pageYOffset(l.pageIndex) + (l.height_mm * s) / 2
       if (mouseY < centerY) { visualIdx = i; break }
     }
   }
@@ -246,7 +246,8 @@ const dropIndicatorStyle = computed(() => {
       }
     }
 
-    const top = cl.y_mm * s
+    const clPageOff = pageYOffset(cl.pageIndex)
+    const top = cl.y_mm * s + clPageOff
     const height = cl.height_mm * s
 
     return {
@@ -263,30 +264,31 @@ const dropIndicatorStyle = computed(() => {
   }
 
   // Column container: yatay gösterge çizgisi
+  const colPageOff = pageYOffset(cl.pageIndex)
   let y = 0
   if (idx === 0 && flowChildren.length > 0) {
     const l = props.layoutMap[flowChildren[0].id]
     if (l) {
-      y = (cl.y_mm * s + l.y_mm * s) / 2
+      y = (cl.y_mm * s + colPageOff + l.y_mm * s + pageYOffset(l.pageIndex)) / 2
     } else {
-      y = cl.y_mm * s - 4
+      y = cl.y_mm * s + colPageOff - 4
     }
   } else if (idx < flowChildren.length && idx > 0) {
     const above = props.layoutMap[flowChildren[idx - 1].id]
     const below = props.layoutMap[flowChildren[idx].id]
     if (above && below) {
-      const aboveBottom = (above.y_mm + above.height_mm) * s
-      const belowTop = below.y_mm * s
+      const aboveBottom = (above.y_mm + above.height_mm) * s + pageYOffset(above.pageIndex)
+      const belowTop = below.y_mm * s + pageYOffset(below.pageIndex)
       y = (aboveBottom + belowTop) / 2
     }
   } else if (idx === 0 && flowChildren.length === 0) {
-    y = cl.y_mm * s + 8
+    y = cl.y_mm * s + colPageOff + 8
   } else if (flowChildren.length > 0) {
     const last = flowChildren[flowChildren.length - 1]
     const l = props.layoutMap[last.id]
     if (l) {
       const gapPx = container.gap * props.scale
-      y = (l.y_mm + l.height_mm) * s + gapPx / 2
+      y = (l.y_mm + l.height_mm) * s + pageYOffset(l.pageIndex) + gapPx / 2
     }
   }
 

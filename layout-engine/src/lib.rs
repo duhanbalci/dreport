@@ -59,7 +59,10 @@ pub enum ResolvedContent {
     #[serde(rename = "page_number")]
     PageNumber { current: usize, total: usize },
     #[serde(rename = "shape")]
-    Shape { shape_type: String },
+    Shape {
+        #[serde(rename = "shapeType")]
+        shape_type: String,
+    },
     #[serde(rename = "checkbox")]
     Checkbox { checked: bool },
     #[serde(rename = "rich_text")]

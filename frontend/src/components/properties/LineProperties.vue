@@ -18,13 +18,13 @@ function updateStyle(key: string, value: unknown) {
 <template>
   <div class="prop-section">
     <div class="prop-section__title">Cizgi Stili</div>
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Cizgi kalinligi (mm)">
       <label class="prop-label">Kalinlik (mm)</label>
       <input class="prop-input" type="number" step="0.1" min="0.1"
         :value="element.style.strokeWidth ?? 0.5"
         @input="(e) => updateStyle('strokeWidth', parseFloat((e.target as HTMLInputElement).value) || 0.5)" />
     </div>
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Cizgi rengi">
       <label class="prop-label">Renk</label>
       <input class="prop-input prop-color" type="color"
         :value="element.style.strokeColor ?? '#000000'"

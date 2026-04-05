@@ -22,7 +22,7 @@ function updateStyle(key: string, value: unknown) {
 <template>
   <div class="prop-section">
     <div class="prop-section__title">Sayfa Numarasi</div>
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Sayfa numarasi gosterim formati">
       <label class="prop-label">Format</label>
       <select class="prop-input prop-select"
         :value="element.format ?? '{current} / {total}'"
@@ -33,19 +33,19 @@ function updateStyle(key: string, value: unknown) {
         <option value="Sayfa {current} / {total}">Sayfa 1 / 5</option>
       </select>
     </div>
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Yazi tipi boyutu (point)">
       <label class="prop-label">Boyut (pt)</label>
       <input class="prop-input" type="number" step="1" min="1"
         :value="(element.style as TextStyle).fontSize ?? 10"
         @input="(e) => updateStyle('fontSize', parseFloat((e.target as HTMLInputElement).value) || 10)" />
     </div>
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Metin rengi">
       <label class="prop-label">Renk</label>
       <input class="prop-input prop-color" type="color"
         :value="(element.style as TextStyle).color ?? '#666666'"
         @input="(e) => updateStyle('color', (e.target as HTMLInputElement).value)" />
     </div>
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Metnin yatay hizalamasi">
       <label class="prop-label">Hizalama</label>
       <select class="prop-input prop-select"
         :value="(element.style as TextStyle).align ?? 'center'"

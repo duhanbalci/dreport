@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useTemplateStore } from '../../stores/template'
 import { useEditorStore } from '../../stores/editor'
 import { isContainer } from '../../core/types'
-import type { ContainerElement, TextStyle } from '../../core/types'
+import type { ContainerElement, TextStyle, RepeatingTableElement, TableStyle } from '../../core/types'
 import type { ElementLayout } from '../../core/layout-types'
 
 const props = defineProps<{
@@ -31,6 +31,10 @@ const isText = computed(() => {
 })
 
 const isLine = computed(() => selected.value?.type === 'line')
+
+const isTable = computed(() => selected.value?.type === 'repeating_table')
+const tableEl = computed(() => isTable.value ? selected.value as RepeatingTableElement : null)
+const tableStyle = computed(() => tableEl.value?.style as TableStyle | undefined)
 
 const toolbarStyle = computed(() => {
   const el = selected.value
@@ -66,6 +70,12 @@ function setGap(e: Event) { update({ gap: parseFloat((e.target as HTMLInputEleme
 // Text
 function setFontWeight(w: string) { updateStyle('fontWeight', w) }
 function setTextAlign(a: string) { updateStyle('align', a) }
+
+// Table
+function updateTableStyle(key: string, value: unknown) {
+  if (!selected.value) return
+  update({ style: { ...selected.value.style, [key]: value } })
+}
 </script>
 
 <template>
@@ -230,6 +240,66 @@ function setTextAlign(a: string) { updateStyle('align', a) }
       </div>
     </template>
 
+    <!-- ===== Repeating Table ===== -->
+    <template v-if="isTable && tableStyle">
+      <!-- Font size -->
+      <div class="et__group et__group--gap" data-tip="Yazi Boyutu">
+        <svg class="et__gap-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M2 10L6 2l4 8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          <line x1="3.5" y1="7" x2="8.5" y2="7" stroke="currentColor" stroke-width="1" stroke-linecap="round"/>
+        </svg>
+        <input type="number" class="et__num" step="1" min="6" :value="tableStyle.fontSize ?? 10" @input="(e) => updateTableStyle('fontSize', parseFloat((e.target as HTMLInputElement).value) || 10)" />
+      </div>
+
+      <div class="et__sep" />
+
+      <!-- Header bg color -->
+      <div class="et__group">
+        <label class="et__color-wrap" data-tip="Header Rengi">
+          <input type="color" class="et__color" :value="tableStyle.headerBg ?? '#f0f0f0'" @input="(e) => updateTableStyle('headerBg', (e.target as HTMLInputElement).value)" />
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="2" y="2" width="10" height="4" rx="1" :fill="tableStyle.headerBg ?? '#f0f0f0'" stroke="#94a3b8" stroke-width="0.5"/>
+            <rect x="2" y="7" width="10" height="2" rx="0.5" fill="none" stroke="#94a3b8" stroke-width="0.5"/>
+            <rect x="2" y="10" width="10" height="2" rx="0.5" fill="none" stroke="#94a3b8" stroke-width="0.5"/>
+          </svg>
+        </label>
+      </div>
+
+      <!-- Zebra color -->
+      <div class="et__group">
+        <label class="et__color-wrap" data-tip="Zebra Rengi">
+          <input type="color" class="et__color" :value="tableStyle.zebraOdd ?? '#fafafa'" @input="(e) => updateTableStyle('zebraOdd', (e.target as HTMLInputElement).value)" />
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="2" y="2" width="10" height="2.5" rx="0.5" fill="none" stroke="#94a3b8" stroke-width="0.5"/>
+            <rect x="2" y="5.5" width="10" height="2.5" rx="0.5" :fill="tableStyle.zebraOdd ?? '#fafafa'" stroke="#94a3b8" stroke-width="0.5"/>
+            <rect x="2" y="9" width="10" height="2.5" rx="0.5" fill="none" stroke="#94a3b8" stroke-width="0.5"/>
+          </svg>
+        </label>
+      </div>
+
+      <div class="et__sep" />
+
+      <!-- Border color -->
+      <div class="et__group">
+        <label class="et__color-wrap" data-tip="Kenarlik Rengi">
+          <input type="color" class="et__color" :value="tableStyle.borderColor ?? '#cccccc'" @input="(e) => updateTableStyle('borderColor', (e.target as HTMLInputElement).value)" />
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="2" y="2" width="10" height="10" rx="1" fill="none" :stroke="tableStyle.borderColor ?? '#cccccc'" stroke-width="1.5"/>
+            <line x1="2" y1="6" x2="12" y2="6" :stroke="tableStyle.borderColor ?? '#cccccc'" stroke-width="0.8"/>
+            <line x1="7" y1="2" x2="7" y2="12" :stroke="tableStyle.borderColor ?? '#cccccc'" stroke-width="0.8"/>
+          </svg>
+        </label>
+      </div>
+
+      <!-- Border width -->
+      <div class="et__group et__group--gap" data-tip="Kenarlik (mm)">
+        <svg class="et__gap-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <rect x="1" y="1" width="10" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        <input type="number" class="et__num" step="0.1" min="0" :value="tableStyle.borderWidth ?? 0.5" @input="(e) => updateTableStyle('borderWidth', parseFloat((e.target as HTMLInputElement).value) || 0)" />
+      </div>
+    </template>
+
     <!-- ===== Line ===== -->
     <template v-if="isLine">
       <!-- Stroke width -->
@@ -280,34 +350,6 @@ function setTextAlign(a: string) { updateStyle('align', a) }
   background: #334155;
   margin: 0 2px;
   flex-shrink: 0;
-}
-
-/* Tooltip */
-[data-tip] {
-  position: relative;
-}
-
-[data-tip]::after {
-  content: attr(data-tip);
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  background: #0f172a;
-  color: #e2e8f0;
-  font-size: 10px;
-  padding: 3px 6px;
-  border-radius: 4px;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s;
-  z-index: 10;
-}
-
-[data-tip]:hover::after,
-[data-tip]:focus-within::after {
-  opacity: 1;
 }
 
 /* Button */

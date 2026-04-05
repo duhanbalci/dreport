@@ -134,6 +134,14 @@ pub struct TableStyle {
     pub border_width: Option<f64>,
     pub font_size: Option<f64>,
     pub header_font_size: Option<f64>,
+    /// Hücre iç boşluğu — yatay (sol+sağ), mm cinsinden. Default: 2.0
+    pub cell_padding_h: Option<f64>,
+    /// Hücre iç boşluğu — dikey (üst+alt), mm cinsinden. Default: 1.0
+    pub cell_padding_v: Option<f64>,
+    /// Header hücre iç boşluğu — yatay (sol+sağ), mm cinsinden. Default: cell_padding_h
+    pub header_padding_h: Option<f64>,
+    /// Header hücre iç boşluğu — dikey (üst+alt), mm cinsinden. Default: cell_padding_v
+    pub header_padding_v: Option<f64>,
 }
 
 // --- Barcode ---

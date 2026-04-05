@@ -9,6 +9,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 dreport-core = { path = "../core" }
+dexpr = { path = "../../rust-expr" }
 taffy = "0.9"
 cosmic-text = { version = "0.18", default-features = false, features = ["std", "swash"] }
 serde = { version = "1", features = ["derive"] }
@@ -18,6 +19,8 @@ rxing = { version = "0.8", default-features = false, features = ["encoding_rs"] 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"
 js-sys = "0.3"
+getrandom_03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+getrandom_04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 krilla = { version = "0.6", features = ["raster-images", "simple-text"] }

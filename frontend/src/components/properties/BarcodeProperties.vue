@@ -94,7 +94,7 @@ function onBarcodeFormatChange(newFormat: BarcodeFormat) {
 <template>
   <div class="prop-section">
     <div class="prop-section__title">Barkod Ayarlari</div>
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Barkod formati">
       <label class="prop-label">Format</label>
       <select class="prop-input prop-select"
         :value="element.format"
@@ -106,14 +106,14 @@ function onBarcodeFormatChange(newFormat: BarcodeFormat) {
         <option value="code39">Code 39</option>
       </select>
     </div>
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Barkod icerigi — formata uygun olmali">
       <label class="prop-label">Deger</label>
       <input class="prop-input" type="text"
         :class="{ 'prop-input--invalid': barcodeInputInvalid }"
         :value="barcodeInputValue"
         @input="onBarcodeValueInput" />
     </div>
-    <div class="prop-row">
+    <div class="prop-row" data-tip="Barkod cizgi/modül rengi">
       <label class="prop-label">Renk</label>
       <div class="prop-row-inline">
         <input class="prop-input prop-color" type="color"
@@ -122,13 +122,13 @@ function onBarcodeFormatChange(newFormat: BarcodeFormat) {
         <button v-if="element.style.color" class="prop-clear" @click="updateStyle('color', undefined)">x</button>
       </div>
     </div>
-    <div v-if="element.format !== 'qr'" class="prop-row">
+    <div v-if="element.format !== 'qr'" class="prop-row" data-tip="Barkod altinda degeri metin olarak goster">
       <label class="prop-label">Metin Goster</label>
       <input type="checkbox"
         :checked="element.style.includeText ?? (element.format === 'ean13' || element.format === 'ean8')"
         @change="(e) => updateStyle('includeText', (e.target as HTMLInputElement).checked)" />
     </div>
-    <div v-if="schemaStore.scalarFields.length > 0" class="prop-row">
+    <div v-if="schemaStore.scalarFields.length > 0" class="prop-row" data-tip="Schema'dan dinamik veri baglama">
       <label class="prop-label">Veri Baglama</label>
       <select class="prop-input prop-select"
         :value="element.binding?.path ?? ''"

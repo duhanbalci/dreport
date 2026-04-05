@@ -101,6 +101,10 @@ export interface TableStyle {
   borderWidth?: number // pt
   fontSize?: number // pt
   headerFontSize?: number // pt
+  cellPaddingH?: number // mm — hücre yatay iç boşluk (sol+sağ). Default: 2
+  cellPaddingV?: number // mm — hücre dikey iç boşluk (üst+alt). Default: 1
+  headerPaddingH?: number // mm — header yatay iç boşluk. Default: cellPaddingH
+  headerPaddingV?: number // mm — header dikey iç boşluk. Default: cellPaddingV
 }
 
 // --- Barcode ---
@@ -208,9 +212,9 @@ export interface RichTextElement extends BaseElement {
   style: TextStyle // varsayılan stil
 }
 
-export interface PageBreakElement {
+export interface PageBreakElement extends BaseElement {
   type: 'page_break'
-  id: string
+  style: Record<string, never>
 }
 
 export interface ContainerElement extends BaseElement {

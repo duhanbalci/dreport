@@ -35,17 +35,18 @@ pub fn compute(
     measurer: &mut TextMeasurer,
 ) -> LayoutResult {
     let page_w_pt = mm_to_pt(template.page.width);
+    let page_width_mm = template.page.width;
 
     // --- 1. Header layout (varsa) ---
     let (header_elements, header_height_mm) = if let Some(ref header) = template.header {
-        compute_section(header, page_w_pt, resolved, measurer)
+        compute_section(header, page_w_pt, page_width_mm, resolved, measurer)
     } else {
         (vec![], 0.0)
     };
 
     // --- 2. Footer layout (varsa) ---
     let (footer_elements, footer_height_mm) = if let Some(ref footer) = template.footer {
-        compute_section(footer, page_w_pt, resolved, measurer)
+        compute_section(footer, page_w_pt, page_width_mm, resolved, measurer)
     } else {
         (vec![], 0.0)
     };
@@ -55,12 +56,15 @@ pub fn compute(
     taffy.disable_rounding();
     let mut node_map: HashMap<NodeId, NodeInfo> = HashMap::new();
 
+    let page_width_mm = template.page.width;
     let root_node = build_container(
         &template.root,
         &mut taffy,
         &mut node_map,
         resolved,
         None,
+        measurer,
+        page_width_mm,
     );
 
     // Sayfa wrapper: sayfa genişliğinde ama yükseklik sınırsız (auto)
@@ -117,6 +121,7 @@ pub fn compute(
 fn compute_section(
     container: &ContainerElement,
     page_w_pt: f32,
+    page_width_mm: f64,
     resolved: &ResolvedData,
     measurer: &mut TextMeasurer,
 ) -> (Vec<ElementLayout>, f64) {
@@ -124,7 +129,7 @@ fn compute_section(
     taffy.disable_rounding();
     let mut node_map: HashMap<NodeId, NodeInfo> = HashMap::new();
 
-    let section_node = build_container(container, &mut taffy, &mut node_map, resolved, None);
+    let section_node = build_container(container, &mut taffy, &mut node_map, resolved, None, measurer, page_width_mm);
 
     let wrapper_style = Style {
         display: Display::Flex,
@@ -182,15 +187,27 @@ fn build_container(
     node_map: &mut HashMap<NodeId, NodeInfo>,
     resolved: &ResolvedData,
     parent_direction: Option<&str>,
+    measurer: &mut TextMeasurer,
+    page_width_mm: f64,
 ) -> NodeId {
     let style = sizing::container_to_style(el, parent_direction);
     let direction = el.direction.as_str();
+
+    // Child'lar için kullanılabilir genişliği hesapla
+    // Container'ın kendi padding ve border'ını çıkar
+    let border_w = el.style.border_width.unwrap_or(0.0);
+    let container_own_width = match &el.size.width {
+        SizeValue::Fixed { value } => *value,
+        _ => page_width_mm, // Fr veya Auto ise parent'ın genişliğini kullan
+    };
+    let content_width_mm = container_own_width - el.padding.left - el.padding.right - border_w * 2.0;
+    let content_width_mm = content_width_mm.max(0.0);
 
     let mut child_nodes = Vec::new();
     let mut children_ids = Vec::new();
 
     for child in &el.children {
-        let child_node = build_element(child, taffy, node_map, resolved, Some(direction));
+        let child_node = build_element(child, taffy, node_map, resolved, Some(direction), measurer, content_width_mm);
         child_nodes.push(child_node);
         children_ids.push(child.id().to_string());
     }
@@ -225,10 +242,12 @@ fn build_element(
     node_map: &mut HashMap<NodeId, NodeInfo>,
     resolved: &ResolvedData,
     parent_direction: Option<&str>,
+    measurer: &mut TextMeasurer,
+    page_width_mm: f64,
 ) -> NodeId {
     match el {
         TemplateElement::Container(e) => {
-            build_container(e, taffy, node_map, resolved, parent_direction)
+            build_container(e, taffy, node_map, resolved, parent_direction, measurer, page_width_mm)
         }
         TemplateElement::StaticText(e) => build_text_leaf(
             taffy,
@@ -396,8 +415,8 @@ fn build_element(
             node
         }
         TemplateElement::RepeatingTable(e) => {
-            // Tabloyu container ağacına expand et
-            let expanded = table_layout::expand_table(e, resolved);
+            // Tabloyu container ağacına expand et (measurer ile auto sütun genişlikleri hesaplanır)
+            let expanded = table_layout::expand_table(e, resolved, measurer, page_width_mm);
 
             // Expand edilmiş tablo cell'lerinin text'lerini resolved'a ekle
             // (expand_table StaticText'ler üretir, bunların text'leri zaten content'te)
@@ -414,6 +433,8 @@ fn build_element(
                 node_map,
                 &table_resolved,
                 parent_direction,
+                measurer,
+                page_width_mm,
             )
         }
         TemplateElement::Shape(e) => {
