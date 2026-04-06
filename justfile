@@ -68,6 +68,33 @@ diff-open:
     fi
     open "$DIFF_DIR"/*_diff.png "$DIFF_DIR"/*_html.png 2>/dev/null || xdg-open "$DIFF_DIR" 2>/dev/null || echo "Dosyalar: $DIFF_DIR"
 
+# --- Lint / Format / Build ---
+
+# Rust + frontend lint
+lint:
+    cargo clippy --workspace -- -D warnings
+    cd frontend && bun run lint
+
+# Rust + frontend format
+fmt:
+    cargo fmt --workspace
+    cd frontend && bun run format
+
+# Format kontrolu (CI icin)
+fmt-check:
+    cargo fmt --workspace --check
+    cd frontend && bun run format:check
+
+# Full build
+build:
+    cd frontend && bun run build
+    cargo build --release -p dreport-backend
+
+# Type check (Rust + TypeScript)
+check:
+    cargo check --workspace
+    cd frontend && bun run type-check
+
 # --- Publish ---
 
 # Publish dreport-core to Gitea

@@ -711,6 +711,29 @@ fn render_line(
     surface.set_fill(None);
 }
 
+#[derive(Debug, PartialEq)]
+enum ImageFormat {
+    Png,
+    Jpeg,
+    Gif,
+    WebP,
+    Unknown,
+}
+
+fn detect_image_format(data: &[u8]) -> ImageFormat {
+    if data.starts_with(&[0x89, 0x50, 0x4E, 0x47]) {
+        ImageFormat::Png
+    } else if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        ImageFormat::Jpeg
+    } else if data.starts_with(b"GIF8") {
+        ImageFormat::Gif
+    } else if data.len() >= 12 && &data[8..12] == b"WEBP" {
+        ImageFormat::WebP
+    } else {
+        ImageFormat::Unknown
+    }
+}
+
 fn render_image(
     surface: &mut krilla::surface::Surface<'_>,
     x: f32,
@@ -735,16 +758,35 @@ fn render_image(
         return;
     };
 
-    // Tüm formatları image crate ile decode edip PNG'ye çevir (krilla JPEG desteği sınırlı)
-    let png_data = match decode_to_png(&decoded) {
-        Some(data) => data,
-        None => {
-            eprintln!("[dreport] Image decode/re-encode hatası, ham veri deneniyor");
-            decoded
+    // Magic bytes ile format tespit et, krilla'nın native desteğini kullan
+    let img_result = match detect_image_format(&decoded) {
+        ImageFormat::Png => krilla::image::Image::from_png(decoded.into(), true),
+        ImageFormat::Jpeg => krilla::image::Image::from_jpeg(decoded.into(), true),
+        ImageFormat::Gif => krilla::image::Image::from_gif(decoded.into(), true),
+        ImageFormat::WebP => krilla::image::Image::from_webp(decoded.into(), true),
+        ImageFormat::Unknown => {
+            match decode_to_png(&decoded) {
+                Some(png_data) => krilla::image::Image::from_png(png_data.into(), true),
+                None => {
+                    eprintln!("[dreport] Image decode/re-encode hatası");
+                    return;
+                }
+            }
         }
     };
 
-    embed_png(surface, x, y, w, h, &png_data);
+    let Ok(img) = img_result else {
+        eprintln!("[dreport] Image krilla embed hatası");
+        return;
+    };
+
+    let Some(size) = Size::from_wh(w, h) else {
+        return;
+    };
+
+    surface.push_transform(&Transform::from_translate(x, y));
+    surface.draw_image(img, size);
+    surface.pop();
 }
 
 fn render_barcode(
@@ -1390,5 +1432,38 @@ mod tests {
             .join("test_output_full.pdf");
         std::fs::write(&out_path, &pdf).unwrap();
         println!("Full pipeline PDF: {}", out_path.display());
+    }
+
+    #[test]
+    fn test_detect_png() {
+        let data = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        assert_eq!(detect_image_format(&data), ImageFormat::Png);
+    }
+
+    #[test]
+    fn test_detect_jpeg() {
+        let data = [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10];
+        assert_eq!(detect_image_format(&data), ImageFormat::Jpeg);
+    }
+
+    #[test]
+    fn test_detect_gif() {
+        assert_eq!(detect_image_format(b"GIF89a..."), ImageFormat::Gif);
+        assert_eq!(detect_image_format(b"GIF87a..."), ImageFormat::Gif);
+    }
+
+    #[test]
+    fn test_detect_webp() {
+        // RIFF____WEBP
+        let mut data = vec![0u8; 12];
+        data[0..4].copy_from_slice(b"RIFF");
+        data[8..12].copy_from_slice(b"WEBP");
+        assert_eq!(detect_image_format(&data), ImageFormat::WebP);
+    }
+
+    #[test]
+    fn test_detect_unknown() {
+        assert_eq!(detect_image_format(&[0x00, 0x01, 0x02]), ImageFormat::Unknown);
+        assert_eq!(detect_image_format(&[]), ImageFormat::Unknown);
     }
 }

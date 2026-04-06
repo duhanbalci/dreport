@@ -1,7 +1,37 @@
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+
 use dreport_core::models::*;
 
 use crate::data_resolve::ResolvedData;
 use crate::text_measure::TextMeasurer;
+
+/// Cache for expanded table containers.
+/// Key: hash of (table JSON + resolved rows + available width).
+pub type TableExpandCache = HashMap<u64, ContainerElement>;
+
+fn table_cache_key(
+    table: &RepeatingTableElement,
+    rows: &[Vec<String>],
+    available_width_mm: f64,
+) -> u64 {
+    let mut hasher = std::hash::DefaultHasher::new();
+    // Serialize table definition (id, columns, style, etc.)
+    if let Ok(json) = serde_json::to_string(table) {
+        json.hash(&mut hasher);
+    }
+    // Hash resolved row data
+    for row in rows {
+        for cell in row {
+            cell.hash(&mut hasher);
+        }
+        row.len().hash(&mut hasher);
+    }
+    rows.len().hash(&mut hasher);
+    // Hash available width (as bits to avoid float hashing issues)
+    available_width_mm.to_bits().hash(&mut hasher);
+    hasher.finish()
+}
 
 /// Her auto sütun için header + tüm data satırlarındaki en geniş text'i ölç,
 /// doğal genişliklerini Fixed olarak ata.
@@ -135,6 +165,29 @@ fn compute_auto_column_widths(
         }
     }
 
+    result
+}
+
+/// Cache-aware table expansion.
+/// Verilen cache'e bakar, hit varsa clone döner. Miss'te expand edip cache'e yazar.
+pub fn expand_table_cached(
+    table: &RepeatingTableElement,
+    resolved: &ResolvedData,
+    measurer: &mut TextMeasurer,
+    available_width_mm: f64,
+    cache: &mut TableExpandCache,
+) -> ContainerElement {
+    let rows = resolved.tables.get(&table.id)
+        .map(|t| t.rows.as_slice())
+        .unwrap_or(&[]);
+    let key = table_cache_key(table, rows, available_width_mm);
+
+    if let Some(cached) = cache.get(&key) {
+        return cached.clone();
+    }
+
+    let result = expand_table(table, resolved, measurer, available_width_mm);
+    cache.insert(key, result.clone());
     result
 }
 
@@ -707,5 +760,62 @@ mod tests {
             }
             _ => panic!("Expected Container"),
         }
+    }
+
+    #[test]
+    fn test_table_cache_hit() {
+        let table = make_table(2);
+        let resolved = make_resolved("tbl", vec![
+            vec!["A".to_string(), "1".to_string()],
+        ]);
+        let mut measurer = make_measurer();
+        let mut cache = TableExpandCache::new();
+
+        // First call — cache miss
+        let result1 = expand_table_cached(&table, &resolved, &mut measurer, 180.0, &mut cache);
+        assert_eq!(cache.len(), 1);
+
+        // Second call — same inputs — cache hit
+        let result2 = expand_table_cached(&table, &resolved, &mut measurer, 180.0, &mut cache);
+        assert_eq!(cache.len(), 1); // no new entry
+        assert_eq!(result1.id, result2.id);
+        assert_eq!(result1.children.len(), result2.children.len());
+    }
+
+    #[test]
+    fn test_table_cache_miss_on_data_change() {
+        let table = make_table(2);
+        let resolved1 = make_resolved("tbl", vec![
+            vec!["A".to_string(), "1".to_string()],
+        ]);
+        let resolved2 = make_resolved("tbl", vec![
+            vec!["B".to_string(), "2".to_string()],
+        ]);
+        let mut measurer = make_measurer();
+        let mut cache = TableExpandCache::new();
+
+        expand_table_cached(&table, &resolved1, &mut measurer, 180.0, &mut cache);
+        assert_eq!(cache.len(), 1);
+
+        // Different data — cache miss
+        expand_table_cached(&table, &resolved2, &mut measurer, 180.0, &mut cache);
+        assert_eq!(cache.len(), 2);
+    }
+
+    #[test]
+    fn test_table_cache_miss_on_width_change() {
+        let table = make_table(2);
+        let resolved = make_resolved("tbl", vec![
+            vec!["A".to_string(), "1".to_string()],
+        ]);
+        let mut measurer = make_measurer();
+        let mut cache = TableExpandCache::new();
+
+        expand_table_cached(&table, &resolved, &mut measurer, 180.0, &mut cache);
+        assert_eq!(cache.len(), 1);
+
+        // Different available width — cache miss
+        expand_table_cached(&table, &resolved, &mut measurer, 160.0, &mut cache);
+        assert_eq!(cache.len(), 2);
     }
 }

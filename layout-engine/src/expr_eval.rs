@@ -81,20 +81,27 @@ pub fn apply_format_with_config(value: &str, format: Option<&str>, config: &drep
 }
 
 fn format_currency(value: &str, config: &dreport_core::models::FormatConfig) -> String {
-    if let Ok(n) = value.parse::<f64>() {
-        let abs = n.abs();
-        let integer = abs.floor() as i64;
-        let frac = ((abs - abs.floor()) * 100.0).round() as i64;
+    use dexpr::Decimal;
 
-        let int_str = format_with_thousands(integer, &config.thousands_separator);
-        let sign = if n < 0.0 { "-" } else { "" };
-        if config.currency_position == "prefix" {
-            format!("{}{}{}{}{:02}", config.currency_symbol, sign, int_str, config.decimal_separator, frac)
-        } else {
-            format!("{}{}{}{:02} {}", sign, int_str, config.decimal_separator, frac, config.currency_symbol)
-        }
+    let Ok(d) = value.parse::<Decimal>() else {
+        return value.to_string();
+    };
+
+    // Round to 2 decimal places using Decimal — no float precision loss
+    // MidpointAwayFromZero: 1.005 → 1.01 (currency convention)
+    let rounded = d.abs().round_dp_with_strategy(2, rust_decimal::RoundingStrategy::MidpointAwayFromZero);
+    // Extract integer and fractional parts from the rounded Decimal
+    let truncated = rounded.trunc();
+    let frac_part = rounded - truncated;
+    let integer = truncated.to_string().parse::<i64>().unwrap_or(0);
+    let frac = (frac_part * Decimal::from(100)).trunc().to_string().parse::<i64>().unwrap_or(0);
+
+    let int_str = format_with_thousands(integer, &config.thousands_separator);
+    let sign = if d.is_sign_negative() { "-" } else { "" };
+    if config.currency_position == "prefix" {
+        format!("{}{}{}{}{:02}", config.currency_symbol, sign, int_str, config.decimal_separator, frac)
     } else {
-        value.to_string()
+        format!("{}{}{}{:02} {}", sign, int_str, config.decimal_separator, frac, config.currency_symbol)
     }
 }
 
@@ -264,5 +271,50 @@ mod tests {
             evaluate_expression("toplamlar.araToplam * toplamlar.kdvOran / 100", &data),
             "2880"
         );
+    }
+
+    #[test]
+    fn test_currency_format_basic() {
+        let config = dreport_core::models::FormatConfig::default();
+        assert_eq!(format_currency("1500", &config), "1.500,00 ₺");
+        assert_eq!(format_currency("0", &config), "0,00 ₺");
+    }
+
+    #[test]
+    fn test_currency_format_fractional() {
+        let config = dreport_core::models::FormatConfig::default();
+        assert_eq!(format_currency("19.99", &config), "19,99 ₺");
+        assert_eq!(format_currency("100.50", &config), "100,50 ₺");
+    }
+
+    #[test]
+    fn test_currency_format_rounding_edge_case() {
+        // 1.005 should round to 1.01, not 1.00
+        let config = dreport_core::models::FormatConfig::default();
+        let result = format_currency("1.005", &config);
+        assert_eq!(result, "1,01 ₺");
+    }
+
+    #[test]
+    fn test_currency_format_negative() {
+        let config = dreport_core::models::FormatConfig::default();
+        assert_eq!(format_currency("-250.75", &config), "-250,75 ₺");
+    }
+
+    #[test]
+    fn test_currency_format_large_number() {
+        let config = dreport_core::models::FormatConfig::default();
+        assert_eq!(format_currency("1234567.89", &config), "1.234.567,89 ₺");
+    }
+
+    #[test]
+    fn test_currency_format_prefix_position() {
+        let config = dreport_core::models::FormatConfig {
+            currency_symbol: "$".to_string(),
+            currency_position: "prefix".to_string(),
+            thousands_separator: ",".to_string(),
+            decimal_separator: ".".to_string(),
+        };
+        assert_eq!(format_currency("1500.25", &config), "$1,500.25");
     }
 }

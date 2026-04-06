@@ -417,7 +417,7 @@ dependencies = [
 
 [[package]]
 name = "dreport-backend"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -432,7 +432,7 @@ dependencies = [
 
 [[package]]
 name = "dreport-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64",
  "serde",
@@ -441,7 +441,7 @@ dependencies = [
 
 [[package]]
 name = "dreport-layout"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "base64",
  "cosmic-text",
@@ -452,6 +452,7 @@ dependencies = [
  "image",
  "js-sys",
  "krilla",
+ "rust_decimal",
  "rxing",
  "serde",
  "serde_json",

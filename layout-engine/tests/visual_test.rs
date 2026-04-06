@@ -7,14 +7,18 @@
 
 #![cfg(not(target_arch = "wasm32"))]
 
+mod common;
+
 mod visual {
     use std::fs;
     use std::path::Path;
     use std::process::Command;
 
     use dreport_core::models::Template;
-    use dreport_layout::{compute_layout, FontData, ResolvedContent};
+    use dreport_layout::{compute_layout, ResolvedContent};
     use dreport_layout::pdf_render::render_pdf;
+
+    use crate::common::load_test_fonts;
 
     fn fixtures_dir() -> std::path::PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
@@ -22,26 +26,6 @@ mod visual {
 
     fn snapshots_dir() -> std::path::PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/snapshots")
-    }
-
-    fn load_test_fonts() -> Vec<FontData> {
-        let font_dir = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .join("backend/fonts");
-
-        let mut fonts = Vec::new();
-        for entry in fs::read_dir(&font_dir).expect("backend/fonts directory not found") {
-            let entry = entry.unwrap();
-            let path = entry.path();
-            if path.extension().is_some_and(|e| e == "ttf") {
-                let data = fs::read(&path).unwrap();
-                if let Some(fd) = FontData::from_bytes(data) {
-                    fonts.push(fd);
-                }
-            }
-        }
-        fonts
     }
 
     fn generate_test_pdf(template_name: &str, data_name: &str) -> Vec<u8> {

@@ -362,7 +362,7 @@ Component dosyasi olusturulmamis, hicbir yerde import edilmiyor.
 
 ## 4. Mimari Iyilestirmeler
 
-### 4.1 Worker Message Type Safety `[IMPLEMENTE EDILMEDI]`
+### 4.1 Worker Message Type Safety `[TAMAMLANDI]`
 
 **Dosya:** `frontend/src/composables/useLayoutEngine.ts` (satir 27)
 
@@ -388,7 +388,7 @@ worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
 
 ---
 
-### 4.2 Image Re-Encoding Optimizasyonu `[IMPLEMENTE EDILMEDI]`
+### 4.2 Image Re-Encoding Optimizasyonu `[TAMAMLANDI]`
 
 **Dosya:** `layout-engine/src/pdf_render.rs` (satir ~712)
 
@@ -405,7 +405,7 @@ worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
 
 ---
 
-### 4.3 Tablo Genisletme Cache `[IMPLEMENTE EDILMEDI]`
+### 4.3 Tablo Genisletme Cache `[TAMAMLANDI]`
 
 **Dosya:** `layout-engine/src/table_layout.rs`
 
@@ -421,7 +421,7 @@ Buyuk tablolarda layout hesaplama suresi ve bellek kullanimi artar. Editorde her
 
 ---
 
-### 4.4 Font Loader Iyilestirmesi (Backend) `[font loader implementasyonu yapıldı. check edilmesi gerek bu sorunun tekrar]`
+### 4.4 Font Loader Iyilestirmesi (Backend) `[TAMAMLANDI]`
 
 **Dosya:** `backend/src/main.rs` (satirlar 44-53)
 
@@ -433,7 +433,7 @@ TTF/OTF `name` tablosunu okuyarak font ailesini (family name) metadata'dan almak
 
 ---
 
-### 4.5 Floating-Point Currency Formatlama Hatasi `[IMPLEMENTE EDILMEDI]`
+### 4.5 Floating-Point Currency Formatlama Hatasi `[TAMAMLANDI]`
 
 **Dosya:** `layout-engine/src/expr_eval.rs` (satir ~82)
 
@@ -450,7 +450,7 @@ TTF/OTF `name` tablosunu okuyarak font ailesini (family name) metadata'dan almak
 
 ## 5. Altyapi ve Developer Experience
 
-### 5.1 CI/CD Pipeline `[IMPLEMENTE EDILMEDI]`
+### 5.1 CI/CD Pipeline `[TAMAMLANDI]`
 
 **Mevcut Durum:**
 Hicbir CI/CD konfigurasyonu yok (`.github/`, `.gitea/`, vb.).
@@ -476,7 +476,7 @@ jobs:
 
 ---
 
-### 5.2 justfile Test/Lint/Fmt Recipe'leri `[IMPLEMENTE EDILMEDI]`
+### 5.2 justfile Test/Lint/Fmt Recipe'leri `[TAMAMLANDI]`
 
 **Dosya:** `justfile`
 
@@ -508,7 +508,7 @@ check:
 
 ---
 
-### 5.3 rust-toolchain.toml `[IMPLEMENTE EDILMEDI]`
+### 5.3 rust-toolchain.toml `[TAMAMLANDI]`
 
 **Sorun:**
 Proje Rust edition 2024 kullaniyor (Rust 1.85+) ama toolchain pinlenmemis. Farkli gelistirici ortamlarinda farkli Rust versiyonlari derleme hatalarina yol acabilir.
@@ -524,7 +524,7 @@ targets = ["wasm32-unknown-unknown"]
 
 ---
 
-### 5.4 WASM Binary Git'te Tracked `[IMPLEMENTE EDILMEDI]`
+### 5.4 WASM Binary Git'te Tracked `[TAMAMLANDI]`
 
 **Dosya:** `frontend/public/wasm/dreport_layout_bg.wasm`
 
@@ -539,7 +539,7 @@ WASM dosyasini build artifact olarak ele almak. CI/CD veya README'de build adimi
 
 ---
 
-### 5.5 codemirror-lang-dexpr Dis Bagimlilik `[IMPLEMENTE EDILMEDI]`
+### 5.5 codemirror-lang-dexpr Dis Bagimlilik `[TAMAMLANDI]`
 
 **Dosya:** `frontend/package.json`
 
@@ -556,10 +556,13 @@ Repo disinda, ust dizinde `rust-expr` projesinin checkout edilmis olmasini gerek
 
 ---
 
-### 5.6 ESLint / Prettier Kurulumu `[IMPLEMENTE EDILMEDI]`
+### 5.6 ESLint / oxfmt Kurulumu `[TAMAMLANDI]`
 
 **Mevcut Durum:**
 Frontend'de hicbir linter veya formatter konfigurasyonu yok. TypeScript strict mode tip hatalarini yakalasa da, AST-level linting (unused imports, Vue-specific patterns, tutarli stil kurallari) bulunmuyor.
+
+**Master Thougs**
+oxfmt kullanalım prettier yerine, eslint kullanmaya devam edebiliriz oxlint vue için yeterince olgun değil.
 
 **Onerilen Yaklasim:**
 - `eslint` + `@vue/eslint-config-typescript` + `eslint-plugin-vue`
@@ -568,7 +571,7 @@ Frontend'de hicbir linter veya formatter konfigurasyonu yok. TypeScript strict m
 
 ---
 
-### 5.7 Test Helper Duplikasyonu `[IMPLEMENTE EDILMEDI]`
+### 5.7 Test Helper Duplikasyonu `[TAMAMLANDI]`
 
 **Dosyalar:**
 - `layout-engine/tests/layout_integration.rs`
@@ -587,7 +590,7 @@ pub fn load_test_fonts() -> Vec<FontData> { ... }
 
 ---
 
-### 5.8 Test Artifact Temizligi `[IMPLEMENTE EDILMEDI]`
+### 5.8 Test Artifact Temizligi `[TAMAMLANDI]`
 
 **Dosya:** `layout-engine/tests/pdf_render_test.rs`
 

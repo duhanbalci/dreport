@@ -87,7 +87,7 @@ function drawTicks(
 
   // Tick aralığı belirleme (zoom'a göre)
   const mmPerPx = 1 / s
-  let tickMm = 1
+  let tickMm: number
   if (mmPerPx > 2) tickMm = 50
   else if (mmPerPx > 1) tickMm = 20
   else if (mmPerPx > 0.5) tickMm = 10

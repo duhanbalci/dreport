@@ -5,7 +5,7 @@ use taffy::prelude::*;
 
 use crate::data_resolve::ResolvedData;
 use crate::sizing::{self, mm_to_pt, pt_to_mm};
-use crate::table_layout;
+use crate::table_layout::{self, TableExpandCache};
 use crate::text_measure::TextMeasurer;
 use crate::{ElementLayout, LayoutError, LayoutResult, ResolvedContent, ResolvedStyle};
 
@@ -55,6 +55,7 @@ pub fn compute(
     let mut taffy = TaffyTree::<MeasureContext>::new();
     taffy.disable_rounding();
     let mut node_map: HashMap<NodeId, NodeInfo> = HashMap::new();
+    let mut table_cache = TableExpandCache::new();
 
     let page_width_mm = template.page.width;
     let root_node = build_container(
@@ -65,6 +66,7 @@ pub fn compute(
         None,
         measurer,
         page_width_mm,
+        &mut table_cache,
     )?;
 
     // Sayfa wrapper: sayfa genişliğinde ama yükseklik sınırsız (auto)
@@ -131,8 +133,9 @@ fn compute_section(
     let mut taffy = TaffyTree::<MeasureContext>::new();
     taffy.disable_rounding();
     let mut node_map: HashMap<NodeId, NodeInfo> = HashMap::new();
+    let mut table_cache = TableExpandCache::new();
 
-    let section_node = build_container(container, &mut taffy, &mut node_map, resolved, None, measurer, page_width_mm)?;
+    let section_node = build_container(container, &mut taffy, &mut node_map, resolved, None, measurer, page_width_mm, &mut table_cache)?;
 
     let wrapper_style = Style {
         display: Display::Flex,
@@ -214,6 +217,7 @@ fn build_container(
     parent_direction: Option<&str>,
     measurer: &mut TextMeasurer,
     page_width_mm: f64,
+    table_cache: &mut TableExpandCache,
 ) -> Result<NodeId, LayoutError> {
     let style = sizing::container_to_style(el, parent_direction);
     let direction = el.direction.as_str();
@@ -232,7 +236,7 @@ fn build_container(
     let mut children_ids = Vec::new();
 
     for child in &el.children {
-        let child_node = build_element(child, taffy, node_map, resolved, Some(direction), measurer, content_width_mm)?;
+        let child_node = build_element(child, taffy, node_map, resolved, Some(direction), measurer, content_width_mm, table_cache)?;
         child_nodes.push(child_node);
         children_ids.push(child.id().to_string());
     }
@@ -269,10 +273,11 @@ fn build_element(
     parent_direction: Option<&str>,
     measurer: &mut TextMeasurer,
     page_width_mm: f64,
+    table_cache: &mut TableExpandCache,
 ) -> Result<NodeId, LayoutError> {
     match el {
         TemplateElement::Container(e) => {
-            build_container(e, taffy, node_map, resolved, parent_direction, measurer, page_width_mm)
+            build_container(e, taffy, node_map, resolved, parent_direction, measurer, page_width_mm, table_cache)
         }
         TemplateElement::StaticText(e) => build_text_leaf(
             taffy,
@@ -440,8 +445,8 @@ fn build_element(
             Ok(node)
         }
         TemplateElement::RepeatingTable(e) => {
-            // Tabloyu container ağacına expand et (measurer ile auto sütun genişlikleri hesaplanır)
-            let expanded = table_layout::expand_table(e, resolved, measurer, page_width_mm);
+            // Tabloyu container ağacına expand et (cache ile)
+            let expanded = table_layout::expand_table_cached(e, resolved, measurer, page_width_mm, table_cache);
 
             // Expand edilmiş tablo cell'lerinin text'lerini resolved'a ekle
             // (expand_table StaticText'ler üretir, bunların text'leri zaten content'te)
@@ -460,6 +465,7 @@ fn build_element(
                 parent_direction,
                 measurer,
                 page_width_mm,
+                table_cache,
             )
         }
         TemplateElement::Shape(e) => {

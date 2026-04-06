@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - name: Format check
+        run: cargo fmt --workspace --check
+      - name: Clippy
+        run: cargo clippy --workspace -- -D warnings
+      - name: Test
+        run: cargo test --workspace
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - name: Install dependencies
+        run: cd frontend && bun install
+      - name: Type check
+        run: cd frontend && bun run type-check
+      - name: Lint
+        run: cd frontend && bun run lint
+      - name: Format check
+        run: cd frontend && bun run format:check
+      - name: Unit tests
+        run: cd frontend && bun run test:run
+
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Build WASM
+        run: wasm-pack build layout-engine --target web --release
+
+  publish-crates:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [rust, wasm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Configure Gitea cargo registry
+        run: |
+          mkdir -p ~/.cargo
+          cat >> ~/.cargo/config.toml <<EOF
+          [registries.gitea]
+          index = "sparse+${{ github.server_url }}/api/packages/${{ github.repository_owner }}/cargo/"
+          EOF
+          cat >> ~/.cargo/credentials.toml <<EOF
+          [registries.gitea]
+          token = "Bearer ${{ secrets.GITEA_TOKEN }}"
+          EOF
+      - name: Publish dreport-core
+        run: cargo publish -p dreport-core --registry gitea --allow-dirty || true
+      - name: Publish dreport-layout
+        run: cargo publish -p dreport-layout --registry gitea --allow-dirty || true
+
+  publish-npm:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [frontend, wasm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Build WASM
+        run: wasm-pack build layout-engine --target web --release --out-dir ../frontend/src/core/wasm-pkg-layout
+      - name: Configure npm registry
+        run: |
+          echo "@duhanbalci:registry=${{ github.server_url }}/api/packages/${{ github.repository_owner }}/npm/" >> ~/.npmrc
+          echo "//${{ github.server_url }}/api/packages/${{ github.repository_owner }}/npm/:_authToken=${{ secrets.GITEA_TOKEN }}" >> ~/.npmrc
+      - name: Install frontend dependencies
+        run: cd frontend && bun install
+      - name: Build frontend
+        run: cd frontend && bun run build

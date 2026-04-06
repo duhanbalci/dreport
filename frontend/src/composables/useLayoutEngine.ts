@@ -4,6 +4,13 @@ import type { LayoutResult, LayoutMapEntry } from '../core/layout-types'
 
 export type { LayoutMapEntry }
 
+/** Discriminated union for all messages the layout worker can send back */
+type WorkerResponse =
+  | { type: 'result'; layout: LayoutResult; id: number }
+  | { type: 'error'; error: string; id: number }
+  | { type: 'barcode-result'; width: number; height: number; rgba: ArrayBuffer; id: number }
+  | { type: 'barcode-error'; error: string; id: number }
+
 export interface LayoutEngineOptions {
   /** Font API base URL. Default: '/api/fonts' */
   fontApiBase?: string
@@ -35,7 +42,7 @@ export function useLayoutEngine(
       worker.postMessage({ type: 'configure', fontApiBase: options.fontApiBase })
     }
 
-    worker.onmessage = (e: MessageEvent<any>) => {
+    worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
       const msg = e.data
 
       // Barcode yanıtları
@@ -47,22 +54,26 @@ export function useLayoutEngine(
       if (msg.id !== requestId) return
 
       computing.value = false
-      if (msg.type === 'result' && msg.layout) {
-        layout.value = msg.layout
-        error.value = null
+      switch (msg.type) {
+        case 'result': {
+          layout.value = msg.layout
+          error.value = null
 
-        // Flat map oluştur: id → LayoutMapEntry (pageIndex dahil)
-        const map: Record<string, LayoutMapEntry> = {}
-        for (const page of msg.layout.pages) {
-          for (const el of page.elements) {
-            if (!map[el.id]) {
-              map[el.id] = { ...el, pageIndex: page.page_index }
+          // Flat map oluştur: id → LayoutMapEntry (pageIndex dahil)
+          const map: Record<string, LayoutMapEntry> = {}
+          for (const page of msg.layout.pages) {
+            for (const el of page.elements) {
+              if (!map[el.id]) {
+                map[el.id] = { ...el, pageIndex: page.page_index }
+              }
             }
           }
+          layoutMap.value = map
+          break
         }
-        layoutMap.value = map
-      } else if (msg.type === 'error') {
-        error.value = msg.error ?? 'Bilinmeyen layout hatası'
+        case 'error':
+          error.value = msg.error ?? 'Bilinmeyen layout hatası'
+          break
       }
     }
 
@@ -129,13 +140,11 @@ export function useLayoutEngine(
     })
   }
 
-  function handleBarcodeResponse(msg: any) {
-    if (msg.type === 'barcode-result' || msg.type === 'barcode-error') {
-      const cb = barcodeCallbacks.get(msg.id)
-      if (cb) {
-        barcodeCallbacks.delete(msg.id)
-        cb(msg.type === 'barcode-result' ? { width: msg.width, height: msg.height, rgba: msg.rgba } : null)
-      }
+  function handleBarcodeResponse(msg: Extract<WorkerResponse, { type: 'barcode-result' } | { type: 'barcode-error' }>) {
+    const cb = barcodeCallbacks.get(msg.id)
+    if (cb) {
+      barcodeCallbacks.delete(msg.id)
+      cb(msg.type === 'barcode-result' ? { width: msg.width, height: msg.height, rgba: msg.rgba } : null)
     }
   }
 

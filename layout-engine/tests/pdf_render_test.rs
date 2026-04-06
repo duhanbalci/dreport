@@ -4,27 +4,10 @@
 #![cfg(not(target_arch = "wasm32"))]
 
 use dreport_core::models::*;
-use dreport_layout::{compute_layout, FontData};
+use dreport_layout::compute_layout;
 
-fn load_test_fonts() -> Vec<FontData> {
-    let font_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .unwrap()
-        .join("backend/fonts");
-
-    let mut fonts = Vec::new();
-    for entry in std::fs::read_dir(&font_dir).expect("backend/fonts directory not found") {
-        let entry = entry.unwrap();
-        let path = entry.path();
-        if path.extension().is_some_and(|e| e == "ttf") {
-            let data = std::fs::read(&path).unwrap();
-            if let Some(fd) = FontData::from_bytes(data) {
-                fonts.push(fd);
-            }
-        }
-    }
-    fonts
-}
+mod common;
+use common::load_test_fonts;
 
 fn simple_template() -> Template {
     Template {
@@ -320,10 +303,8 @@ fn test_page_break_produces_multiple_pages() {
     let pdf_bytes = dreport_layout::pdf_render::render_pdf(&layout, &fonts).unwrap();
     assert!(pdf_bytes.starts_with(b"%PDF"));
     
-    // Write PDF for manual inspection
-    let out_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent().unwrap()
-        .join("test_page_break.pdf");
+    // Write PDF to temp dir for manual inspection
+    let out_path = std::env::temp_dir().join("dreport_test_page_break.pdf");
     std::fs::write(&out_path, &pdf_bytes).unwrap();
     println!("Wrote: {}", out_path.display());
 }

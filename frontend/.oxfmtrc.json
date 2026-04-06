@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": false,
+  "singleQuote": true,
+  "printWidth": 100,
+  "ignorePatterns": [
+    "src/core/wasm-layout/",
+    "src/core/wasm-pkg-layout/",
+    "src/core/wasm-pkg/",
+    "src/core/wasm/"
+  ]
+}

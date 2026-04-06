@@ -245,7 +245,7 @@ export const useTemplateStore = defineStore('template', () => {
     try {
       parsed = JSON.parse(json) as Template
     } catch (e) {
-      throw new Error(`Geçersiz JSON: ${e instanceof Error ? e.message : String(e)}`)
+      throw new Error(`Geçersiz JSON: ${e instanceof Error ? e.message : String(e)}`, { cause: e })
     }
     // Minimum schema doğrulaması
     if (!parsed.root || parsed.root.type !== 'container') {
