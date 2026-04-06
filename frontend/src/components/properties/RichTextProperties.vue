@@ -46,21 +46,33 @@ function removeSpan(index: number) {
     <div class="prop-section__title">Varsayilan Stil</div>
     <div class="prop-row" data-tip="Varsayilan yazi tipi boyutu (point)">
       <label class="prop-label">Boyut (pt)</label>
-      <input class="prop-input" type="number" step="1" min="1"
+      <input
+        class="prop-input"
+        type="number"
+        step="1"
+        min="1"
         :value="element.style.fontSize ?? 11"
-        @input="(e) => updateStyle('fontSize', parseFloat((e.target as HTMLInputElement).value) || 11)" />
+        @input="
+          (e) => updateStyle('fontSize', parseFloat((e.target as HTMLInputElement).value) || 11)
+        "
+      />
     </div>
     <div class="prop-row" data-tip="Varsayilan metin rengi">
       <label class="prop-label">Renk</label>
-      <input class="prop-input prop-color" type="color"
+      <input
+        class="prop-input prop-color"
+        type="color"
         :value="element.style.color ?? '#000000'"
-        @input="(e) => updateStyle('color', (e.target as HTMLInputElement).value)" />
+        @input="(e) => updateStyle('color', (e.target as HTMLInputElement).value)"
+      />
     </div>
     <div class="prop-row" data-tip="Metnin yatay hizalamasi">
       <label class="prop-label">Hizalama</label>
-      <select class="prop-input prop-select"
+      <select
+        class="prop-input prop-select"
         :value="element.style.align ?? 'left'"
-        @change="(e) => updateStyle('align', (e.target as HTMLSelectElement).value)">
+        @change="(e) => updateStyle('align', (e.target as HTMLSelectElement).value)"
+      >
         <option value="left">Sol</option>
         <option value="center">Orta</option>
         <option value="right">Sag</option>
@@ -82,33 +94,49 @@ function removeSpan(index: number) {
           class="prop-span-card__remove"
           @click="removeSpan(idx)"
           title="Sil"
-        >&times;</button>
+        >
+          &times;
+        </button>
       </div>
 
       <div class="prop-row" data-tip="Span metin icerigi">
         <label class="prop-label">Metin</label>
-        <input class="prop-input" type="text"
+        <input
+          class="prop-input"
+          type="text"
           :value="span.text ?? ''"
-          @input="(e) => updateSpan(idx, { text: (e.target as HTMLInputElement).value })" />
+          @input="(e) => updateSpan(idx, { text: (e.target as HTMLInputElement).value })"
+        />
       </div>
       <div class="prop-row" data-tip="Span yazi boyutu — bos birakilirsa varsayilan kullanilir">
         <label class="prop-label">Boyut</label>
-        <input class="prop-input" type="number" step="1" min="1"
+        <input
+          class="prop-input"
+          type="number"
+          step="1"
+          min="1"
           :value="(span.style as TextStyle).fontSize ?? ''"
           placeholder="varsayilan"
-          @input="(e) => {
-            const v = (e.target as HTMLInputElement).value
-            updateSpanStyle(idx, 'fontSize', v ? parseFloat(v) : undefined)
-          }" />
+          @input="
+            (e) => {
+              const v = (e.target as HTMLInputElement).value
+              updateSpanStyle(idx, 'fontSize', v ? parseFloat(v) : undefined)
+            }
+          "
+        />
       </div>
       <div class="prop-row" data-tip="Span yazi kalinligi">
         <label class="prop-label">Kalinlik</label>
-        <select class="prop-input prop-select"
+        <select
+          class="prop-input prop-select"
           :value="(span.style as TextStyle).fontWeight ?? ''"
-          @change="(e) => {
-            const v = (e.target as HTMLSelectElement).value
-            updateSpanStyle(idx, 'fontWeight', v || undefined)
-          }">
+          @change="
+            (e) => {
+              const v = (e.target as HTMLSelectElement).value
+              updateSpanStyle(idx, 'fontWeight', v || undefined)
+            }
+          "
+        >
           <option value="">Varsayilan</option>
           <option value="normal">Normal</option>
           <option value="bold">Kalin</option>
@@ -116,9 +144,12 @@ function removeSpan(index: number) {
       </div>
       <div class="prop-row" data-tip="Span metin rengi">
         <label class="prop-label">Renk</label>
-        <input class="prop-input prop-color" type="color"
+        <input
+          class="prop-input prop-color"
+          type="color"
           :value="(span.style as TextStyle).color ?? element.style.color ?? '#000000'"
-          @input="(e) => updateSpanStyle(idx, 'color', (e.target as HTMLInputElement).value)" />
+          @input="(e) => updateSpanStyle(idx, 'color', (e.target as HTMLInputElement).value)"
+        />
       </div>
     </div>
   </div>

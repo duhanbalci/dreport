@@ -40,7 +40,9 @@ function setMode(mode: 'static' | 'dynamic') {
     update({ binding: undefined } as Partial<TemplateElement>)
   } else {
     // Dinamik moda geç — ilk uygun alanı seç veya boş bırak
-    const imageFields = schemaStore.scalarFields.filter(f => f.format === 'image' || f.type === 'string')
+    const imageFields = schemaStore.scalarFields.filter(
+      (f) => f.format === 'image' || f.type === 'string',
+    )
     const path = imageFields.length > 0 ? imageFields[0].path : ''
     update({ src: undefined, binding: { type: 'scalar', path } } as Partial<TemplateElement>)
   }
@@ -52,7 +54,7 @@ function setBindingPath(path: string) {
 
 /** Schema'dan görsel olabilecek alanlar (format: image veya string) */
 const imageScalarFields = computed(() => {
-  return schemaStore.scalarFields.filter(f => f.format === 'image' || f.type === 'string')
+  return schemaStore.scalarFields.filter((f) => f.format === 'image' || f.type === 'string')
 })
 </script>
 
@@ -64,8 +66,20 @@ const imageScalarFields = computed(() => {
     <div class="prop-row" data-tip="Gorsel kaynagi: dosya veya veri alanından">
       <label class="prop-label">Mod</label>
       <div class="prop-toggle-group">
-        <button class="prop-toggle-btn" :class="{ 'prop-toggle-btn--active': !isDynamic }" @click="setMode('static')">Statik</button>
-        <button class="prop-toggle-btn" :class="{ 'prop-toggle-btn--active': isDynamic }" @click="setMode('dynamic')">Dinamik</button>
+        <button
+          class="prop-toggle-btn"
+          :class="{ 'prop-toggle-btn--active': !isDynamic }"
+          @click="setMode('static')"
+        >
+          Statik
+        </button>
+        <button
+          class="prop-toggle-btn"
+          :class="{ 'prop-toggle-btn--active': isDynamic }"
+          @click="setMode('dynamic')"
+        >
+          Dinamik
+        </button>
       </div>
     </div>
 
@@ -84,7 +98,9 @@ const imageScalarFields = computed(() => {
       </div>
       <div v-if="element.src" class="prop-row" data-tip="Gorseli kaldirmak icin tiklayin">
         <label class="prop-label"></label>
-        <button class="prop-clear" @click="update({ src: undefined } as any)">Gorseli kaldir</button>
+        <button class="prop-clear" @click="update({ src: undefined } as any)">
+          Gorseli kaldir
+        </button>
       </div>
     </template>
 
@@ -92,15 +108,15 @@ const imageScalarFields = computed(() => {
     <template v-else>
       <div class="prop-row" data-tip="Gorsel URL'sinin gelecegi veri alani">
         <label class="prop-label">Veri Alani</label>
-        <select class="prop-input prop-select"
+        <select
+          class="prop-input prop-select"
           :value="element.binding?.path ?? ''"
-          @change="(e) => setBindingPath((e.target as HTMLSelectElement).value)">
+          @change="(e) => setBindingPath((e.target as HTMLSelectElement).value)"
+        >
           <option value="" disabled>Secin...</option>
-          <option
-            v-for="field in imageScalarFields"
-            :key="field.path"
-            :value="field.path"
-          >{{ field.title }} ({{ field.path }})</option>
+          <option v-for="field in imageScalarFields" :key="field.path" :value="field.path">
+            {{ field.title }} ({{ field.path }})
+          </option>
         </select>
       </div>
       <div v-if="element.binding?.path" class="prop-row">
@@ -112,9 +128,11 @@ const imageScalarFields = computed(() => {
     <!-- Sığdırma modu (ortak) -->
     <div class="prop-row" data-tip="Gorselin alana sigdirma modu">
       <label class="prop-label">Sigdirma</label>
-      <select class="prop-input prop-select"
+      <select
+        class="prop-input prop-select"
         :value="element.style.objectFit ?? 'contain'"
-        @change="(e) => updateStyle('objectFit', (e.target as HTMLSelectElement).value)">
+        @change="(e) => updateStyle('objectFit', (e.target as HTMLSelectElement).value)"
+      >
         <option value="contain">Sigdir</option>
         <option value="cover">Kap</option>
         <option value="stretch">Esnet</option>
@@ -137,7 +155,9 @@ const imageScalarFields = computed(() => {
   color: #64748b;
   font-size: 11px;
   cursor: pointer;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .prop-toggle-btn:first-child {

@@ -148,7 +148,7 @@ describe('findScalarFields', () => {
     // firma.unvan, firma.vergiNo, fatura.no, fatura.tutar, fatura.tarih = 5
     expect(scalars).toHaveLength(5)
 
-    const paths = scalars.map(s => s.path)
+    const paths = scalars.map((s) => s.path)
     expect(paths).toContain('firma.unvan')
     expect(paths).toContain('firma.vergiNo')
     expect(paths).toContain('fatura.no')
@@ -159,7 +159,7 @@ describe('findScalarFields', () => {
   it('does not include object or array nodes', () => {
     const tree = parseSchema(testSchema)
     const scalars = findScalarFields(tree)
-    const types = scalars.map(s => s.type)
+    const types = scalars.map((s) => s.type)
 
     expect(types).not.toContain('object')
     expect(types).not.toContain('array')
@@ -195,17 +195,38 @@ describe('defaultAlignForSchema', () => {
   })
 
   it('returns right for currency format', () => {
-    const node: SchemaNode = { path: 'x', key: 'x', title: 'X', type: 'string', format: 'currency', children: [] }
+    const node: SchemaNode = {
+      path: 'x',
+      key: 'x',
+      title: 'X',
+      type: 'string',
+      format: 'currency',
+      children: [],
+    }
     expect(defaultAlignForSchema(node)).toBe('right')
   })
 
   it('returns right for percentage format', () => {
-    const node: SchemaNode = { path: 'x', key: 'x', title: 'X', type: 'string', format: 'percentage', children: [] }
+    const node: SchemaNode = {
+      path: 'x',
+      key: 'x',
+      title: 'X',
+      type: 'string',
+      format: 'percentage',
+      children: [],
+    }
     expect(defaultAlignForSchema(node)).toBe('right')
   })
 
   it('returns center for date format', () => {
-    const node: SchemaNode = { path: 'x', key: 'x', title: 'X', type: 'string', format: 'date', children: [] }
+    const node: SchemaNode = {
+      path: 'x',
+      key: 'x',
+      title: 'X',
+      type: 'string',
+      format: 'date',
+      children: [],
+    }
     expect(defaultAlignForSchema(node)).toBe('center')
   })
 

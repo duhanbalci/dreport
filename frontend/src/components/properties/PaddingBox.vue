@@ -22,10 +22,42 @@ function onInput(side: 'top' | 'right' | 'bottom' | 'left', e: Event) {
   <div class="pb">
     <span class="pb__label">Padding</span>
     <div class="pb__box">
-      <input class="pb__in pb__in--t" type="number" step="1" min="0" :value="props.top" @input="(e) => onInput('top', e)" data-tip="Ust bosluk (mm)" />
-      <input class="pb__in pb__in--r" type="number" step="1" min="0" :value="props.right" @input="(e) => onInput('right', e)" data-tip="Sag bosluk (mm)" />
-      <input class="pb__in pb__in--b" type="number" step="1" min="0" :value="props.bottom" @input="(e) => onInput('bottom', e)" data-tip="Alt bosluk (mm)" />
-      <input class="pb__in pb__in--l" type="number" step="1" min="0" :value="props.left" @input="(e) => onInput('left', e)" data-tip="Sol bosluk (mm)" />
+      <input
+        class="pb__in pb__in--t"
+        type="number"
+        step="1"
+        min="0"
+        :value="props.top"
+        @input="(e) => onInput('top', e)"
+        data-tip="Ust bosluk (mm)"
+      />
+      <input
+        class="pb__in pb__in--r"
+        type="number"
+        step="1"
+        min="0"
+        :value="props.right"
+        @input="(e) => onInput('right', e)"
+        data-tip="Sag bosluk (mm)"
+      />
+      <input
+        class="pb__in pb__in--b"
+        type="number"
+        step="1"
+        min="0"
+        :value="props.bottom"
+        @input="(e) => onInput('bottom', e)"
+        data-tip="Alt bosluk (mm)"
+      />
+      <input
+        class="pb__in pb__in--l"
+        type="number"
+        step="1"
+        min="0"
+        :value="props.left"
+        @input="(e) => onInput('left', e)"
+        data-tip="Sol bosluk (mm)"
+      />
       <div class="pb__center" />
     </div>
   </div>
@@ -87,11 +119,32 @@ function onInput(side: 'top' | 'right' | 'bottom' | 'left', e: Event) {
   margin: 0;
 }
 
-.pb__in:hover { background: #f1f5f9; }
-.pb__in:focus { background: white; box-shadow: 0 0 0 1px #93c5fd; }
+.pb__in:hover {
+  background: #f1f5f9;
+}
+.pb__in:focus {
+  background: white;
+  box-shadow: 0 0 0 1px #93c5fd;
+}
 
-.pb__in--t { top: 1px; left: 50%; transform: translateX(-50%); }
-.pb__in--b { bottom: 1px; left: 50%; transform: translateX(-50%); }
-.pb__in--l { left: 2px; top: 50%; transform: translateY(-50%); }
-.pb__in--r { right: 2px; top: 50%; transform: translateY(-50%); }
+.pb__in--t {
+  top: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.pb__in--b {
+  bottom: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.pb__in--l {
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.pb__in--r {
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+}
 </style>

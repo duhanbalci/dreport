@@ -7,12 +7,15 @@ import { sz } from '../../core/types'
 import { useEditorStore } from '../../stores/editor'
 import { useSchemaStore } from '../../stores/schema'
 
-const props = withDefaults(defineProps<{
-  node: SchemaNode
-  depth?: number
-}>(), {
-  depth: 0,
-})
+const props = withDefaults(
+  defineProps<{
+    node: SchemaNode
+    depth?: number
+  }>(),
+  {
+    depth: 0,
+  },
+)
 
 const editorStore = useEditorStore()
 const schemaStore = useSchemaStore()
@@ -68,7 +71,7 @@ function createBoundTextElement(node: SchemaNode): TemplateElement {
 
 function createBoundTableElement(node: SchemaNode): RepeatingTableElement {
   const itemFields = schemaStore.getArrayItemFields(node.path)
-  const columns: TableColumn[] = itemFields.map(field => ({
+  const columns: TableColumn[] = itemFields.map((field) => ({
     id: `col_${(++colIdCounter).toString(36)}`,
     field: field.key,
     title: field.title,
@@ -108,9 +111,7 @@ function onDragEnd() {
   editorStore.endDragNewElement()
 }
 
-const displayChildren = isArray
-  ? (props.node.itemProperties ?? [])
-  : props.node.children
+const displayChildren = isArray ? (props.node.itemProperties ?? []) : props.node.children
 </script>
 
 <template>
@@ -131,7 +132,11 @@ const displayChildren = isArray
       @dragstart="onDragStart"
       @dragend="onDragEnd"
     >
-      <span v-if="hasChildren" class="schema-node__arrow" :class="{ 'schema-node__arrow--expanded': expanded }">
+      <span
+        v-if="hasChildren"
+        class="schema-node__arrow"
+        :class="{ 'schema-node__arrow--expanded': expanded }"
+      >
         &#9654;
       </span>
       <span v-else class="schema-node__arrow-placeholder" />

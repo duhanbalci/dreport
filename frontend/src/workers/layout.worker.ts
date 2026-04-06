@@ -2,7 +2,12 @@
 /// Template JSON + Data JSON → Layout WASM → LayoutResult
 /// Font loading is dynamic — fetches from backend API based on template needs.
 
-import init, { loadFonts, addFonts, computeLayout, generateBarcode } from '../core/wasm-layout/dreport_layout.js'
+import init, {
+  loadFonts,
+  addFonts,
+  computeLayout,
+  generateBarcode,
+} from '../core/wasm-layout/dreport_layout.js'
 import type { LayoutResult } from '../core/layout-types'
 
 let initPromise: Promise<void> | null = null
@@ -35,7 +40,9 @@ async function doInit() {
       fontCatalog = await res.json()
       console.log(`[layout-worker] Font kataloğu yüklendi (${fontCatalog.length} aile)`)
     } else {
-      console.warn(`[layout-worker] Font kataloğu alınamadı (HTTP ${res.status}), static fallback deneniyor`)
+      console.warn(
+        `[layout-worker] Font kataloğu alınamadı (HTTP ${res.status}), static fallback deneniyor`,
+      )
       await loadStaticFallback()
       return
     }
@@ -68,7 +75,7 @@ async function loadStaticFallback() {
       if (res.ok) {
         buffers.push(new Uint8Array(await res.arrayBuffer()))
       }
-    })
+    }),
   )
 
   if (buffers.length > 0) {
@@ -81,13 +88,13 @@ async function loadStaticFallback() {
 
 /** Load all variants of given families from the API into WASM */
 async function ensureFamiliesLoaded(families: string[]): Promise<void> {
-  const toLoad = families.filter(f => !loadedFamilies.has(f.toLowerCase()))
+  const toLoad = families.filter((f) => !loadedFamilies.has(f.toLowerCase()))
   if (toLoad.length === 0) return
 
   const buffers: Uint8Array[] = []
 
   for (const family of toLoad) {
-    const info = fontCatalog.find(f => f.family.toLowerCase() === family.toLowerCase())
+    const info = fontCatalog.find((f) => f.family.toLowerCase() === family.toLowerCase())
     if (!info) {
       console.warn(`[layout-worker] Font ailesi bulunamadı: ${family}`)
       continue
@@ -132,7 +139,15 @@ function ensureInit(): Promise<void> {
 
 type WorkerMessage =
   | { type: 'compile'; templateJson: string; dataJson: string; id: number }
-  | { type: 'barcode'; format: string; value: string; width: number; height: number; includeText: boolean; id: number }
+  | {
+      type: 'barcode'
+      format: string
+      value: string
+      width: number
+      height: number
+      includeText: boolean
+      id: number
+    }
   | { type: 'configure'; fontApiBase?: string }
 
 self.onmessage = async (e: MessageEvent<WorkerMessage>) => {

@@ -21,10 +21,7 @@ const RULER_SIZE = computed(() => props.rulerSize ?? 20)
 const hCanvas = ref<HTMLCanvasElement | null>(null)
 const vCanvas = ref<HTMLCanvasElement | null>(null)
 
-function drawRuler(
-  canvas: HTMLCanvasElement | null,
-  direction: 'horizontal' | 'vertical',
-) {
+function drawRuler(canvas: HTMLCanvasElement | null, direction: 'horizontal' | 'vertical') {
   if (!canvas) return
   const ctx = canvas.getContext('2d')
   if (!ctx) return
@@ -79,9 +76,10 @@ function drawTicks(
   // EditorCanvas sayfayı ortalar, ruler da buna uymalı
   // Yatay: canvas ortası - sayfa genişliği/2
   // Sayfanın canvas üzerindeki orijin px'i
-  const canvasCenter = direction === 'horizontal'
-    ? (length / 2)  // flex centering approximation
-    : 40  // EditorCanvas padding-top: 40px
+  const canvasCenter =
+    direction === 'horizontal'
+      ? length / 2 // flex centering approximation
+      : 40 // EditorCanvas padding-top: 40px
 
   const pageStartPx = canvasCenter - (pageMm * s) / 2 + pan
 
@@ -188,16 +186,8 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="ruler-corner" :style="{ width: `${RULER_SIZE}px`, height: `${RULER_SIZE}px` }" />
-  <canvas
-    ref="hCanvas"
-    class="ruler-h"
-    :style="{ height: `${RULER_SIZE}px` }"
-  />
-  <canvas
-    ref="vCanvas"
-    class="ruler-v"
-    :style="{ width: `${RULER_SIZE}px` }"
-  />
+  <canvas ref="hCanvas" class="ruler-h" :style="{ height: `${RULER_SIZE}px` }" />
+  <canvas ref="vCanvas" class="ruler-v" :style="{ width: `${RULER_SIZE}px` }" />
 </template>
 
 <style scoped>

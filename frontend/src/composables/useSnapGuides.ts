@@ -13,7 +13,7 @@ export interface SnapResult {
 }
 
 interface EdgeSet {
-  verticals: number[]  // x positions in mm (left, right, center of elements + page)
+  verticals: number[] // x positions in mm (left, right, center of elements + page)
   horizontals: number[] // y positions in mm (top, bottom, center of elements + page)
 }
 
@@ -27,9 +27,9 @@ export function useSnapGuides() {
     layoutMap: Record<string, ElementLayout>,
     excludeId: string,
     pageWidth: number,
-    pageHeight: number
+    pageHeight: number,
   ) {
-    const verticals: number[] = [0, pageWidth / 2, pageWidth]  // page edges + center
+    const verticals: number[] = [0, pageWidth / 2, pageWidth] // page edges + center
     const horizontals: number[] = [0, pageHeight / 2, pageHeight]
 
     for (const [id, el] of Object.entries(layoutMap)) {
@@ -48,7 +48,7 @@ export function useSnapGuides() {
     proposedX_mm: number,
     proposedY_mm: number,
     width_mm: number,
-    height_mm: number
+    height_mm: number,
   ): SnapResult {
     if (!cachedEdges) {
       return { snappedX_mm: proposedX_mm, snappedY_mm: proposedY_mm, guides: [] }
@@ -132,13 +132,12 @@ export function useSnapGuides() {
   /** Calculate snap for resize edge */
   function calculateResizeSnap(
     edge: 'left' | 'right' | 'top' | 'bottom',
-    proposedValue_mm: number
+    proposedValue_mm: number,
   ): number {
     if (!cachedEdges) return proposedValue_mm
 
-    const targets = (edge === 'left' || edge === 'right')
-      ? cachedEdges.verticals
-      : cachedEdges.horizontals
+    const targets =
+      edge === 'left' || edge === 'right' ? cachedEdges.verticals : cachedEdges.horizontals
 
     const guides: SnapGuide[] = []
     let snapped = proposedValue_mm
@@ -154,7 +153,7 @@ export function useSnapGuides() {
 
     if (snapped !== proposedValue_mm) {
       guides.push({
-        type: (edge === 'left' || edge === 'right') ? 'vertical' : 'horizontal',
+        type: edge === 'left' || edge === 'right' ? 'vertical' : 'horizontal',
         position_mm: snapped,
       })
     }

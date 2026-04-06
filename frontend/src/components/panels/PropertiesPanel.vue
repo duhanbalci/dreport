@@ -55,21 +55,36 @@ const elementTypeLabel = computed(() => {
       if (el.id === 'header') return 'Üst Bilgi'
       if (el.id === 'footer') return 'Alt Bilgi'
       return 'Container'
-    case 'static_text': return 'Metin'
-    case 'text': return 'Metin'
-    case 'line': return 'Cizgi'
-    case 'repeating_table': return 'Tablo'
-    case 'image': return 'Gorsel'
-    case 'page_number': return 'Sayfa No'
-    case 'barcode': return 'Barkod'
-    case 'checkbox': return 'Onay Kutusu'
-    case 'shape': return 'Sekil'
-    case 'current_date': return 'Tarih'
-    case 'calculated_text': return 'Hesaplanan Metin'
-    case 'rich_text': return 'Zengin Metin'
-    case 'page_break': return 'Sayfa Sonu'
-    case 'chart': return 'Grafik'
-    default: return 'Eleman'
+    case 'static_text':
+      return 'Metin'
+    case 'text':
+      return 'Metin'
+    case 'line':
+      return 'Cizgi'
+    case 'repeating_table':
+      return 'Tablo'
+    case 'image':
+      return 'Gorsel'
+    case 'page_number':
+      return 'Sayfa No'
+    case 'barcode':
+      return 'Barkod'
+    case 'checkbox':
+      return 'Onay Kutusu'
+    case 'shape':
+      return 'Sekil'
+    case 'current_date':
+      return 'Tarih'
+    case 'calculated_text':
+      return 'Hesaplanan Metin'
+    case 'rich_text':
+      return 'Zengin Metin'
+    case 'page_break':
+      return 'Sayfa Sonu'
+    case 'chart':
+      return 'Grafik'
+    default:
+      return 'Eleman'
   }
 })
 
@@ -105,12 +120,12 @@ function deleteSelected() {
   <div class="properties-panel">
     <div v-if="multipleSelected" class="properties-panel__empty">
       {{ editorStore.selectedElementIds.size }} eleman secili
-      <button class="prop-delete-btn" style="margin-top: 12px" @click="deleteSelected">Secilenleri Sil</button>
+      <button class="prop-delete-btn" style="margin-top: 12px" @click="deleteSelected">
+        Secilenleri Sil
+      </button>
     </div>
 
-    <div v-else-if="!selectedElement" class="properties-panel__empty">
-      Bir eleman secin
-    </div>
+    <div v-else-if="!selectedElement" class="properties-panel__empty">Bir eleman secin</div>
 
     <template v-else>
       <!-- Header -->
@@ -134,68 +149,87 @@ function deleteSelected() {
 
         <TextProperties
           v-if="selectedElement.type === 'static_text' || selectedElement.type === 'text'"
-          :element="selectedElement" />
+          :element="selectedElement"
+        />
 
         <LineProperties
           v-if="selectedElement.type === 'line'"
-          :element="(selectedElement as LineElement)" />
+          :element="selectedElement as LineElement"
+        />
 
         <ImageProperties
           v-if="selectedElement.type === 'image'"
-          :element="(selectedElement as ImageElement)" />
+          :element="selectedElement as ImageElement"
+        />
 
         <PageNumberProperties
           v-if="selectedElement.type === 'page_number'"
-          :element="(selectedElement as PageNumberElement)" />
+          :element="selectedElement as PageNumberElement"
+        />
 
         <BarcodeProperties
           v-if="selectedElement.type === 'barcode'"
-          :element="(selectedElement as BarcodeElement)" />
+          :element="selectedElement as BarcodeElement"
+        />
 
         <CurrentDateProperties
           v-if="selectedElement.type === 'current_date'"
-          :element="(selectedElement as CurrentDateElement)" />
+          :element="selectedElement as CurrentDateElement"
+        />
 
         <CheckboxProperties
           v-if="selectedElement.type === 'checkbox'"
-          :element="(selectedElement as CheckboxElement)" />
+          :element="selectedElement as CheckboxElement"
+        />
 
         <CalculatedTextProperties
           v-if="selectedElement.type === 'calculated_text'"
-          :element="(selectedElement as CalculatedTextElement)" />
+          :element="selectedElement as CalculatedTextElement"
+        />
 
         <RichTextProperties
           v-if="selectedElement.type === 'rich_text'"
-          :element="(selectedElement as RichTextElement)" />
+          :element="selectedElement as RichTextElement"
+        />
 
         <ShapeProperties
           v-if="selectedElement.type === 'shape'"
-          :element="(selectedElement as ShapeElement)" />
+          :element="selectedElement as ShapeElement"
+        />
 
         <ContainerProperties
           v-if="isContainer(selectedElement)"
-          :element="(selectedElement as ContainerElement)" />
+          :element="selectedElement as ContainerElement"
+        />
 
         <RepeatingTableProperties
           v-if="selectedElement.type === 'repeating_table'"
-          :element="(selectedElement as RepeatingTableElement)" />
+          :element="selectedElement as RepeatingTableElement"
+        />
 
         <ChartProperties
           v-if="selectedElement.type === 'chart'"
-          :element="(selectedElement as ChartElement)" />
+          :element="selectedElement as ChartElement"
+        />
 
         <!-- Header/Footer toggles for root element -->
         <div v-if="selectedElement.id === 'root'" class="prop-section">
           <div class="prop-section__title">Sayfa Ust/Alt Bilgi</div>
           <div class="prop-row">
             <label class="prop-label">Ust Bilgi (Header)</label>
-            <input type="checkbox" :checked="!!templateStore.template.header"
-              @change="toggleHeader" />
+            <input
+              type="checkbox"
+              :checked="!!templateStore.template.header"
+              @change="toggleHeader"
+            />
           </div>
           <div class="prop-row">
             <label class="prop-label">Alt Bilgi (Footer)</label>
-            <input type="checkbox" :checked="!!templateStore.template.footer"
-              @change="toggleFooter" />
+            <input
+              type="checkbox"
+              :checked="!!templateStore.template.footer"
+              @change="toggleFooter"
+            />
           </div>
         </div>
 

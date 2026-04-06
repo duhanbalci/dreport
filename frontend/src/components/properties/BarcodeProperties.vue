@@ -50,7 +50,7 @@ function validateBarcode(format: BarcodeFormat, value: string): boolean {
     case 'code39':
       return /^[A-Z0-9\-. $/+%]+$/i.test(value)
     case 'code128':
-      return value.length > 0 && [...value].every(c => c.charCodeAt(0) < 128)
+      return value.length > 0 && [...value].every((c) => c.charCodeAt(0) < 128)
     case 'qr':
       return value.length > 0
     default:
@@ -61,10 +61,14 @@ function validateBarcode(format: BarcodeFormat, value: string): boolean {
 const barcodeInputValue = ref('')
 const barcodeInputInvalid = ref(false)
 
-watch(() => props.element.value ?? '', (val) => {
-  barcodeInputValue.value = val
-  barcodeInputInvalid.value = false
-}, { immediate: true })
+watch(
+  () => props.element.value ?? '',
+  (val) => {
+    barcodeInputValue.value = val
+    barcodeInputInvalid.value = false
+  },
+  { immediate: true },
+)
 
 function onBarcodeValueInput(e: Event) {
   const val = (e.target as HTMLInputElement).value
@@ -96,9 +100,13 @@ function onBarcodeFormatChange(newFormat: BarcodeFormat) {
     <div class="prop-section__title">Barkod Ayarlari</div>
     <div class="prop-row" data-tip="Barkod formati">
       <label class="prop-label">Format</label>
-      <select class="prop-input prop-select"
+      <select
+        class="prop-input prop-select"
         :value="element.format"
-        @change="(e) => onBarcodeFormatChange((e.target as HTMLSelectElement).value as BarcodeFormat)">
+        @change="
+          (e) => onBarcodeFormatChange((e.target as HTMLSelectElement).value as BarcodeFormat)
+        "
+      >
         <option value="qr">QR Kod</option>
         <option value="ean13">EAN-13</option>
         <option value="ean8">EAN-8</option>
@@ -108,44 +116,70 @@ function onBarcodeFormatChange(newFormat: BarcodeFormat) {
     </div>
     <div class="prop-row" data-tip="Barkod icerigi — formata uygun olmali">
       <label class="prop-label">Deger</label>
-      <input class="prop-input" type="text"
+      <input
+        class="prop-input"
+        type="text"
         :class="{ 'prop-input--invalid': barcodeInputInvalid }"
         :value="barcodeInputValue"
-        @input="onBarcodeValueInput" />
+        @input="onBarcodeValueInput"
+      />
     </div>
     <div class="prop-row" data-tip="Barkod cizgi/modül rengi">
       <label class="prop-label">Renk</label>
       <div class="prop-row-inline">
-        <input class="prop-input prop-color" type="color"
+        <input
+          class="prop-input prop-color"
+          type="color"
           :value="element.style.color ?? '#000000'"
-          @input="(e) => updateStyle('color', (e.target as HTMLInputElement).value)" />
-        <button v-if="element.style.color" class="prop-clear" @click="updateStyle('color', undefined)">x</button>
+          @input="(e) => updateStyle('color', (e.target as HTMLInputElement).value)"
+        />
+        <button
+          v-if="element.style.color"
+          class="prop-clear"
+          @click="updateStyle('color', undefined)"
+        >
+          x
+        </button>
       </div>
     </div>
-    <div v-if="element.format !== 'qr'" class="prop-row" data-tip="Barkod altinda degeri metin olarak goster">
+    <div
+      v-if="element.format !== 'qr'"
+      class="prop-row"
+      data-tip="Barkod altinda degeri metin olarak goster"
+    >
       <label class="prop-label">Metin Goster</label>
-      <input type="checkbox"
-        :checked="element.style.includeText ?? (element.format === 'ean13' || element.format === 'ean8')"
-        @change="(e) => updateStyle('includeText', (e.target as HTMLInputElement).checked)" />
+      <input
+        type="checkbox"
+        :checked="
+          element.style.includeText ?? (element.format === 'ean13' || element.format === 'ean8')
+        "
+        @change="(e) => updateStyle('includeText', (e.target as HTMLInputElement).checked)"
+      />
     </div>
-    <div v-if="schemaStore.scalarFields.length > 0" class="prop-row" data-tip="Schema'dan dinamik veri baglama">
+    <div
+      v-if="schemaStore.scalarFields.length > 0"
+      class="prop-row"
+      data-tip="Schema'dan dinamik veri baglama"
+    >
       <label class="prop-label">Veri Baglama</label>
-      <select class="prop-input prop-select"
+      <select
+        class="prop-input prop-select"
         :value="element.binding?.path ?? ''"
-        @change="(e) => {
-          const val = (e.target as HTMLSelectElement).value
-          if (val) {
-            update({ binding: { type: 'scalar', path: val } } as any)
-          } else {
-            update({ binding: undefined } as any)
+        @change="
+          (e) => {
+            const val = (e.target as HTMLSelectElement).value
+            if (val) {
+              update({ binding: { type: 'scalar', path: val } } as any)
+            } else {
+              update({ binding: undefined } as any)
+            }
           }
-        }">
+        "
+      >
         <option value="">Yok (statik deger)</option>
-        <option
-          v-for="field in schemaStore.scalarFields"
-          :key="field.path"
-          :value="field.path"
-        >{{ field.title }} ({{ field.path }})</option>
+        <option v-for="field in schemaStore.scalarFields" :key="field.path" :value="field.path">
+          {{ field.title }} ({{ field.path }})
+        </option>
       </select>
     </div>
   </div>

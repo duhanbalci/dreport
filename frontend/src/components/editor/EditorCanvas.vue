@@ -8,11 +8,14 @@ import LayoutRenderer from './LayoutRenderer.vue'
 import InteractionOverlay from './InteractionOverlay.vue'
 import RulerBar from './RulerBar.vue'
 
-const props = withDefaults(defineProps<{
-  handleErrors?: boolean
-}>(), {
-  handleErrors: true,
-})
+const props = withDefaults(
+  defineProps<{
+    handleErrors?: boolean
+  }>(),
+  {
+    handleErrors: true,
+  },
+)
 
 const templateStore = useTemplateStore()
 const editorStore = useEditorStore()
@@ -26,7 +29,14 @@ const emit = defineEmits<{
 }>()
 
 // Layout engine — template + data'yı worker'a gönderir, WASM ile layout hesaplar
-const { layout, layoutMap, error, computing: compiling, generateBarcode, dispose } = useLayoutEngine(template, mockData, layoutVersion)
+const {
+  layout,
+  layoutMap,
+  error,
+  computing: compiling,
+  generateBarcode,
+  dispose,
+} = useLayoutEngine(template, mockData, layoutVersion)
 
 // LayoutRenderer'ın barcode üretmek için kullanabileceği fonksiyon
 provide('generateBarcode', generateBarcode)
@@ -86,7 +96,7 @@ let resizeObserver: ResizeObserver | null = null
 
 onMounted(() => {
   if (containerRef.value) {
-    resizeObserver = new ResizeObserver(entries => {
+    resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0]
       if (entry) containerWidth.value = entry.contentRect.width
     })
@@ -132,10 +142,7 @@ function onWheel(e: WheelEvent) {
   } else {
     // İki parmak pan (touchpad) veya normal scroll
     e.preventDefault()
-    editorStore.setPan(
-      editorStore.panX - e.deltaX,
-      editorStore.panY - e.deltaY,
-    )
+    editorStore.setPan(editorStore.panX - e.deltaX, editorStore.panY - e.deltaY)
   }
 }
 
@@ -169,7 +176,16 @@ function applyZoom(delta: number, clientX: number, clientY: number) {
 }
 
 function onKeyDown(e: KeyboardEvent) {
-  if (e.code === 'Space' && !e.repeat && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement || e.target instanceof HTMLTextAreaElement || (e.target as HTMLElement)?.isContentEditable)) {
+  if (
+    e.code === 'Space' &&
+    !e.repeat &&
+    !(
+      e.target instanceof HTMLInputElement ||
+      e.target instanceof HTMLSelectElement ||
+      e.target instanceof HTMLTextAreaElement ||
+      (e.target as HTMLElement)?.isContentEditable
+    )
+  ) {
     e.preventDefault()
     spaceHeld.value = true
   }
@@ -225,9 +241,18 @@ function onPointerUp(e: PointerEvent) {
       @pointerup="onPointerUp"
     >
       <!-- Sayfalar -->
-      <div ref="pageRef" class="editor-canvas__pages" :style="[pagesContainerStyle, panTransform ? { transform: panTransform } : {}]">
+      <div
+        ref="pageRef"
+        class="editor-canvas__pages"
+        :style="[pagesContainerStyle, panTransform ? { transform: panTransform } : {}]"
+      >
         <LayoutRenderer :layout="layout" :scale="scale" />
-        <InteractionOverlay :scale="scale" :layout-map="layoutMap" :page-count="layoutPages.length" :page-height-px="pageHeightPx" />
+        <InteractionOverlay
+          :scale="scale"
+          :layout-map="layoutMap"
+          :page-count="layoutPages.length"
+          :page-height-px="pageHeightPx"
+        />
       </div>
     </div>
 
@@ -235,12 +260,8 @@ function onPointerUp(e: PointerEvent) {
     <div v-if="props.handleErrors && error" class="editor-canvas__error">
       {{ error }}
     </div>
-    <div v-if="compiling" class="editor-canvas__compiling">
-      Derleniyor...
-    </div>
-    <div class="editor-canvas__zoom">
-      %{{ editorStore.zoomPercent }}
-    </div>
+    <div v-if="compiling" class="editor-canvas__compiling">Derleniyor...</div>
+    <div class="editor-canvas__zoom">%{{ editorStore.zoomPercent }}</div>
   </div>
 </template>
 

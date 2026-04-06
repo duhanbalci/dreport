@@ -57,10 +57,13 @@ function mockColumnValue(field: string, format: string | undefined, index: numbe
   const lower = field.toLowerCase()
   if (lower.includes('sira') || lower.includes('no') || lower === 'id') return index + 1
   if (lower.includes('miktar') || lower.includes('adet')) return [2, 1, 5][index % 3]
-  if (lower.includes('fiyat') || lower.includes('tutar') || lower.includes('toplam')) return [1500, 2750, 500][index % 3]
+  if (lower.includes('fiyat') || lower.includes('tutar') || lower.includes('toplam'))
+    return [1500, 2750, 500][index % 3]
   if (lower.includes('birim')) return ['Adet', 'Saat', 'Adet'][index % 3]
-  if (lower.includes('tarih') || lower.includes('date')) return ['2026-01-15', '2026-02-20', '2026-03-10'][index % 3]
-  if (lower.includes('ad') || lower.includes('isim') || lower.includes('name')) return ['Kalem A', 'Kalem B', 'Kalem C'][index % 3]
+  if (lower.includes('tarih') || lower.includes('date'))
+    return ['2026-01-15', '2026-02-20', '2026-03-10'][index % 3]
+  if (lower.includes('ad') || lower.includes('isim') || lower.includes('name'))
+    return ['Kalem A', 'Kalem B', 'Kalem C'][index % 3]
 
   return `Ornek ${index + 1}`
 }

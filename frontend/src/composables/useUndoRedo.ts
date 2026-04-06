@@ -29,7 +29,7 @@ export function useUndoRedo<T>(source: Ref<T>, maxHistory = 50) {
         redoStack.value = []
       }, 300)
     },
-    { deep: true }
+    { deep: true },
   )
 
   function undo() {

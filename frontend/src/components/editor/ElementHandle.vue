@@ -59,7 +59,12 @@ const layoutStyle = computed(() => {
     }
 
     // justify (main-axis)
-    const justifyMap = { start: 'flex-start', center: 'center', end: 'flex-end', 'space-between': 'space-between' }
+    const justifyMap = {
+      start: 'flex-start',
+      center: 'center',
+      end: 'flex-end',
+      'space-between': 'space-between',
+    }
     style.justifyContent = justifyMap[c.justify] || 'flex-start'
   }
 

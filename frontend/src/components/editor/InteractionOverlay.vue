@@ -19,7 +19,8 @@ const props = defineProps<{
 
 const templateStore = useTemplateStore()
 const editorStore = useEditorStore()
-const { activeGuides, collectEdges, calculateSnap, calculateResizeSnap, clearGuides } = useSnapGuides()
+const { activeGuides, collectEdges, calculateSnap, calculateResizeSnap, clearGuides } =
+  useSnapGuides()
 
 // Tüm elemanları flat olarak topla (root hariç)
 const flatElements = computed(() => {
@@ -69,7 +70,7 @@ const allContainers = computed(() => {
 /** Sayfa index'ine göre y offset hesapla (sayfalar arası gap dahil) */
 function pageYOffset(pageIndex: number): number {
   if (pageIndex <= 0) return 0
-  const pageH = props.pageHeightPx ?? (templateStore.template.page.height * props.scale)
+  const pageH = props.pageHeightPx ?? templateStore.template.page.height * props.scale
   return pageIndex * (pageH + PAGE_GAP_PX)
 }
 
@@ -118,7 +119,11 @@ const dropVisualIndex = ref<number | null>(null)
 const dropLogicalIndex = ref<number | null>(null)
 
 /** Mouse pozisyonuna göre en derin container'ı bul */
-function findDeepestContainer(mouseX: number, mouseY: number, excludeId?: string): ContainerElement {
+function findDeepestContainer(
+  mouseX: number,
+  mouseY: number,
+  excludeId?: string,
+): ContainerElement {
   const s = props.scale
   let best: ContainerElement = templateStore.template.root
 
@@ -135,7 +140,7 @@ function findDeepestContainer(mouseX: number, mouseY: number, excludeId?: string
     if (mouseX >= cx && mouseX <= cx + cw && mouseY >= cy && mouseY <= cy + ch) {
       // Daha küçük (daha derin) container'ı tercih et
       const bestL = props.layoutMap[best.id]
-      if (!bestL || (cw * ch < bestL.width_mm * s * bestL.height_mm * s)) {
+      if (!bestL || cw * ch < bestL.width_mm * s * bestL.height_mm * s) {
         best = c
       }
     }
@@ -144,9 +149,16 @@ function findDeepestContainer(mouseX: number, mouseY: number, excludeId?: string
 }
 
 /** Container içinde drop index hesapla */
-function computeDropIndex(container: ContainerElement, mouseX: number, mouseY: number, excludeId?: string) {
+function computeDropIndex(
+  container: ContainerElement,
+  mouseX: number,
+  mouseY: number,
+  excludeId?: string,
+) {
   const s = props.scale
-  const flowChildren = container.children.filter(c => c.type !== 'page_break' && c.position.type !== 'absolute' && c.id !== excludeId)
+  const flowChildren = container.children.filter(
+    (c) => c.type !== 'page_break' && c.position.type !== 'absolute' && c.id !== excludeId,
+  )
   const isRow = container.direction === 'row'
 
   let visualIdx = flowChildren.length
@@ -156,18 +168,26 @@ function computeDropIndex(container: ContainerElement, mouseX: number, mouseY: n
     if (!l) continue
     if (isRow) {
       const centerX = l.x_mm * s + (l.width_mm * s) / 2
-      if (mouseX < centerX) { visualIdx = i; break }
+      if (mouseX < centerX) {
+        visualIdx = i
+        break
+      }
     } else {
       const centerY = l.y_mm * s + pageYOffset(l.pageIndex) + (l.height_mm * s) / 2
-      if (mouseY < centerY) { visualIdx = i; break }
+      if (mouseY < centerY) {
+        visualIdx = i
+        break
+      }
     }
   }
 
   // Mantıksal index: excludeId aynı container'daysa offset hesapla
   let logicalIdx = visualIdx
   if (excludeId) {
-    const allFlow = container.children.filter(c => c.type !== 'page_break' && c.position.type !== 'absolute')
-    const currentIdx = allFlow.findIndex(c => c.id === excludeId)
+    const allFlow = container.children.filter(
+      (c) => c.type !== 'page_break' && c.position.type !== 'absolute',
+    )
+    const currentIdx = allFlow.findIndex((c) => c.id === excludeId)
     if (currentIdx >= 0) {
       // visualIdx, excludeId çıkarılmış listede. Gerçek listedeki pozisyona çevir.
       // flowChildren zaten excludeId hariç, dolayısıyla visualIdx doğrudan gerçek insert indexi
@@ -177,7 +197,10 @@ function computeDropIndex(container: ContainerElement, mouseX: number, mouseY: n
       let count = 0
       for (let i = 0; i < allFlow.length; i++) {
         if (allFlow[i].id === excludeId) continue
-        if (count === visualIdx) { realIdx = i; break }
+        if (count === visualIdx) {
+          realIdx = i
+          break
+        }
         count++
         realIdx = i + 1
       }
@@ -219,7 +242,9 @@ const dropIndicatorStyle = computed(() => {
 
   // Sürüklenen elemanı çıkar
   const dragId = dragElementId.value
-  const flowChildren = container.children.filter(c => c.type !== 'page_break' && c.position.type !== 'absolute' && c.id !== dragId)
+  const flowChildren = container.children.filter(
+    (c) => c.type !== 'page_break' && c.position.type !== 'absolute' && c.id !== dragId,
+  )
 
   const cl = props.layoutMap[container.id]
   if (!cl) return { display: 'none' }
@@ -380,13 +405,18 @@ function onDragEnd() {
   window.removeEventListener('pointermove', onDragMove)
   window.removeEventListener('pointerup', onDragEnd)
 
-  if (isDragging.value && dragElementId.value && dropTargetContainerId.value !== null && dropLogicalIndex.value !== null) {
+  if (
+    isDragging.value &&
+    dragElementId.value &&
+    dropTargetContainerId.value !== null &&
+    dropLogicalIndex.value !== null
+  ) {
     const currentParent = templateStore.getParent(dragElementId.value)
     const targetContainerId = dropTargetContainerId.value
 
     if (currentParent && currentParent.id === targetContainerId) {
       // Aynı container içinde reorder
-      const currentIdx = currentParent.children.findIndex(c => c.id === dragElementId.value)
+      const currentIdx = currentParent.children.findIndex((c) => c.id === dragElementId.value)
       if (currentIdx !== -1 && currentIdx !== dropLogicalIndex.value) {
         templateStore.reorderChild(currentParent.id, currentIdx, dropLogicalIndex.value)
       }
@@ -400,7 +430,9 @@ function onDragEnd() {
   dragElementId.value = null
   editorStore.setDragging(false)
   clearDropTarget()
-  setTimeout(() => { didDrag.value = false }, 50)
+  setTimeout(() => {
+    didDrag.value = false
+  }, 50)
 }
 
 // --- Absolute eleman drag ---
@@ -420,7 +452,12 @@ function onAbsoluteDragStart(e: PointerEvent, el: TemplateElement) {
     elY: el.position.y,
   }
 
-  collectEdges(props.layoutMap, el.id, templateStore.template.page.width, templateStore.template.page.height)
+  collectEdges(
+    props.layoutMap,
+    el.id,
+    templateStore.template.page.width,
+    templateStore.template.page.height,
+  )
 
   window.addEventListener('pointermove', onAbsoluteDragMove)
   window.addEventListener('pointerup', onAbsoluteDragEnd)
@@ -466,7 +503,9 @@ function onAbsoluteDragEnd() {
   absoluteDragId.value = null
   editorStore.setDragging(false)
   clearGuides()
-  setTimeout(() => { didDrag.value = false }, 50)
+  setTimeout(() => {
+    didDrag.value = false
+  }, 50)
 }
 
 // --- Resize ---
@@ -493,18 +532,34 @@ function onResizeStart(e: PointerEvent, elId: string, handle: string) {
   const s = props.scale
 
   // Barkod ve görsel elemanları için aspect ratio'yu kaydet
-  const el = flatElements.value.find(e => e.id === elId)
-  resizeAspectRatio.value = ((el?.type === 'barcode' || el?.type === 'image') && l.height_mm > 0) ? l.width_mm / l.height_mm : 0
+  const el = flatElements.value.find((e) => e.id === elId)
+  resizeAspectRatio.value =
+    (el?.type === 'barcode' || el?.type === 'image') && l.height_mm > 0
+      ? l.width_mm / l.height_mm
+      : 0
 
   resizeStart.value = {
-    mouseX: e.clientX, mouseY: e.clientY,
-    x: l.x_mm * s, y: l.y_mm * s,
-    width: l.width_mm * s, height: l.height_mm * s,
+    mouseX: e.clientX,
+    mouseY: e.clientY,
+    x: l.x_mm * s,
+    y: l.y_mm * s,
+    width: l.width_mm * s,
+    height: l.height_mm * s,
   }
-  resizeGhost.value = { x: l.x_mm * s, y: l.y_mm * s, width: l.width_mm * s, height: l.height_mm * s }
+  resizeGhost.value = {
+    x: l.x_mm * s,
+    y: l.y_mm * s,
+    width: l.width_mm * s,
+    height: l.height_mm * s,
+  }
   resizeFinalMm.value = { width: l.width_mm, height: l.height_mm }
 
-  collectEdges(props.layoutMap, elId, templateStore.template.page.width, templateStore.template.page.height)
+  collectEdges(
+    props.layoutMap,
+    elId,
+    templateStore.template.page.width,
+    templateStore.template.page.height,
+  )
 
   window.addEventListener('pointermove', onResizeMove)
   window.addEventListener('pointerup', onResizeEnd)
@@ -519,13 +574,21 @@ function onResizeMove(e: PointerEvent) {
   const pxToMm = 1 / props.scale
   const ar = resizeAspectRatio.value
 
-  let gx = resizeStart.value.x, gy = resizeStart.value.y
-  let gw = resizeStart.value.width, gh = resizeStart.value.height
+  let gx = resizeStart.value.x,
+    gy = resizeStart.value.y
+  let gw = resizeStart.value.width,
+    gh = resizeStart.value.height
 
   if (handle.includes('e')) gw = Math.max(20, resizeStart.value.width + dx)
-  if (handle.includes('w')) { gw = Math.max(20, resizeStart.value.width - dx); gx = resizeStart.value.x + dx }
+  if (handle.includes('w')) {
+    gw = Math.max(20, resizeStart.value.width - dx)
+    gx = resizeStart.value.x + dx
+  }
   if (handle.includes('s')) gh = Math.max(10, resizeStart.value.height + dy)
-  if (handle.includes('n')) { gh = Math.max(10, resizeStart.value.height - dy); gy = resizeStart.value.y + dy }
+  if (handle.includes('n')) {
+    gh = Math.max(10, resizeStart.value.height - dy)
+    gy = resizeStart.value.y + dy
+  }
 
   // Aspect ratio koruma (barkod)
   if (ar > 0) {
@@ -538,7 +601,8 @@ function onResizeMove(e: PointerEvent) {
   const startHMm = resizeStart.value.height * pxToMm
   const startXMm = resizeStart.value.x * pxToMm
   const startYMm = resizeStart.value.y * pxToMm
-  let wMm = startWMm, hMm = startHMm
+  let wMm = startWMm,
+    hMm = startHMm
   if (handle.includes('e')) {
     const rightEdge = calculateResizeSnap('right', startXMm + startWMm + dx * pxToMm)
     wMm = Math.max(5, rightEdge - startXMm)
@@ -571,8 +635,10 @@ function onResizeEnd() {
     const handle = resizeHandle.value
     const ar = resizeAspectRatio.value
     const sizeUpdate: { width?: SizeValue; height?: SizeValue } = {}
-    if (handle.includes('e') || handle.includes('w')) sizeUpdate.width = sz.fixed(resizeFinalMm.value.width)
-    if (handle.includes('s') || handle.includes('n')) sizeUpdate.height = sz.fixed(resizeFinalMm.value.height)
+    if (handle.includes('e') || handle.includes('w'))
+      sizeUpdate.width = sz.fixed(resizeFinalMm.value.width)
+    if (handle.includes('s') || handle.includes('n'))
+      sizeUpdate.height = sz.fixed(resizeFinalMm.value.height)
     // Aspect ratio aktifken her zaman hem width hem height güncelle
     if (ar > 0) {
       sizeUpdate.width = sz.fixed(resizeFinalMm.value.width)
@@ -621,8 +687,8 @@ function onToolboxDrop(_e: DragEvent) {
 }
 
 // Aktif sürükleme var mı (eleman veya toolbox)
-const isAnyDragActive = computed(() =>
-  (isDragging.value && dragElementId.value !== null) || !!editorStore.draggedNewElement
+const isAnyDragActive = computed(
+  () => (isDragging.value && dragElementId.value !== null) || !!editorStore.draggedNewElement,
 )
 </script>
 
@@ -644,26 +710,57 @@ const isAnyDragActive = computed(() =>
         'element-handle--selected': editorStore.isSelected(el.id),
         'element-handle--container': isContainer(el),
         'element-handle--dragging': isDragging && dragElementId === el.id,
-        'element-handle--drop-target': isContainer(el) && dropTargetContainerId === el.id && isAnyDragActive,
+        'element-handle--drop-target':
+          isContainer(el) && dropTargetContainerId === el.id && isAnyDragActive,
       }"
       :style="getElementStyle(el)"
-      @pointerdown="(e: PointerEvent) => { onElementClick(e, el.id); onDragStart(e, el) }"
+      @pointerdown="
+        (e: PointerEvent) => {
+          onElementClick(e, el.id)
+          onDragStart(e, el)
+        }
+      "
     >
       <!-- Selection border -->
       <div v-if="editorStore.isSelected(el.id)" class="selection-border" />
 
       <!-- Resize handles (sadece tek seçimde) -->
-      <template v-if="editorStore.isSelected(el.id) && editorStore.selectedElementIds.size === 1 && !isResizing && el.type !== 'page_break'">
+      <template
+        v-if="
+          editorStore.isSelected(el.id) &&
+          editorStore.selectedElementIds.size === 1 &&
+          !isResizing &&
+          el.type !== 'page_break'
+        "
+      >
         <template v-if="el.type === 'barcode' || el.type === 'image'">
           <!-- Barkod/Görsel: sadece yatay resize (aspect ratio korunur) -->
-          <div class="resize-handle resize-handle--e" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'e')" />
-          <div class="resize-handle resize-handle--w" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'w')" />
+          <div
+            class="resize-handle resize-handle--e"
+            @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'e')"
+          />
+          <div
+            class="resize-handle resize-handle--w"
+            @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'w')"
+          />
         </template>
         <template v-else>
-          <div class="resize-handle resize-handle--se" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'se')" />
-          <div class="resize-handle resize-handle--sw" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'sw')" />
-          <div class="resize-handle resize-handle--ne" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'ne')" />
-          <div class="resize-handle resize-handle--nw" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'nw')" />
+          <div
+            class="resize-handle resize-handle--se"
+            @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'se')"
+          />
+          <div
+            class="resize-handle resize-handle--sw"
+            @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'sw')"
+          />
+          <div
+            class="resize-handle resize-handle--ne"
+            @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'ne')"
+          />
+          <div
+            class="resize-handle resize-handle--nw"
+            @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'nw')"
+          />
         </template>
       </template>
     </div>
@@ -777,12 +874,36 @@ const isAnyDragActive = computed(() =>
   z-index: 10;
 }
 
-.resize-handle--se { right: -3px; bottom: -3px; cursor: se-resize; }
-.resize-handle--sw { left: -3px; bottom: -3px; cursor: sw-resize; }
-.resize-handle--ne { right: -3px; top: -3px; cursor: ne-resize; }
-.resize-handle--nw { left: -3px; top: -3px; cursor: nw-resize; }
-.resize-handle--e { right: -3px; top: calc(50% - 3px); cursor: e-resize; }
-.resize-handle--w { left: -3px; top: calc(50% - 3px); cursor: w-resize; }
+.resize-handle--se {
+  right: -3px;
+  bottom: -3px;
+  cursor: se-resize;
+}
+.resize-handle--sw {
+  left: -3px;
+  bottom: -3px;
+  cursor: sw-resize;
+}
+.resize-handle--ne {
+  right: -3px;
+  top: -3px;
+  cursor: ne-resize;
+}
+.resize-handle--nw {
+  left: -3px;
+  top: -3px;
+  cursor: nw-resize;
+}
+.resize-handle--e {
+  right: -3px;
+  top: calc(50% - 3px);
+  cursor: e-resize;
+}
+.resize-handle--w {
+  left: -3px;
+  top: calc(50% - 3px);
+  cursor: w-resize;
+}
 
 /* Drag ghost */
 .drag-ghost {

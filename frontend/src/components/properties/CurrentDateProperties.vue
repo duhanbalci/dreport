@@ -24,9 +24,11 @@ function updateStyle(key: string, value: unknown) {
     <div class="prop-section__title">Tarih</div>
     <div class="prop-row" data-tip="Tarih gosterim formati">
       <label class="prop-label">Format</label>
-      <select class="prop-input prop-select"
+      <select
+        class="prop-input prop-select"
         :value="element.format ?? 'DD.MM.YYYY'"
-        @change="(e) => update({ format: (e.target as HTMLSelectElement).value } as any)">
+        @change="(e) => update({ format: (e.target as HTMLSelectElement).value } as any)"
+      >
         <option value="DD.MM.YYYY">30.03.2026</option>
         <option value="DD/MM/YYYY">30/03/2026</option>
         <option value="YYYY-MM-DD">2026-03-30</option>
@@ -35,21 +37,33 @@ function updateStyle(key: string, value: unknown) {
     </div>
     <div class="prop-row" data-tip="Yazi tipi boyutu (point)">
       <label class="prop-label">Boyut (pt)</label>
-      <input class="prop-input" type="number" step="1" min="1"
+      <input
+        class="prop-input"
+        type="number"
+        step="1"
+        min="1"
         :value="(element.style as TextStyle).fontSize ?? 10"
-        @input="(e) => updateStyle('fontSize', parseFloat((e.target as HTMLInputElement).value) || 10)" />
+        @input="
+          (e) => updateStyle('fontSize', parseFloat((e.target as HTMLInputElement).value) || 10)
+        "
+      />
     </div>
     <div class="prop-row" data-tip="Metin rengi">
       <label class="prop-label">Renk</label>
-      <input class="prop-input prop-color" type="color"
+      <input
+        class="prop-input prop-color"
+        type="color"
         :value="(element.style as TextStyle).color ?? '#666666'"
-        @input="(e) => updateStyle('color', (e.target as HTMLInputElement).value)" />
+        @input="(e) => updateStyle('color', (e.target as HTMLInputElement).value)"
+      />
     </div>
     <div class="prop-row" data-tip="Metnin yatay hizalamasi">
       <label class="prop-label">Hizalama</label>
-      <select class="prop-input prop-select"
+      <select
+        class="prop-input prop-select"
         :value="(element.style as TextStyle).align ?? 'left'"
-        @change="(e) => updateStyle('align', (e.target as HTMLSelectElement).value)">
+        @change="(e) => updateStyle('align', (e.target as HTMLSelectElement).value)"
+      >
         <option value="left">Sol</option>
         <option value="center">Orta</option>
         <option value="right">Sag</option>

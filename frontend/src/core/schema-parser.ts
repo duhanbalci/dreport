@@ -4,11 +4,11 @@
  */
 
 export interface SchemaNode {
-  path: string        // Noktalı yol — ör: "firma.unvan"
-  key: string         // Son segment — ör: "unvan"
-  title: string       // Görüntüleme adı — schema'daki "title" veya key
+  path: string // Noktalı yol — ör: "firma.unvan"
+  key: string // Son segment — ör: "unvan"
+  title: string // Görüntüleme adı — schema'daki "title" veya key
   type: 'object' | 'array' | 'string' | 'number' | 'integer' | 'boolean'
-  format?: string     // "currency", "date", "percentage", "image" vs.
+  format?: string // "currency", "date", "percentage", "image" vs.
   children: SchemaNode[]
   /** Sadece array tipi için: array item'larının alt alanları */
   itemProperties?: SchemaNode[]
@@ -73,7 +73,12 @@ export function findArrayFields(node: SchemaNode): SchemaNode[] {
 /** Schema ağacından tüm scalar alanları bulur (metin binding için) */
 export function findScalarFields(node: SchemaNode): SchemaNode[] {
   const result: SchemaNode[] = []
-  if (node.type === 'string' || node.type === 'number' || node.type === 'integer' || node.type === 'boolean') {
+  if (
+    node.type === 'string' ||
+    node.type === 'number' ||
+    node.type === 'integer' ||
+    node.type === 'boolean'
+  ) {
     result.push(node)
   }
   for (const child of node.children) {
@@ -83,13 +88,19 @@ export function findScalarFields(node: SchemaNode): SchemaNode[] {
 }
 
 /** Format tipinden FormatType'a dönüşüm */
-export function schemaFormatToFormatType(format?: string): 'currency' | 'date' | 'percentage' | 'number' | undefined {
+export function schemaFormatToFormatType(
+  format?: string,
+): 'currency' | 'date' | 'percentage' | 'number' | undefined {
   if (!format) return undefined
   switch (format) {
-    case 'currency': return 'currency'
-    case 'date': return 'date'
-    case 'percentage': return 'percentage'
-    default: return undefined
+    case 'currency':
+      return 'currency'
+    case 'date':
+      return 'date'
+    case 'percentage':
+      return 'percentage'
+    default:
+      return undefined
   }
 }
 

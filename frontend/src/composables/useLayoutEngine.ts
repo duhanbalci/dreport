@@ -121,11 +121,20 @@ export function useLayoutEngine(
 
   // --- Barcode üretimi (WASM üzerinden) ---
   let barcodeReqId = 0
-  const barcodeCallbacks = new Map<number, (result: { width: number; height: number; rgba: ArrayBuffer } | null) => void>()
+  const barcodeCallbacks = new Map<
+    number,
+    (result: { width: number; height: number; rgba: ArrayBuffer } | null) => void
+  >()
 
-  function generateBarcode(format: string, value: string, width: number, height: number, includeText: boolean = false): Promise<{ width: number; height: number; rgba: ArrayBuffer } | null> {
+  function generateBarcode(
+    format: string,
+    value: string,
+    width: number,
+    height: number,
+    includeText: boolean = false,
+  ): Promise<{ width: number; height: number; rgba: ArrayBuffer } | null> {
     if (!worker) initWorker()
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       barcodeReqId++
       const id = barcodeReqId
       const timeout = setTimeout(() => {
@@ -140,11 +149,17 @@ export function useLayoutEngine(
     })
   }
 
-  function handleBarcodeResponse(msg: Extract<WorkerResponse, { type: 'barcode-result' } | { type: 'barcode-error' }>) {
+  function handleBarcodeResponse(
+    msg: Extract<WorkerResponse, { type: 'barcode-result' } | { type: 'barcode-error' }>,
+  ) {
     const cb = barcodeCallbacks.get(msg.id)
     if (cb) {
       barcodeCallbacks.delete(msg.id)
-      cb(msg.type === 'barcode-result' ? { width: msg.width, height: msg.height, rgba: msg.rgba } : null)
+      cb(
+        msg.type === 'barcode-result'
+          ? { width: msg.width, height: msg.height, rgba: msg.rgba }
+          : null,
+      )
     }
   }
 

@@ -15,15 +15,18 @@ export interface DreportEditorConfig {
   apiBaseUrl?: string
 }
 
-const props = withDefaults(defineProps<{
-  schema: JsonSchema
-  modelValue: Template
-  data?: Record<string, unknown>
-  config?: DreportEditorConfig
-  handleErrors?: boolean
-}>(), {
-  handleErrors: true,
-})
+const props = withDefaults(
+  defineProps<{
+    schema: JsonSchema
+    modelValue: Template
+    data?: Record<string, unknown>
+    config?: DreportEditorConfig
+    handleErrors?: boolean
+  }>(),
+  {
+    handleErrors: true,
+  },
+)
 
 const emit = defineEmits<{
   'update:modelValue': [value: Template]
@@ -45,34 +48,55 @@ onMounted(() => {
   schemaStore.setSchema(props.schema)
   syncing = true
   templateStore.template = JSON.parse(JSON.stringify(props.modelValue))
-  nextTick(() => { syncing = false })
+  nextTick(() => {
+    syncing = false
+  })
   templateStore.setOverrideData(props.data ?? null)
   setupTooltips()
 })
 
-watch(() => props.schema, (val) => {
-  schemaStore.setSchema(val)
-}, { deep: true })
+watch(
+  () => props.schema,
+  (val) => {
+    schemaStore.setSchema(val)
+  },
+  { deep: true },
+)
 
-watch(() => props.data, (val) => {
-  templateStore.setOverrideData(val ?? null)
-}, { deep: true })
+watch(
+  () => props.data,
+  (val) => {
+    templateStore.setOverrideData(val ?? null)
+  },
+  { deep: true },
+)
 
 // Template: prop → store (only on reference change from parent)
-watch(() => props.modelValue, (val) => {
-  if (syncing) return
-  syncing = true
-  templateStore.template = JSON.parse(JSON.stringify(val))
-  nextTick(() => { syncing = false })
-})
+watch(
+  () => props.modelValue,
+  (val) => {
+    if (syncing) return
+    syncing = true
+    templateStore.template = JSON.parse(JSON.stringify(val))
+    nextTick(() => {
+      syncing = false
+    })
+  },
+)
 
 // Template: store → emit
-watch(() => templateStore.template, (val) => {
-  if (syncing) return
-  syncing = true
-  emit('update:modelValue', JSON.parse(JSON.stringify(val)))
-  nextTick(() => { syncing = false })
-}, { deep: true })
+watch(
+  () => templateStore.template,
+  (val) => {
+    if (syncing) return
+    syncing = true
+    emit('update:modelValue', JSON.parse(JSON.stringify(val)))
+    nextTick(() => {
+      syncing = false
+    })
+  },
+  { deep: true },
+)
 
 // --- Error forwarding ---
 
@@ -85,7 +109,8 @@ function onCompileError(error: string | null) {
 function onKeyDown(e: KeyboardEvent) {
   const target = e.target as HTMLElement
   const tag = target?.tagName
-  const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable
+  const isInput =
+    tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable
 
   // Delete / Backspace — çoklu seçim desteği
   if ((e.key === 'Delete' || e.key === 'Backspace') && editorStore.selectedElementIds.size > 0) {
@@ -116,7 +141,11 @@ function onKeyDown(e: KeyboardEvent) {
   }
 
   // Z-Order kısayolları
-  if ((e.ctrlKey || e.metaKey) && editorStore.selectedElementId && editorStore.selectedElementId !== 'root') {
+  if (
+    (e.ctrlKey || e.metaKey) &&
+    editorStore.selectedElementId &&
+    editorStore.selectedElementId !== 'root'
+  ) {
     if (e.key === ']' && e.shiftKey) {
       e.preventDefault()
       templateStore.bringToFront(editorStore.selectedElementId)
@@ -202,8 +231,20 @@ defineExpose({
   <div class="dreport-editor">
     <aside class="dreport-editor__sidebar dreport-editor__sidebar--left">
       <div class="sidebar-tabs">
-        <button class="sidebar-tab" :class="{ 'sidebar-tab--active': leftTab === 'tools' }" @click="leftTab = 'tools'">Araclar</button>
-        <button class="sidebar-tab" :class="{ 'sidebar-tab--active': leftTab === 'schema' }" @click="leftTab = 'schema'">Schema</button>
+        <button
+          class="sidebar-tab"
+          :class="{ 'sidebar-tab--active': leftTab === 'tools' }"
+          @click="leftTab = 'tools'"
+        >
+          Araclar
+        </button>
+        <button
+          class="sidebar-tab"
+          :class="{ 'sidebar-tab--active': leftTab === 'schema' }"
+          @click="leftTab = 'schema'"
+        >
+          Schema
+        </button>
       </div>
       <ToolboxPanel v-if="leftTab === 'tools'" />
       <SchemaTreePanel v-else />

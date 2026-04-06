@@ -78,7 +78,7 @@ describe('useTemplateStore', () => {
     store.addChild('root', createTextElement('b', 'B'))
     store.addChild('root', createTextElement('c', 'C'), 1)
 
-    expect(store.template.root.children.map(c => c.id)).toEqual(['a', 'c', 'b'])
+    expect(store.template.root.children.map((c) => c.id)).toEqual(['a', 'c', 'b'])
   })
 
   it('removeElement removes element', () => {
@@ -133,7 +133,7 @@ describe('useTemplateStore', () => {
 
     store.reorderChild('root', 0, 2)
 
-    expect(store.template.root.children.map(c => c.id)).toEqual(['b', 'c', 'a'])
+    expect(store.template.root.children.map((c) => c.id)).toEqual(['b', 'c', 'a'])
   })
 
   it('exportTemplate returns valid JSON', () => {

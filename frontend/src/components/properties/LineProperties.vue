@@ -11,7 +11,9 @@ const editorStore = useEditorStore()
 function updateStyle(key: string, value: unknown) {
   const id = editorStore.selectedElementId
   if (!id) return
-  templateStore.updateElement(id, { style: { ...props.element.style, [key]: value } } as Partial<TemplateElement>)
+  templateStore.updateElement(id, {
+    style: { ...props.element.style, [key]: value },
+  } as Partial<TemplateElement>)
 }
 </script>
 
@@ -20,15 +22,25 @@ function updateStyle(key: string, value: unknown) {
     <div class="prop-section__title">Cizgi Stili</div>
     <div class="prop-row" data-tip="Cizgi kalinligi (mm)">
       <label class="prop-label">Kalinlik (mm)</label>
-      <input class="prop-input" type="number" step="0.1" min="0.1"
+      <input
+        class="prop-input"
+        type="number"
+        step="0.1"
+        min="0.1"
         :value="element.style.strokeWidth ?? 0.5"
-        @input="(e) => updateStyle('strokeWidth', parseFloat((e.target as HTMLInputElement).value) || 0.5)" />
+        @input="
+          (e) => updateStyle('strokeWidth', parseFloat((e.target as HTMLInputElement).value) || 0.5)
+        "
+      />
     </div>
     <div class="prop-row" data-tip="Cizgi rengi">
       <label class="prop-label">Renk</label>
-      <input class="prop-input prop-color" type="color"
+      <input
+        class="prop-input prop-color"
+        type="color"
         :value="element.style.strokeColor ?? '#000000'"
-        @input="(e) => updateStyle('strokeColor', (e.target as HTMLInputElement).value)" />
+        @input="(e) => updateStyle('strokeColor', (e.target as HTMLInputElement).value)"
+      />
     </div>
   </div>
 </template>

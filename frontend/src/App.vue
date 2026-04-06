@@ -94,9 +94,13 @@ if (savedSchema) {
   currentSchema.value = savedSchema
 }
 
-watch(currentSchema, (val) => {
-  localStorage.setItem(SCHEMA_STORAGE_KEY, JSON.stringify(val))
-}, { deep: true })
+watch(
+  currentSchema,
+  (val) => {
+    localStorage.setItem(SCHEMA_STORAGE_KEY, JSON.stringify(val))
+  },
+  { deep: true },
+)
 
 // --- Sample Invoice Data ---
 
@@ -125,10 +129,38 @@ const sampleData: Record<string, unknown> = {
     telefon: '+90 216 444 0018',
   },
   kalemler: [
-    { siraNo: 1, adi: 'Web Uygulama Gelistirme', miktar: 1, birim: 'Adet', birimFiyat: 45000, tutar: 45000 },
-    { siraNo: 2, adi: 'Mobil Uygulama Gelistirme', miktar: 1, birim: 'Adet', birimFiyat: 35000, tutar: 35000 },
-    { siraNo: 3, adi: 'UI/UX Tasarim Hizmeti', miktar: 40, birim: 'Saat', birimFiyat: 750, tutar: 30000 },
-    { siraNo: 4, adi: 'Sunucu Bakim Sozlesmesi (Yillik)', miktar: 1, birim: 'Adet', birimFiyat: 12000, tutar: 12000 },
+    {
+      siraNo: 1,
+      adi: 'Web Uygulama Gelistirme',
+      miktar: 1,
+      birim: 'Adet',
+      birimFiyat: 45000,
+      tutar: 45000,
+    },
+    {
+      siraNo: 2,
+      adi: 'Mobil Uygulama Gelistirme',
+      miktar: 1,
+      birim: 'Adet',
+      birimFiyat: 35000,
+      tutar: 35000,
+    },
+    {
+      siraNo: 3,
+      adi: 'UI/UX Tasarim Hizmeti',
+      miktar: 40,
+      birim: 'Saat',
+      birimFiyat: 750,
+      tutar: 30000,
+    },
+    {
+      siraNo: 4,
+      adi: 'Sunucu Bakim Sozlesmesi (Yillik)',
+      miktar: 1,
+      birim: 'Adet',
+      birimFiyat: 12000,
+      tutar: 12000,
+    },
     { siraNo: 5, adi: 'SSL Sertifikasi', miktar: 3, birim: 'Adet', birimFiyat: 500, tutar: 1500 },
   ],
   toplamlar: {
@@ -370,10 +402,30 @@ const defaultInvoiceTemplate: Template = {
         columns: [
           { id: 'col_sira', field: 'siraNo', title: '#', width: sz.fixed(10), align: 'center' },
           { id: 'col_adi', field: 'adi', title: 'Urun / Hizmet', width: sz.fr(), align: 'left' },
-          { id: 'col_miktar', field: 'miktar', title: 'Miktar', width: sz.fixed(18), align: 'right' },
+          {
+            id: 'col_miktar',
+            field: 'miktar',
+            title: 'Miktar',
+            width: sz.fixed(18),
+            align: 'right',
+          },
           { id: 'col_birim', field: 'birim', title: 'Birim', width: sz.fixed(18), align: 'center' },
-          { id: 'col_fiyat', field: 'birimFiyat', title: 'Birim Fiyat', width: sz.fixed(28), align: 'right', format: 'currency' as const },
-          { id: 'col_tutar', field: 'tutar', title: 'Tutar', width: sz.fixed(28), align: 'right', format: 'currency' as const },
+          {
+            id: 'col_fiyat',
+            field: 'birimFiyat',
+            title: 'Birim Fiyat',
+            width: sz.fixed(28),
+            align: 'right',
+            format: 'currency' as const,
+          },
+          {
+            id: 'col_tutar',
+            field: 'tutar',
+            title: 'Tutar',
+            width: sz.fixed(28),
+            align: 'right',
+            format: 'currency' as const,
+          },
         ],
         style: {
           fontSize: 9,
@@ -486,12 +538,16 @@ function loadFromLocalStorage(): Template | null {
 const template = ref<Template>(loadFromLocalStorage() ?? structuredClone(defaultInvoiceTemplate))
 
 let saveTimeout: ReturnType<typeof setTimeout> | null = null
-watch(template, (val) => {
-  if (saveTimeout) clearTimeout(saveTimeout)
-  saveTimeout = setTimeout(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(val))
-  }, 500)
-}, { deep: true })
+watch(
+  template,
+  (val) => {
+    if (saveTimeout) clearTimeout(saveTimeout)
+    saveTimeout = setTimeout(() => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(val))
+    }, 500)
+  },
+  { deep: true },
+)
 
 // --- Editor ref ---
 
@@ -626,36 +682,120 @@ function resetTemplate() {
       <h1>dreport</h1>
       <span class="app-header__subtitle">Belge Tasarim Araci</span>
       <div style="flex: 1"></div>
-      <input ref="fileInputRef" type="file" accept=".json" style="display: none" @change="onImportFile" />
-      <input ref="schemaFileInputRef" type="file" accept=".json" style="display: none" @change="onSchemaImportFile" />
+      <input
+        ref="fileInputRef"
+        type="file"
+        accept=".json"
+        style="display: none"
+        @change="onImportFile"
+      />
+      <input
+        ref="schemaFileInputRef"
+        type="file"
+        accept=".json"
+        style="display: none"
+        @change="onSchemaImportFile"
+      />
 
       <!-- Template operations -->
       <button class="header-btn header-btn--secondary" @click="resetTemplate" title="Sifirla">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8a6 6 0 0 1 10.2-4.3L14 2v4h-4l1.7-1.7A4.5 4.5 0 1 0 12.5 8" /><path d="M12.5 8a4.5 4.5 0 0 1-8.2 2.5" /></svg>
+        <svg
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M2 8a6 6 0 0 1 10.2-4.3L14 2v4h-4l1.7-1.7A4.5 4.5 0 1 0 12.5 8" />
+          <path d="M12.5 8a4.5 4.5 0 0 1-8.2 2.5" />
+        </svg>
         Sifirla
       </button>
       <button class="header-btn header-btn--secondary" @click="triggerImport" title="Sablon Yukle">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10V2m0 0L5 5m3-3 3 3" /><path d="M2 10v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" /></svg>
+        <svg
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M8 10V2m0 0L5 5m3-3 3 3" />
+          <path d="M2 10v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" />
+        </svg>
         Yukle
       </button>
-      <button class="header-btn header-btn--secondary" @click="exportTemplate" title="Sablon Kaydet">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8m0 0 3-3m-3 3L5 7" /><path d="M2 10v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" /></svg>
+      <button
+        class="header-btn header-btn--secondary"
+        @click="exportTemplate"
+        title="Sablon Kaydet"
+      >
+        <svg
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M8 2v8m0 0 3-3m-3 3L5 7" />
+          <path d="M2 10v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" />
+        </svg>
         Kaydet
       </button>
-      <button class="header-btn header-btn--secondary" @click="exportBundle" title="Sablon + Schema Birlikte Kaydet">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="1" width="12" height="14" rx="1.5" /><path d="M5 4h6M5 7h6M5 10h4" /></svg>
+      <button
+        class="header-btn header-btn--secondary"
+        @click="exportBundle"
+        title="Sablon + Schema Birlikte Kaydet"
+      >
+        <svg
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="2" y="1" width="12" height="14" rx="1.5" />
+          <path d="M5 4h6M5 7h6M5 10h4" />
+        </svg>
         Paket
       </button>
 
       <div class="header-divider"></div>
 
       <!-- Schema operations -->
-      <button class="header-btn header-btn--secondary" @click="triggerSchemaImport" title="Schema Yukle">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 10V2m0 0L5 5m3-3 3 3" /><path d="M2 10v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" /></svg>
+      <button
+        class="header-btn header-btn--secondary"
+        @click="triggerSchemaImport"
+        title="Schema Yukle"
+      >
+        <svg
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M8 10V2m0 0L5 5m3-3 3 3" />
+          <path d="M2 10v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" />
+        </svg>
         Schema
       </button>
       <button class="header-btn header-btn--secondary" @click="exportSchema" title="Schema Kaydet">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8m0 0 3-3m-3 3L5 7" /><path d="M2 10v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" /></svg>
+        <svg
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M8 2v8m0 0 3-3m-3 3L5 7" />
+          <path d="M2 10v2a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2v-2" />
+        </svg>
         Schema
       </button>
 
@@ -663,7 +803,17 @@ function resetTemplate() {
 
       <!-- Output -->
       <button class="header-btn" :disabled="pdfLoading" @click="downloadPdf">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="1" width="10" height="14" rx="1.5" /><path d="M6 5h4M6 8h4M6 11h2" /></svg>
+        <svg
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <rect x="3" y="1" width="10" height="14" rx="1.5" />
+          <path d="M6 5h4M6 8h4M6 11h2" />
+        </svg>
         {{ pdfLoading ? 'Hazirlaniyor...' : 'PDF Onizle' }}
       </button>
     </header>

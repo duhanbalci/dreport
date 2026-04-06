@@ -58,23 +58,39 @@ let installed = false
 export function setupTooltips() {
   if (installed) return
   installed = true
-  document.addEventListener('pointerenter', (e) => {
-    const target = closest(e.target)
-    if (target) show(target)
-  }, true)
+  document.addEventListener(
+    'pointerenter',
+    (e) => {
+      const target = closest(e.target)
+      if (target) show(target)
+    },
+    true,
+  )
 
-  document.addEventListener('pointerleave', (e) => {
-    const target = closest(e.target)
-    if (target && target === currentTarget) hide()
-  }, true)
+  document.addEventListener(
+    'pointerleave',
+    (e) => {
+      const target = closest(e.target)
+      if (target && target === currentTarget) hide()
+    },
+    true,
+  )
 
-  document.addEventListener('focusin', (e) => {
-    const target = closest(e.target)
-    if (target) show(target)
-  }, true)
+  document.addEventListener(
+    'focusin',
+    (e) => {
+      const target = closest(e.target)
+      if (target) show(target)
+    },
+    true,
+  )
 
-  document.addEventListener('focusout', (e) => {
-    const target = closest(e.target)
-    if (target && target === currentTarget) hide()
-  }, true)
+  document.addEventListener(
+    'focusout',
+    (e) => {
+      const target = closest(e.target)
+      if (target && target === currentTarget) hide()
+    },
+    true,
+  )
 }

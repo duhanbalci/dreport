@@ -24,13 +24,17 @@ const template = ref<Template>({
   page: { width: 210, height: 297 },
   fonts: ['Noto Sans'],
   root: {
-    id: 'root', type: 'container',
+    id: 'root',
+    type: 'container',
     position: { type: 'flow' },
     size: { width: { type: 'auto' }, height: { type: 'auto' } },
-    direction: 'column', gap: 0,
+    direction: 'column',
+    gap: 0,
     padding: { top: 0, right: 0, bottom: 0, left: 0 },
-    align: 'stretch', justify: 'start',
-    style: {}, children: [],
+    align: 'stretch',
+    justify: 'start',
+    style: {},
+    children: [],
   },
 })
 const data = ref<Record<string, unknown>>({})
@@ -81,11 +85,7 @@ onMounted(() => {
     :data-render-ready="ready || undefined"
     :data-render-error="errorMsg || undefined"
   >
-    <LayoutRenderer
-      v-if="layout"
-      :layout="layout"
-      :scale="SCALE"
-    />
+    <LayoutRenderer v-if="layout" :layout="layout" :scale="SCALE" />
     <div v-else-if="errorMsg" class="error">{{ errorMsg }}</div>
     <div v-else class="loading">Computing layout...</div>
   </div>

@@ -8,7 +8,16 @@ const props = defineProps<{
 }>()
 
 // WASM barcode üretme fonksiyonu (EditorCanvas'tan provide edilir)
-const generateBarcode = inject<(format: string, value: string, width: number, height: number, includeText: boolean) => Promise<{ width: number; height: number; rgba: ArrayBuffer } | null>>('generateBarcode')
+const generateBarcode =
+  inject<
+    (
+      format: string,
+      value: string,
+      width: number,
+      height: number,
+      includeText: boolean,
+    ) => Promise<{ width: number; height: number; rgba: ArrayBuffer } | null>
+  >('generateBarcode')
 
 function pageContainerStyle(page: PageLayout): Record<string, string> {
   const s = props.scale
@@ -92,7 +101,12 @@ function lineStyle(el: ElementLayout): Record<string, string> {
 
 // --- Barcode rendering (WASM ile) ---
 
-async function renderBarcodeToCanvas(canvas: HTMLCanvasElement, format: string, value: string, includeText: boolean = false) {
+async function renderBarcodeToCanvas(
+  canvas: HTMLCanvasElement,
+  format: string,
+  value: string,
+  includeText: boolean = false,
+) {
   if (!value || !generateBarcode) return
 
   try {
@@ -106,7 +120,13 @@ async function renderBarcodeToCanvas(canvas: HTMLCanvasElement, format: string, 
     const hPt = elHmm * MM_TO_PT
     const size = Math.max(1, Math.round(wPt * 4))
     const barcodeHeight = Math.max(1, Math.round(hPt * 4))
-    const result = await generateBarcode(format, value, size, barcodeHeight, isQr ? false : includeText)
+    const result = await generateBarcode(
+      format,
+      value,
+      size,
+      barcodeHeight,
+      isQr ? false : includeText,
+    )
     if (!result) return
 
     // Canvas boyutlarını WASM çıktısına ayarla (crisp rendering)
@@ -116,11 +136,7 @@ async function renderBarcodeToCanvas(canvas: HTMLCanvasElement, format: string, 
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const imageData = new ImageData(
-      new Uint8ClampedArray(result.rgba),
-      result.width,
-      result.height,
-    )
+    const imageData = new ImageData(new Uint8ClampedArray(result.rgba), result.width, result.height)
     ctx.putImageData(imageData, 0, 0)
   } catch (e) {
     console.warn(`[dreport] WASM barcode render hatası (${format}):`, e)
@@ -159,7 +175,7 @@ watch(
     await nextTick()
     await nextTick()
     const canvases = document.querySelectorAll<HTMLCanvasElement>('canvas[data-barcode]')
-    canvases.forEach(canvas => {
+    canvases.forEach((canvas) => {
       const format = canvas.dataset.format
       const value = canvas.dataset.value
       const includeText = canvas.dataset.includeText === 'true'
@@ -168,7 +184,7 @@ watch(
       }
     })
   },
-  { deep: true }
+  { deep: true },
 )
 </script>
 
@@ -187,7 +203,7 @@ watch(
           class="layout-el layout-el--page-break"
           :style="elStyle(el)"
         >
-          <div style="border-top: 1px dashed #9ca3af; width: 100%; height: 0;" />
+          <div style="border-top: 1px dashed #9ca3af; width: 100%; height: 0" />
         </div>
 
         <!-- Container -->
@@ -200,13 +216,27 @@ watch(
           }"
           :style="{ ...elStyle(el), ...containerStyle(el) }"
         >
-          <span v-if="el.id === 'header' || el.id.startsWith('header_p')" class="layout-el__section-label">Üst Bilgi</span>
-          <span v-else-if="el.id === 'footer' || el.id.startsWith('footer_p')" class="layout-el__section-label">Alt Bilgi</span>
+          <span
+            v-if="el.id === 'header' || el.id.startsWith('header_p')"
+            class="layout-el__section-label"
+            >Üst Bilgi</span
+          >
+          <span
+            v-else-if="el.id === 'footer' || el.id.startsWith('footer_p')"
+            class="layout-el__section-label"
+            >Alt Bilgi</span
+          >
         </div>
 
         <!-- Static text / Text / Page number -->
         <div
-          v-else-if="el.element_type === 'static_text' || el.element_type === 'text' || el.element_type === 'page_number' || el.element_type === 'current_date' || el.element_type === 'calculated_text'"
+          v-else-if="
+            el.element_type === 'static_text' ||
+            el.element_type === 'text' ||
+            el.element_type === 'page_number' ||
+            el.element_type === 'current_date' ||
+            el.element_type === 'calculated_text'
+          "
           class="layout-el layout-el--text"
           :style="{ ...elStyle(el), ...textStyle(el) }"
         >
@@ -231,7 +261,11 @@ watch(
           <img
             v-if="el.content?.type === 'image' && el.content.src"
             :src="el.content.src"
-            :style="{ width: '100%', height: '100%', objectFit: (el.style.objectFit || 'fill') as CSSProperties['objectFit'] }"
+            :style="{
+              width: '100%',
+              height: '100%',
+              objectFit: (el.style.objectFit || 'fill') as CSSProperties['objectFit'],
+            }"
           />
           <div v-else class="layout-el__placeholder">Görsel</div>
         </div>
@@ -248,7 +282,10 @@ watch(
             data-barcode
             :data-format="el.content.format"
             :data-value="el.content.value"
-            :data-include-text="el.style.barcodeIncludeText ?? (el.content.format === 'ean13' || el.content.format === 'ean8')"
+            :data-include-text="
+              el.style.barcodeIncludeText ??
+              (el.content.format === 'ean13' || el.content.format === 'ean8')
+            "
             :data-el-w="el.width_mm"
             :data-el-h="el.height_mm"
             :style="{ width: '100%', height: '100%', display: 'block' }"
@@ -264,16 +301,24 @@ watch(
           :style="elStyle(el)"
         >
           <svg viewBox="0 0 20 20" :style="{ width: '100%', height: '100%' }">
-            <rect x="1" y="1" width="18" height="18" fill="none"
+            <rect
+              x="1"
+              y="1"
+              width="18"
+              height="18"
+              fill="none"
               :stroke="el.style.borderColor ?? '#333'"
-              :stroke-width="el.style.borderWidth ? el.style.borderWidth * 3 : 1.5" />
-            <path v-if="el.content?.type === 'checkbox' && el.content.checked"
+              :stroke-width="el.style.borderWidth ? el.style.borderWidth * 3 : 1.5"
+            />
+            <path
+              v-if="el.content?.type === 'checkbox' && el.content.checked"
               d="M4 10 L8 15 L16 5"
               fill="none"
               :stroke="el.style.color ?? '#000'"
               stroke-width="2.5"
               stroke-linecap="round"
-              stroke-linejoin="round" />
+              stroke-linejoin="round"
+            />
           </svg>
         </div>
 
@@ -293,7 +338,8 @@ watch(
                 fontFamily: span.fontFamily || undefined,
                 color: span.color || undefined,
               }"
-            >{{ span.text }}</span>
+              >{{ span.text }}</span
+            >
           </template>
         </div>
 
@@ -313,13 +359,24 @@ watch(
           <div
             v-if="el.content?.type === 'chart' && el.content.svg"
             v-html="el.content.svg"
-            style="width: 100%; height: 100%;"
+            style="width: 100%; height: 100%"
           />
-          <div v-else class="layout-el__placeholder" :style="{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', color: '#94a3b8', fontSize: '12px' }">
+          <div
+            v-else
+            class="layout-el__placeholder"
+            :style="{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: '100%',
+              height: '100%',
+              color: '#94a3b8',
+              fontSize: '12px',
+            }"
+          >
             Grafik
           </div>
         </div>
-
       </template>
     </div>
   </div>

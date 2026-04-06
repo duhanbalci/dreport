@@ -180,7 +180,7 @@ export interface ShapeElement extends BaseElement {
 }
 
 export interface CheckboxStyle {
-  size?: number       // mm — kare boyutu
+  size?: number // mm — kare boyutu
   checkColor?: string // checkmark rengi
   borderColor?: string
   borderWidth?: number
@@ -251,11 +251,11 @@ export interface ChartAxis {
 export interface ChartStyle {
   colors?: string[]
   backgroundColor?: string
-  barGap?: number         // 0.0-1.0
-  lineWidth?: number      // mm
+  barGap?: number // 0.0-1.0
+  lineWidth?: number // mm
   showPoints?: boolean
   curveType?: 'linear' | 'smooth'
-  innerRadius?: number    // 0=pie, >0=donut (0-0.9)
+  innerRadius?: number // 0=pie, >0=donut (0-0.9)
 }
 
 export interface ChartElement extends BaseElement {
@@ -293,7 +293,21 @@ export interface RepeatingTableElement extends BaseElement {
   repeatHeader?: boolean
 }
 
-export type LeafElement = StaticTextElement | TextElement | LineElement | RepeatingTableElement | ImageElement | PageNumberElement | BarcodeElement | PageBreakElement | CurrentDateElement | ShapeElement | CheckboxElement | CalculatedTextElement | RichTextElement | ChartElement
+export type LeafElement =
+  | StaticTextElement
+  | TextElement
+  | LineElement
+  | RepeatingTableElement
+  | ImageElement
+  | PageNumberElement
+  | BarcodeElement
+  | PageBreakElement
+  | CurrentDateElement
+  | ShapeElement
+  | CheckboxElement
+  | CalculatedTextElement
+  | RichTextElement
+  | ChartElement
 export type TemplateElement = LeafElement | ContainerElement
 
 // --- Template ---
@@ -330,10 +344,7 @@ export function isLeaf(el: TemplateElement): el is LeafElement {
 }
 
 /** Ağaçta bir element'i ID ile bulur */
-export function findElementById(
-  root: ContainerElement,
-  id: string
-): TemplateElement | undefined {
+export function findElementById(root: ContainerElement, id: string): TemplateElement | undefined {
   if (root.id === id) return root
   for (const child of root.children) {
     if (child.id === id) return child
@@ -346,10 +357,7 @@ export function findElementById(
 }
 
 /** Bir element'in parent container'ını bulur */
-export function findParent(
-  root: ContainerElement,
-  id: string
-): ContainerElement | undefined {
+export function findParent(root: ContainerElement, id: string): ContainerElement | undefined {
   for (const child of root.children) {
     if (child.id === id) return root
     if (isContainer(child)) {

@@ -12,7 +12,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useTemplateStore } from '../template'
 import { useEditorStore } from '../editor'
-import type { Template, StaticTextElement, ContainerElement, ImageElement, TemplateElement } from '../../core/types'
+import type {
+  Template,
+  StaticTextElement,
+  ContainerElement,
+  ImageElement,
+  TemplateElement,
+} from '../../core/types'
 import { sz } from '../../core/types'
 
 function createTestTemplate(): Template {
@@ -392,52 +398,52 @@ describe('3.2 Z-Order controls', () => {
     const store = setupThreeElements()
     // Sıra: [a, b, c] → bringForward(a) → [b, a, c]
     store.bringForward('a')
-    expect(store.template.root.children.map(c => c.id)).toEqual(['b', 'a', 'c'])
+    expect(store.template.root.children.map((c) => c.id)).toEqual(['b', 'a', 'c'])
   })
 
   it('sendBackward moves element one step down', () => {
     const store = setupThreeElements()
     // Sıra: [a, b, c] → sendBackward(c) → [a, c, b]
     store.sendBackward('c')
-    expect(store.template.root.children.map(c => c.id)).toEqual(['a', 'c', 'b'])
+    expect(store.template.root.children.map((c) => c.id)).toEqual(['a', 'c', 'b'])
   })
 
   it('bringToFront moves element to end', () => {
     const store = setupThreeElements()
     // Sıra: [a, b, c] → bringToFront(a) → [b, c, a]
     store.bringToFront('a')
-    expect(store.template.root.children.map(c => c.id)).toEqual(['b', 'c', 'a'])
+    expect(store.template.root.children.map((c) => c.id)).toEqual(['b', 'c', 'a'])
   })
 
   it('sendToBack moves element to beginning', () => {
     const store = setupThreeElements()
     // Sıra: [a, b, c] → sendToBack(c) → [c, a, b]
     store.sendToBack('c')
-    expect(store.template.root.children.map(c => c.id)).toEqual(['c', 'a', 'b'])
+    expect(store.template.root.children.map((c) => c.id)).toEqual(['c', 'a', 'b'])
   })
 
   it('bringForward on last element is no-op', () => {
     const store = setupThreeElements()
     store.bringForward('c')
-    expect(store.template.root.children.map(c => c.id)).toEqual(['a', 'b', 'c'])
+    expect(store.template.root.children.map((c) => c.id)).toEqual(['a', 'b', 'c'])
   })
 
   it('sendBackward on first element is no-op', () => {
     const store = setupThreeElements()
     store.sendBackward('a')
-    expect(store.template.root.children.map(c => c.id)).toEqual(['a', 'b', 'c'])
+    expect(store.template.root.children.map((c) => c.id)).toEqual(['a', 'b', 'c'])
   })
 
   it('bringToFront on last element is no-op', () => {
     const store = setupThreeElements()
     store.bringToFront('c')
-    expect(store.template.root.children.map(c => c.id)).toEqual(['a', 'b', 'c'])
+    expect(store.template.root.children.map((c) => c.id)).toEqual(['a', 'b', 'c'])
   })
 
   it('sendToBack on first element is no-op', () => {
     const store = setupThreeElements()
     store.sendToBack('a')
-    expect(store.template.root.children.map(c => c.id)).toEqual(['a', 'b', 'c'])
+    expect(store.template.root.children.map((c) => c.id)).toEqual(['a', 'b', 'c'])
   })
 })
 

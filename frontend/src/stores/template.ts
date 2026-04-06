@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { Template, TemplateElement, ContainerElement, SizeConstraint, PositionMode } from '../core/types'
+import type {
+  Template,
+  TemplateElement,
+  ContainerElement,
+  SizeConstraint,
+  PositionMode,
+} from '../core/types'
 import { findElementById, findParent, isContainer, sz } from '../core/types'
 import { generateMockData } from '../core/mock-data-generator'
 import { useUndoRedo } from '../composables/useUndoRedo'
@@ -132,7 +138,7 @@ export const useTemplateStore = defineStore('template', () => {
   function removeElement(elementId: string) {
     const parent = getParent(elementId)
     if (!parent) return
-    const idx = parent.children.findIndex(c => c.id === elementId)
+    const idx = parent.children.findIndex((c) => c.id === elementId)
     if (idx !== -1) {
       parent.children.splice(idx, 1)
       bumpLayoutVersion()
@@ -146,7 +152,7 @@ export const useTemplateStore = defineStore('template', () => {
     // Ağaçtan kaldır (bump'sız)
     const parent = getParent(elementId)
     if (parent) {
-      const idx = parent.children.findIndex(c => c.id === elementId)
+      const idx = parent.children.findIndex((c) => c.id === elementId)
       if (idx !== -1) parent.children.splice(idx, 1)
     }
     // Hedef container'a ekle (bump'sız)
@@ -202,7 +208,7 @@ export const useTemplateStore = defineStore('template', () => {
   function bringForward(elementId: string) {
     const parent = getParent(elementId)
     if (!parent) return
-    const idx = parent.children.findIndex(c => c.id === elementId)
+    const idx = parent.children.findIndex((c) => c.id === elementId)
     if (idx < 0 || idx >= parent.children.length - 1) return
     reorderChild(parent.id, idx, idx + 1)
   }
@@ -211,7 +217,7 @@ export const useTemplateStore = defineStore('template', () => {
   function sendBackward(elementId: string) {
     const parent = getParent(elementId)
     if (!parent) return
-    const idx = parent.children.findIndex(c => c.id === elementId)
+    const idx = parent.children.findIndex((c) => c.id === elementId)
     if (idx <= 0) return
     reorderChild(parent.id, idx, idx - 1)
   }
@@ -220,7 +226,7 @@ export const useTemplateStore = defineStore('template', () => {
   function bringToFront(elementId: string) {
     const parent = getParent(elementId)
     if (!parent) return
-    const idx = parent.children.findIndex(c => c.id === elementId)
+    const idx = parent.children.findIndex((c) => c.id === elementId)
     if (idx < 0 || idx >= parent.children.length - 1) return
     reorderChild(parent.id, idx, parent.children.length - 1)
   }
@@ -229,7 +235,7 @@ export const useTemplateStore = defineStore('template', () => {
   function sendToBack(elementId: string) {
     const parent = getParent(elementId)
     if (!parent) return
-    const idx = parent.children.findIndex(c => c.id === elementId)
+    const idx = parent.children.findIndex((c) => c.id === elementId)
     if (idx <= 0) return
     reorderChild(parent.id, idx, 0)
   }
@@ -251,7 +257,11 @@ export const useTemplateStore = defineStore('template', () => {
     if (!parsed.root || parsed.root.type !== 'container') {
       throw new Error('Geçersiz şablon: root alanı eksik veya container değil')
     }
-    if (!parsed.page || typeof parsed.page.width !== 'number' || typeof parsed.page.height !== 'number') {
+    if (
+      !parsed.page ||
+      typeof parsed.page.width !== 'number' ||
+      typeof parsed.page.height !== 'number'
+    ) {
       throw new Error('Geçersiz şablon: page alanı eksik veya geçersiz')
     }
     template.value = parsed

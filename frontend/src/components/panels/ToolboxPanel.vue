@@ -1,7 +1,21 @@
 <script setup lang="ts">
 import { useEditorStore } from '../../stores/editor'
 import { useSchemaStore } from '../../stores/schema'
-import type { TemplateElement, RepeatingTableElement, TableColumn, ImageElement, PageNumberElement, BarcodeElement, PageBreakElement, CurrentDateElement, ShapeElement, CheckboxElement, CalculatedTextElement, RichTextElement, ChartElement } from '../../core/types'
+import type {
+  TemplateElement,
+  RepeatingTableElement,
+  TableColumn,
+  ImageElement,
+  PageNumberElement,
+  BarcodeElement,
+  PageBreakElement,
+  CurrentDateElement,
+  ShapeElement,
+  CheckboxElement,
+  CalculatedTextElement,
+  RichTextElement,
+  ChartElement,
+} from '../../core/types'
 import { sz } from '../../core/types'
 import { schemaFormatToFormatType, defaultAlignForSchema } from '../../core/schema-parser'
 
@@ -88,7 +102,7 @@ const tools: ToolItem[] = [
       if (firstArray) {
         dataPath = firstArray.path
         const itemFields = schemaStore.getArrayItemFields(firstArray.path)
-        columns = itemFields.map(field => ({
+        columns = itemFields.map((field) => ({
           id: nextId('col'),
           field: field.key,
           title: field.title,
@@ -212,8 +226,8 @@ const tools: ToolItem[] = [
       if (firstArray) {
         dataPath = firstArray.path
         const itemFields = schemaStore.getArrayItemFields(firstArray.path)
-        const stringField = itemFields.find(f => f.type === 'string')
-        const numberField = itemFields.find(f => f.type === 'number' || f.type === 'integer')
+        const stringField = itemFields.find((f) => f.type === 'string')
+        const numberField = itemFields.find((f) => f.type === 'number' || f.type === 'integer')
         categoryField = stringField?.key ?? itemFields[0]?.key ?? ''
         valueField = numberField?.key ?? itemFields[1]?.key ?? ''
       }

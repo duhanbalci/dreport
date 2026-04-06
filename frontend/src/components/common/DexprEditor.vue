@@ -90,7 +90,7 @@ function schemaToLanguageInfo(): DexprLanguageInfo {
   const tree = schemaStore.schemaTree
   for (const child of tree.children) {
     if (child.type === 'object') {
-      const fields = child.children.map(f => ({
+      const fields = child.children.map((f) => ({
         name: f.key,
         type: schemaToDexprType(f),
       }))
@@ -112,7 +112,9 @@ function schemaToLanguageInfo(): DexprLanguageInfo {
   return info
 }
 
-function schemaToDexprType(node: SchemaNode): 'String' | 'Number' | 'Boolean' | 'Object' | 'NumberList' | 'StringList' {
+function schemaToDexprType(
+  node: SchemaNode,
+): 'String' | 'Number' | 'Boolean' | 'Object' | 'NumberList' | 'StringList' {
   switch (node.type) {
     case 'number':
     case 'integer':
@@ -134,7 +136,7 @@ function createState(doc: string): EditorState {
   return EditorState.create({
     doc,
     extensions: [
-      EditorView.updateListener.of(update => {
+      EditorView.updateListener.of((update) => {
         if (update.docChanged) {
           const val = update.state.doc.toString()
           if (val !== props.modelValue) {
@@ -207,22 +209,29 @@ onBeforeUnmount(() => {
 })
 
 // Disaridan gelen deger degisikligi (undo/redo vs.)
-watch(() => props.modelValue, (newVal) => {
-  if (!view) return
-  const current = view.state.doc.toString()
-  if (current !== newVal) {
-    view.dispatch({
-      changes: { from: 0, to: current.length, insert: newVal ?? '' },
-    })
-  }
-})
+watch(
+  () => props.modelValue,
+  (newVal) => {
+    if (!view) return
+    const current = view.state.doc.toString()
+    if (current !== newVal) {
+      view.dispatch({
+        changes: { from: 0, to: current.length, insert: newVal ?? '' },
+      })
+    }
+  },
+)
 
 // Schema degisince editor'u yeniden olustur (autocomplete guncellenmeli)
-watch(langInfo, () => {
-  if (!view) return
-  const doc = view.state.doc.toString()
-  view.setState(createState(doc))
-}, { deep: true })
+watch(
+  langInfo,
+  () => {
+    if (!view) return
+    const doc = view.state.doc.toString()
+    view.setState(createState(doc))
+  },
+  { deep: true },
+)
 </script>
 
 <template>
