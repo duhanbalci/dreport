@@ -98,7 +98,11 @@ function getElementStyle(el: TemplateElement) {
 function onElementClick(e: PointerEvent, id: string) {
   e.stopPropagation()
   if (didDrag.value) return
-  editorStore.selectElement(id)
+  if (e.shiftKey) {
+    editorStore.toggleSelection(id)
+  } else {
+    editorStore.selectElement(id)
+  }
 }
 
 function onCanvasClick() {
@@ -637,7 +641,7 @@ const isAnyDragActive = computed(() =>
       :key="el.id"
       class="element-handle"
       :class="{
-        'element-handle--selected': editorStore.selectedElementId === el.id,
+        'element-handle--selected': editorStore.isSelected(el.id),
         'element-handle--container': isContainer(el),
         'element-handle--dragging': isDragging && dragElementId === el.id,
         'element-handle--drop-target': isContainer(el) && dropTargetContainerId === el.id && isAnyDragActive,
@@ -646,10 +650,10 @@ const isAnyDragActive = computed(() =>
       @pointerdown="(e: PointerEvent) => { onElementClick(e, el.id); onDragStart(e, el) }"
     >
       <!-- Selection border -->
-      <div v-if="editorStore.selectedElementId === el.id" class="selection-border" />
+      <div v-if="editorStore.isSelected(el.id)" class="selection-border" />
 
-      <!-- Resize handles -->
-      <template v-if="editorStore.selectedElementId === el.id && !isResizing && el.type !== 'page_break'">
+      <!-- Resize handles (sadece tek seçimde) -->
+      <template v-if="editorStore.isSelected(el.id) && editorStore.selectedElementIds.size === 1 && !isResizing && el.type !== 'page_break'">
         <template v-if="el.type === 'barcode' || el.type === 'image'">
           <!-- Barkod/Görsel: sadece yatay resize (aspect ratio korunur) -->
           <div class="resize-handle resize-handle--e" @pointerdown="(e: PointerEvent) => onResizeStart(e, el.id, 'e')" />

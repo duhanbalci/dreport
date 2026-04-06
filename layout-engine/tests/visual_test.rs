@@ -35,26 +35,10 @@ mod visual {
             let entry = entry.unwrap();
             let path = entry.path();
             if path.extension().is_some_and(|e| e == "ttf") {
-                let family = path
-                    .file_stem()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .split('-')
-                    .next()
-                    .unwrap_or("Unknown")
-                    .to_string();
-                let family = if family == "NotoSansMono" {
-                    "Noto Sans Mono".to_string()
-                } else if family == "NotoSans" {
-                    "Noto Sans".to_string()
-                } else {
-                    family
-                };
-                fonts.push(FontData {
-                    family,
-                    data: fs::read(&path).unwrap(),
-                });
+                let data = fs::read(&path).unwrap();
+                if let Some(fd) = FontData::from_bytes(data) {
+                    fonts.push(fd);
+                }
             }
         }
         fonts
@@ -68,7 +52,7 @@ mod visual {
         let data: serde_json::Value = serde_json::from_str(&data_json).unwrap();
         let fonts = load_test_fonts();
 
-        let layout = compute_layout(&template, &data, &fonts);
+        let layout = compute_layout(&template, &data, &fonts).unwrap();
         render_pdf(&layout, &fonts).expect("PDF render failed")
     }
 
@@ -211,7 +195,7 @@ mod visual {
         let data: serde_json::Value = serde_json::from_str(&data_json).unwrap();
         let fonts = load_test_fonts();
 
-        let layout = compute_layout(&template, &data, &fonts);
+        let layout = compute_layout(&template, &data, &fonts).unwrap();
 
         let mut html = String::from("<!DOCTYPE html><html><head><style>body{margin:20px;font-family:sans-serif;background:#f5f5f5}.chart-box{margin:10px 0;background:white;box-shadow:0 1px 3px rgba(0,0,0,.1)}</style></head><body><h2>Chart SVG Preview (HTML render)</h2>");
 

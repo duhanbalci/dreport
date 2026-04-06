@@ -24,6 +24,8 @@ pub struct PageSplitInput {
     pub page_number_formats: HashMap<String, String>,
     /// Root container'ın üst padding'i (mm) — sayfa 2+ için body offset
     pub root_padding_top_mm: f64,
+    /// Header tekrarı kapatılmış tablo ID'leri
+    pub no_repeat_header_tables: HashSet<String>,
 }
 
 /// Body elemanlarını sayfalara böl, header/footer ekle, page number'ları çöz.
@@ -53,7 +55,11 @@ pub fn split_into_pages(input: PageSplitInput) -> Vec<PageLayout> {
     let avoid_groups = build_avoid_groups(&input.body_elements, &input.break_modes, &parent_map);
 
     // Tablo yapısı tespiti: table_id → header element id'leri
-    let table_info = detect_table_structure(&input.body_elements);
+    // repeat_header == false olan tablolar hariç tutulur
+    let mut table_info = detect_table_structure(&input.body_elements);
+    for table_id in &input.no_repeat_header_tables {
+        table_info.remove(table_id);
+    }
 
     // Elemanları sayfalara böl
     let page_slices = split_elements(
@@ -561,6 +567,7 @@ mod tests {
             break_modes: HashMap::new(),
             page_number_formats: HashMap::new(),
             root_padding_top_mm: 0.0,
+            no_repeat_header_tables: HashSet::new(),
         };
 
         let pages = split_into_pages(input);
@@ -584,6 +591,7 @@ mod tests {
             break_modes: HashMap::new(),
             page_number_formats: HashMap::new(),
             root_padding_top_mm: 0.0,
+            no_repeat_header_tables: HashSet::new(),
         };
 
         let pages = split_into_pages(input);
@@ -611,6 +619,7 @@ mod tests {
             break_modes: HashMap::new(),
             page_number_formats: HashMap::new(),
             root_padding_top_mm: 0.0,
+            no_repeat_header_tables: HashSet::new(),
         };
 
         let pages = split_into_pages(input);
@@ -638,6 +647,7 @@ mod tests {
             break_modes: HashMap::new(),
             page_number_formats: HashMap::new(),
             root_padding_top_mm: 0.0,
+            no_repeat_header_tables: HashSet::new(),
         };
 
         let pages = split_into_pages(input);
@@ -678,6 +688,7 @@ mod tests {
             break_modes: HashMap::new(),
             page_number_formats: formats,
             root_padding_top_mm: 0.0,
+            no_repeat_header_tables: HashSet::new(),
         };
 
         let pages = split_into_pages(input);
@@ -768,6 +779,7 @@ mod tests {
             break_modes: HashMap::new(),
             page_number_formats: HashMap::new(),
             root_padding_top_mm: 0.0,
+            no_repeat_header_tables: HashSet::new(),
         };
 
         let pages = split_into_pages(input);
@@ -860,6 +872,7 @@ mod tests {
             break_modes: HashMap::new(),
             page_number_formats: HashMap::new(),
             root_padding_top_mm: 0.0,
+            no_repeat_header_tables: HashSet::new(),
         };
 
         let pages = split_into_pages(input);
@@ -943,6 +956,7 @@ mod tests {
             break_modes: HashMap::new(),
             page_number_formats: HashMap::new(),
             root_padding_top_mm: 5.0,
+            no_repeat_header_tables: HashSet::new(),
         };
 
         let pages = split_into_pages(input);

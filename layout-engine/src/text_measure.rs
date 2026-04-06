@@ -4,6 +4,13 @@ use std::hash::Hash;
 use crate::FontData;
 use cosmic_text::{Attrs, Buffer, Family, FontSystem, Metrics, Shaping, Weight};
 
+/// Tek bir satırın layout bilgisi (PDF render için)
+pub struct TextLine {
+    pub text: String,
+    pub y_offset_pt: f32,
+    pub width_pt: f32,
+}
+
 /// Rich text span — ölçüm için gerekli bilgiler
 #[derive(Clone)]
 pub struct RichSpanMeasure {
@@ -182,6 +189,58 @@ impl TextMeasurer {
         (width_pt, height_pt)
     }
 
+    /// Text'i verilen genişlik kısıtı ile satırlara böl.
+    /// Her satır için text içeriği ve y-offset (pt) döner.
+    /// PDF render sırasında text wrapping için kullanılır.
+    pub fn layout_lines(
+        &mut self,
+        text: &str,
+        font_family: Option<&str>,
+        font_size_pt: f32,
+        font_weight: Option<&str>,
+        available_width_pt: f32,
+    ) -> Vec<TextLine> {
+        if text.is_empty() {
+            return vec![];
+        }
+
+        let font_size_px = font_size_pt * PT_TO_PX;
+        let line_height_px = font_size_px * 1.2;
+        let metrics = Metrics::new(font_size_px, line_height_px);
+
+        let mut buffer = Buffer::new(&mut self.font_system, metrics);
+
+        let width_px = available_width_pt * PT_TO_PX;
+        buffer.set_size(&mut self.font_system, Some(width_px), None);
+
+        let weight = match font_weight {
+            Some("bold") => Weight::BOLD,
+            _ => Weight::NORMAL,
+        };
+
+        let family_name = font_family.unwrap_or("Noto Sans");
+        let attrs = Attrs::new()
+            .family(Family::Name(family_name))
+            .weight(weight);
+
+        buffer.set_text(&mut self.font_system, text, &attrs, Shaping::Advanced, None);
+        buffer.shape_until_scroll(&mut self.font_system, false);
+
+        let mut lines = Vec::new();
+        for run in buffer.layout_runs() {
+            let line_text = run.text.to_string();
+            let line_top_pt = run.line_top / PT_TO_PX;
+            let line_width_pt = run.line_w / PT_TO_PX;
+            lines.push(TextLine {
+                text: line_text,
+                y_offset_pt: line_top_pt,
+                width_pt: line_width_pt,
+            });
+        }
+
+        lines
+    }
+
     /// Rich text ölç — birden fazla span, her biri farklı font/boyut/kalınlık.
     /// cosmic-text set_rich_text() ile attributed text ölçümü yapar.
     pub fn measure_rich_text(
@@ -273,18 +332,9 @@ pub(crate) fn load_test_fonts() -> Vec<crate::FontData> {
         let path = entry.path();
         if path.extension().is_some_and(|e| e == "ttf") {
             let data = std::fs::read(&path).unwrap();
-            let family = if path
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .contains("Mono")
-            {
-                "Noto Sans Mono".to_string()
-            } else {
-                "Noto Sans".to_string()
-            };
-            fonts.push(crate::FontData { family, data });
+            if let Some(fd) = crate::FontData::from_bytes(data) {
+                fonts.push(fd);
+            }
         }
     }
     fonts

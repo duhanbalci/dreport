@@ -312,7 +312,7 @@ export interface Template {
 // --- Editor state ---
 
 export interface EditorState {
-  selectedElementId: string | null
+  selectedElementIds: Set<string>
   zoom: number // 0.25 - 4.0
   panX: number
   panY: number

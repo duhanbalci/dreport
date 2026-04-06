@@ -10,13 +10,38 @@ pub mod expr_eval;
 pub mod wasm_api;
 
 pub mod barcode_gen;
+pub mod chart_layout;
 pub mod chart_render;
+pub mod font_meta;
+pub mod font_provider;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub mod pdf_render;
 
 use dreport_core::models::{ChartType, Template};
 use serde::{Deserialize, Serialize};
+
+/// Layout hesaplama hata tipi
+#[derive(Debug)]
+pub enum LayoutError {
+    Taffy(taffy::TaffyError),
+}
+
+impl std::fmt::Display for LayoutError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LayoutError::Taffy(e) => write!(f, "Taffy layout hatası: {:?}", e),
+        }
+    }
+}
+
+impl std::error::Error for LayoutError {}
+
+impl From<taffy::TaffyError> for LayoutError {
+    fn from(e: taffy::TaffyError) -> Self {
+        LayoutError::Taffy(e)
+    }
+}
 
 // --- Layout sonuç tipleri ---
 
@@ -172,6 +197,7 @@ pub struct ResolvedStyle {
     // Text
     pub font_size: Option<f64>,
     pub font_weight: Option<String>,
+    pub font_style: Option<String>,
     pub font_family: Option<String>,
     pub color: Option<String>,
     pub text_align: Option<String>,
@@ -203,7 +229,7 @@ pub fn compute_layout(
     template: &Template,
     data: &serde_json::Value,
     font_data: &[FontData],
-) -> LayoutResult {
+) -> Result<LayoutResult, LayoutError> {
     let mut measurer = text_measure::TextMeasurer::new(font_data);
     let resolved = data_resolve::resolve_template(template, data);
     tree::compute(template, &resolved, &mut measurer)
@@ -217,16 +243,41 @@ pub fn compute_layout_cached(
     data: &serde_json::Value,
     font_data: &[FontData],
     text_cache: text_measure::TextMeasureCache,
-) -> (LayoutResult, text_measure::TextMeasureCache) {
+) -> Result<(LayoutResult, text_measure::TextMeasureCache), LayoutError> {
     let mut measurer = text_measure::TextMeasurer::new_with_cache(font_data, text_cache);
     let resolved = data_resolve::resolve_template(template, data);
-    let result = tree::compute(template, &resolved, &mut measurer);
-    (result, measurer.take_cache())
+    let result = tree::compute(template, &resolved, &mut measurer)?;
+    Ok((result, measurer.take_cache()))
 }
 
-/// Font verisi (ham TTF/OTF bytes)
+/// Font verisi (ham TTF/OTF bytes + metadata)
 #[derive(Debug, Clone)]
 pub struct FontData {
     pub family: String,
+    pub weight: u16,
+    pub italic: bool,
     pub data: Vec<u8>,
+}
+
+impl FontData {
+    /// Create FontData from raw bytes, parsing metadata from the font file.
+    /// Returns None if font metadata cannot be parsed.
+    pub fn from_bytes(data: Vec<u8>) -> Option<Self> {
+        let meta = font_meta::parse_font_meta(&data)?;
+        Some(Self {
+            family: meta.family,
+            weight: meta.weight,
+            italic: meta.italic,
+            data,
+        })
+    }
+
+    /// Create FontData with explicit metadata (when metadata is already known).
+    pub fn new(family: String, weight: u16, italic: bool, data: Vec<u8>) -> Self {
+        Self { family, weight, italic, data }
+    }
+
+    pub fn is_bold(&self) -> bool {
+        self.weight >= 700
+    }
 }

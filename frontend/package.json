@@ -17,10 +17,10 @@
     "@codemirror/language": "^6.12.3",
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.41.0",
+    "@duhanbalci/codemirror-lang-dexpr": "0.1.0",
     "@lezer/highlight": "^1.2.3",
     "@lezer/lr": "^1.4.8",
     "codemirror": "^6.0.2",
-    "codemirror-lang-dexpr": "file:../../rust-expr/editor",
     "pinia": "^3.0.4",
     "vue": "^3.5.31"
   },

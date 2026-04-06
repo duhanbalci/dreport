@@ -1,4 +1,4 @@
-use std::sync::{Mutex, OnceLock};
+use std::sync::Mutex;
 use std::collections::HashMap;
 
 use wasm_bindgen::prelude::*;
@@ -6,15 +6,14 @@ use wasm_bindgen::prelude::*;
 use crate::FontData;
 use crate::text_measure::TextMeasureCache;
 
-/// Font verileri worker'da cache'lenir.
-static FONTS: OnceLock<Vec<FontData>> = OnceLock::new();
+/// Font verileri — dinamik olarak eklenebilir (Mutex ile).
+static FONTS: Mutex<Vec<FontData>> = Mutex::new(Vec::new());
 
 /// Text ölçüm cache'i — layout call'ları arasında persist eder.
-/// Aynı text + font + size + weight + available_width → aynı sonuç.
-static TEXT_CACHE: OnceLock<Mutex<TextMeasureCache>> = OnceLock::new();
+static TEXT_CACHE: Mutex<Option<TextMeasureCache>> = Mutex::new(None);
 
 /// Barcode pixel cache — (format, value, width, height, include_text) → RGBA bytes (header dahil).
-static BARCODE_CACHE: OnceLock<Mutex<HashMap<BarcodeCacheKey, Vec<u8>>>> = OnceLock::new();
+static BARCODE_CACHE: Mutex<Option<HashMap<BarcodeCacheKey, Vec<u8>>>> = Mutex::new(None);
 
 #[derive(Clone, Eq, PartialEq, Hash)]
 struct BarcodeCacheKey {
@@ -25,41 +24,87 @@ struct BarcodeCacheKey {
     include_text: bool,
 }
 
-/// Font verilerini yükle (worker init sırasında bir kere çağrılır).
-/// `families`: JSON array of font family names — ["Noto Sans", "Noto Sans", ...]
-/// `buffers`: Her font dosyasının raw bytes'ı (sırayla)
+/// Font verilerini yükle (ilk çağrıda mevcut fontları değiştirir).
+/// `buffers`: Her font dosyasının raw bytes'ı
+/// Font metadata (family, weight, italic) otomatik olarak TTF'den parse edilir.
 #[wasm_bindgen(js_name = "loadFonts")]
-pub fn load_fonts(families: &str, buffers: Vec<js_sys::Uint8Array>) -> Result<(), JsValue> {
-    let families: Vec<String> =
-        serde_json::from_str(families).map_err(|e| JsValue::from_str(&e.to_string()))?;
+pub fn load_fonts(buffers: Vec<js_sys::Uint8Array>) -> Result<(), JsValue> {
+    let mut fonts_lock = FONTS.lock().unwrap();
 
-    if families.len() != buffers.len() {
-        return Err(JsValue::from_str("families and buffers length mismatch"));
+    let mut fonts: Vec<FontData> = Vec::with_capacity(buffers.len());
+    for buf in buffers {
+        let data = buf.to_vec();
+        match FontData::from_bytes(data) {
+            Some(fd) => fonts.push(fd),
+            None => {
+                // Skip unparseable fonts silently
+            }
+        }
     }
 
-    let fonts: Vec<FontData> = families
-        .into_iter()
-        .zip(buffers.into_iter())
-        .map(|(family, buf)| FontData {
-            family,
-            data: buf.to_vec(),
-        })
-        .collect();
+    *fonts_lock = fonts;
 
-    FONTS
-        .set(fonts)
-        .map_err(|_| JsValue::from_str("Fonts already loaded"))?;
+    // Text cache'i temizle (yeni fontlarla eski ölçümler geçersiz)
+    *TEXT_CACHE.lock().unwrap() = None;
 
     Ok(())
+}
+
+/// Mevcut font setine yeni fontlar ekle (on-demand loading için).
+/// Mevcut fontları korur, yenileri ekler. Aynı family+weight+italic varsa üzerine yazar.
+#[wasm_bindgen(js_name = "addFonts")]
+pub fn add_fonts(buffers: Vec<js_sys::Uint8Array>) -> Result<(), JsValue> {
+    let mut fonts_lock = FONTS.lock().unwrap();
+
+    for buf in buffers {
+        let data = buf.to_vec();
+        if let Some(fd) = FontData::from_bytes(data) {
+            // Aynı variant varsa kaldır (üzerine yaz)
+            fonts_lock.retain(|existing| {
+                !(existing.family.eq_ignore_ascii_case(&fd.family)
+                    && existing.weight == fd.weight
+                    && existing.italic == fd.italic)
+            });
+            fonts_lock.push(fd);
+        }
+    }
+
+    // Text cache'i temizle
+    *TEXT_CACHE.lock().unwrap() = None;
+
+    Ok(())
+}
+
+/// Yüklü font ailelerini JSON olarak döndür.
+/// Frontend'in hangi fontların yüklü olduğunu bilmesi için.
+#[wasm_bindgen(js_name = "getLoadedFonts")]
+pub fn get_loaded_fonts() -> String {
+    let fonts = FONTS.lock().unwrap();
+    let mut families: HashMap<String, Vec<serde_json::Value>> = HashMap::new();
+
+    for fd in fonts.iter() {
+        let entry = families.entry(fd.family.clone()).or_default();
+        entry.push(serde_json::json!({
+            "weight": fd.weight,
+            "italic": fd.italic,
+        }));
+    }
+
+    let result: Vec<serde_json::Value> = families
+        .into_iter()
+        .map(|(family, variants)| serde_json::json!({
+            "family": family,
+            "variants": variants,
+        }))
+        .collect();
+
+    serde_json::to_string(&result).unwrap_or_else(|_| "[]".to_string())
 }
 
 /// Layout hesapla.
 /// `template_json`: Template JSON string
 /// `data_json`: Data JSON string
 /// Dönen değer: LayoutResult JSON string
-///
-/// Text ölçüm sonuçları cross-call cache'lenir — değişmeyen text elemanları
-/// cosmic-text'e gitmeden cache'ten döner.
 #[wasm_bindgen(js_name = "computeLayout")]
 pub fn compute_layout_wasm(template_json: &str, data_json: &str) -> Result<String, JsValue> {
     let template: dreport_core::models::Template =
@@ -68,18 +113,20 @@ pub fn compute_layout_wasm(template_json: &str, data_json: &str) -> Result<Strin
     let data: serde_json::Value =
         serde_json::from_str(data_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
 
-    let fonts = FONTS
-        .get()
-        .ok_or_else(|| JsValue::from_str("Fonts not loaded. Call loadFonts() first."))?;
+    let fonts = FONTS.lock().unwrap();
+    if fonts.is_empty() {
+        return Err(JsValue::from_str("Fonts not loaded. Call loadFonts() first."));
+    }
 
     // Text cache'i al (veya ilk kullanımda oluştur)
-    let cache_mutex = TEXT_CACHE.get_or_init(|| Mutex::new(TextMeasureCache::default()));
-    let text_cache = cache_mutex.lock().unwrap().take();
+    let mut cache_guard = TEXT_CACHE.lock().unwrap();
+    let text_cache = cache_guard.take().unwrap_or_default();
 
-    let (result, new_cache) = crate::compute_layout_cached(&template, &data, fonts, text_cache);
+    let (result, new_cache) = crate::compute_layout_cached(&template, &data, &fonts, text_cache)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
     // Güncel cache'i geri koy
-    *cache_mutex.lock().unwrap() = new_cache;
+    *cache_guard = Some(new_cache);
 
     serde_json::to_string(&result).map_err(|e| JsValue::from_str(&e.to_string()))
 }
@@ -96,21 +143,19 @@ pub fn generate_barcode_wasm(format: &str, value: &str, width: u32, height: u32,
         include_text,
     };
 
-    let cache_mutex = BARCODE_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut barcode_guard = BARCODE_CACHE.lock().unwrap();
+    let cache = barcode_guard.get_or_insert_with(HashMap::new);
 
     // Cache hit?
-    {
-        let cache = cache_mutex.lock().unwrap();
-        if let Some(cached_data) = cache.get(&cache_key) {
-            let arr = js_sys::Uint8ClampedArray::new_with_length(cached_data.len() as u32);
-            arr.copy_from(cached_data);
-            return Ok(arr);
-        }
+    if let Some(cached_data) = cache.get(&cache_key) {
+        let arr = js_sys::Uint8ClampedArray::new_with_length(cached_data.len() as u32);
+        arr.copy_from(cached_data);
+        return Ok(arr);
     }
 
-    // Cache miss — üret
-    let fonts = FONTS.get().map(|f| f.as_slice());
-    let result = crate::barcode_gen::generate_barcode_pixels(format, value, width, height, include_text, fonts)
+    let fonts = FONTS.lock().unwrap();
+    let fonts_slice: Option<&[FontData]> = if fonts.is_empty() { None } else { Some(&fonts) };
+    let result = crate::barcode_gen::generate_barcode_pixels(format, value, width, height, include_text, fonts_slice)
         .map_err(|e| JsValue::from_str(&e))?;
 
     // Grayscale → RGBA (canvas ImageData formatı)
@@ -132,7 +177,7 @@ pub fn generate_barcode_wasm(format: &str, value: &str, width: u32, height: u32,
     arr.copy_from(&data);
 
     // Cache'e kaydet
-    cache_mutex.lock().unwrap().insert(cache_key, data);
+    cache.insert(cache_key, data);
 
     Ok(arr)
 }

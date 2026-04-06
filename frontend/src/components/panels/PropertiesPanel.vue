@@ -38,10 +38,14 @@ const templateStore = useTemplateStore()
 const editorStore = useEditorStore()
 
 const selectedElement = computed(() => {
-  const id = editorStore.selectedElementId
+  const ids = editorStore.selectedElementIds
+  if (ids.size !== 1) return null
+  const id = ids.values().next().value
   if (!id) return null
   return templateStore.getElementById(id) ?? null
 })
+
+const multipleSelected = computed(() => editorStore.selectedElementIds.size > 1)
 
 const elementTypeLabel = computed(() => {
   const el = selectedElement.value
@@ -87,11 +91,24 @@ function deleteElement() {
   editorStore.clearSelection()
   templateStore.removeElement(id)
 }
+
+function deleteSelected() {
+  const ids = [...editorStore.selectedElementIds]
+  editorStore.clearSelection()
+  for (const id of ids) {
+    if (id !== 'root') templateStore.removeElement(id)
+  }
+}
 </script>
 
 <template>
   <div class="properties-panel">
-    <div v-if="!selectedElement" class="properties-panel__empty">
+    <div v-if="multipleSelected" class="properties-panel__empty">
+      {{ editorStore.selectedElementIds.size }} eleman secili
+      <button class="prop-delete-btn" style="margin-top: 12px" @click="deleteSelected">Secilenleri Sil</button>
+    </div>
+
+    <div v-else-if="!selectedElement" class="properties-panel__empty">
       Bir eleman secin
     </div>
 

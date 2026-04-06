@@ -65,25 +65,34 @@ fn dexpr_value_to_string(val: &DexprValue) -> String {
     }
 }
 
-/// Format result with given format type
+/// Format result with given format type (varsayılan Türk formatı)
 pub fn apply_format(value: &str, format: Option<&str>) -> String {
+    apply_format_with_config(value, format, &dreport_core::models::FormatConfig::default())
+}
+
+/// Format result with given format type and config
+pub fn apply_format_with_config(value: &str, format: Option<&str>, config: &dreport_core::models::FormatConfig) -> String {
     match format {
-        Some("currency") => format_currency(value),
+        Some("currency") => format_currency(value, config),
         Some("percentage") => format_percentage(value),
-        Some("number") => format_number_str(value),
+        Some("number") => format_number_str(value, config),
         _ => value.to_string(),
     }
 }
 
-fn format_currency(value: &str) -> String {
+fn format_currency(value: &str, config: &dreport_core::models::FormatConfig) -> String {
     if let Ok(n) = value.parse::<f64>() {
         let abs = n.abs();
         let integer = abs.floor() as i64;
         let frac = ((abs - abs.floor()) * 100.0).round() as i64;
 
-        let int_str = format_with_thousands(integer);
+        let int_str = format_with_thousands(integer, &config.thousands_separator);
         let sign = if n < 0.0 { "-" } else { "" };
-        format!("{}{},{:02} ₺", sign, int_str, frac)
+        if config.currency_position == "prefix" {
+            format!("{}{}{}{}{:02}", config.currency_symbol, sign, int_str, config.decimal_separator, frac)
+        } else {
+            format!("{}{}{}{:02} {}", sign, int_str, config.decimal_separator, frac, config.currency_symbol)
+        }
     } else {
         value.to_string()
     }
@@ -97,19 +106,21 @@ fn format_percentage(value: &str) -> String {
     }
 }
 
-fn format_number_str(value: &str) -> String {
+fn format_number_str(value: &str, config: &dreport_core::models::FormatConfig) -> String {
     if let Ok(n) = value.parse::<f64>() {
         if n == n.floor() && n.abs() < 1e15 {
-            format_with_thousands(n.abs() as i64)
+            format_with_thousands(n.abs() as i64, &config.thousands_separator)
         } else {
-            format!("{:.2}", n)
+            // Ondalık ayırıcıyı config'den al
+            let formatted = format!("{:.2}", n);
+            formatted.replace('.', &config.decimal_separator)
         }
     } else {
         value.to_string()
     }
 }
 
-fn format_with_thousands(n: i64) -> String {
+fn format_with_thousands(n: i64, separator: &str) -> String {
     let s = n.to_string();
     let len = s.len();
     if len <= 3 {
@@ -118,7 +129,7 @@ fn format_with_thousands(n: i64) -> String {
     let mut result = String::new();
     for (i, ch) in s.chars().enumerate() {
         if i > 0 && (len - i) % 3 == 0 {
-            result.push('.');
+            result.push_str(separator);
         }
         result.push(ch);
     }

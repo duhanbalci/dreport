@@ -3,7 +3,8 @@ import { ref, computed } from 'vue'
 import type { TemplateElement } from '../core/types'
 
 export const useEditorStore = defineStore('editor', () => {
-  const selectedElementId = ref<string | null>(null)
+  /** Seçili eleman ID'leri — çoklu seçim desteği */
+  const selectedElementIds = ref<Set<string>>(new Set())
   const zoom = ref(1)
   const panX = ref(0)
   const panY = ref(0)
@@ -15,12 +16,36 @@ export const useEditorStore = defineStore('editor', () => {
 
   const zoomPercent = computed(() => Math.round(zoom.value * 100))
 
+  /** Geriye uyumluluk: tek seçili eleman ID'si (ilk seçili veya null) */
+  const selectedElementId = computed<string | null>(() => {
+    const ids = selectedElementIds.value
+    if (ids.size === 0) return null
+    return ids.values().next().value ?? null
+  })
+
+  /** Tek eleman seç (önceki seçimi temizler) */
   function selectElement(id: string | null) {
-    selectedElementId.value = id
+    selectedElementIds.value = id ? new Set([id]) : new Set()
+  }
+
+  /** Shift+click: seçime ekle/çıkar (toggle) */
+  function toggleSelection(id: string) {
+    const next = new Set(selectedElementIds.value)
+    if (next.has(id)) {
+      next.delete(id)
+    } else {
+      next.add(id)
+    }
+    selectedElementIds.value = next
+  }
+
+  /** Eleman seçili mi? */
+  function isSelected(id: string): boolean {
+    return selectedElementIds.value.has(id)
   }
 
   function clearSelection() {
-    selectedElementId.value = null
+    selectedElementIds.value = new Set()
   }
 
   function setZoom(value: number) {
@@ -56,6 +81,7 @@ export const useEditorStore = defineStore('editor', () => {
   }
 
   return {
+    selectedElementIds,
     selectedElementId,
     zoom,
     panX,
@@ -65,6 +91,8 @@ export const useEditorStore = defineStore('editor', () => {
     dropTargetContainerId,
     zoomPercent,
     selectElement,
+    toggleSelection,
+    isSelected,
     clearSelection,
     setZoom,
     setPan,

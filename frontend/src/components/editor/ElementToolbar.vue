@@ -96,6 +96,12 @@ function updateChartStyle(key: string, value: unknown) {
   if (!selected.value) return
   update({ style: { ...selected.value.style, [key]: value } })
 }
+
+// Z-order
+function bringForward() { if (selected.value) templateStore.bringForward(selected.value.id) }
+function sendBackward() { if (selected.value) templateStore.sendBackward(selected.value.id) }
+function bringToFront() { if (selected.value) templateStore.bringToFront(selected.value.id) }
+function sendToBack() { if (selected.value) templateStore.sendToBack(selected.value.id) }
 </script>
 
 <template>
@@ -407,6 +413,37 @@ function updateChartStyle(key: string, value: unknown) {
             <line x1="2" y1="7" x2="12" y2="7" :stroke="(selected!.style as any).strokeColor ?? '#000000'" stroke-width="2.5" stroke-linecap="round"/>
           </svg>
         </label>
+      </div>
+    </template>
+
+    <!-- ===== Z-Order (tüm elemanlar) ===== -->
+    <template v-if="selected">
+      <div class="et__sep" />
+      <div class="et__group">
+        <button class="et__btn" data-tip="Arkaya Gonder" @click="sendToBack">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="5" y="5" width="7" height="7" rx="1" fill="currentColor" opacity="0.3"/>
+            <rect x="2" y="2" width="7" height="7" rx="1" fill="currentColor"/>
+          </svg>
+        </button>
+        <button class="et__btn" data-tip="Bir Geri" @click="sendBackward">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="5" y="5" width="7" height="7" rx="1" fill="currentColor" opacity="0.3"/>
+            <rect x="2" y="2" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.2" fill="none"/>
+          </svg>
+        </button>
+        <button class="et__btn" data-tip="Bir Ileri" @click="bringForward">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="2" y="2" width="7" height="7" rx="1" fill="currentColor" opacity="0.3"/>
+            <rect x="5" y="5" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.2" fill="none"/>
+          </svg>
+        </button>
+        <button class="et__btn" data-tip="One Getir" @click="bringToFront">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="2" y="2" width="7" height="7" rx="1" fill="currentColor" opacity="0.3"/>
+            <rect x="5" y="5" width="7" height="7" rx="1" fill="currentColor"/>
+          </svg>
+        </button>
       </div>
     </template>
   </div>

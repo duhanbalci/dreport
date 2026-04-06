@@ -134,17 +134,23 @@ impl FontCollection {
             };
 
             let family_lower = fd.family.to_lowercase();
-            let is_bold = is_font_bold(&fd.data);
-            let is_italic = is_font_italic(&fd.data);
+            let is_bold = fd.is_bold();
+            let is_italic = fd.italic;
 
             // Default font: ilk regular (non-bold, non-italic)
             if default.is_none() && !is_bold && !is_italic {
                 default = Some(font.clone());
             }
 
-            // Font metriklerini OS/2 tablosundan oku
-            if let Some(m) = read_font_metrics(&fd.data) {
-                metrics.insert((family_lower.clone(), is_bold), m);
+            // Font metriklerini font_meta'dan oku
+            if let Some(meta) = crate::font_meta::parse_font_meta(&fd.data) {
+                let units_per_em = meta.units_per_em;
+                if units_per_em > 0 {
+                    metrics.insert((family_lower.clone(), is_bold), FontMetrics {
+                        ascender: meta.ascender as f32 / units_per_em as f32,
+                        descender: meta.descender.unsigned_abs() as f32 / units_per_em as f32,
+                    });
+                }
             }
 
             fonts.insert((family_lower.clone(), is_bold, is_italic), font);
@@ -160,13 +166,14 @@ impl FontCollection {
         Self { fonts, default, metrics }
     }
 
-    fn get(&self, family: Option<&str>, weight: Option<&str>) -> Option<&KrillaFont> {
+    fn get(&self, family: Option<&str>, weight: Option<&str>, font_style: Option<&str>) -> Option<&KrillaFont> {
         let is_bold = matches!(weight, Some("bold"));
+        let is_italic = matches!(font_style, Some("italic"));
         let family_lower = family.unwrap_or("noto sans").to_lowercase();
 
-        // Her zaman non-italic font ara (italic desteği henüz yok)
         self.fonts
-            .get(&(family_lower.clone(), is_bold, false))
+            .get(&(family_lower.clone(), is_bold, is_italic))
+            .or_else(|| self.fonts.get(&(family_lower.clone(), is_bold, false)))
             .or_else(|| self.fonts.get(&(family_lower, false, false)))
             .or(self.default.as_ref())
     }
@@ -198,102 +205,8 @@ impl FontCollection {
     }
 }
 
-/// TTF OS/2 tablosundan font metriklerini oku
-fn read_font_metrics(data: &[u8]) -> Option<FontMetrics> {
-    let units_per_em = read_units_per_em(data)?;
-    if units_per_em == 0 {
-        return None;
-    }
-
-    let table_offset = find_os2_table(data)?;
-    // sTypoAscender: offset 68 (int16), sTypoDescender: offset 70 (int16, negatif)
-    if table_offset + 72 > data.len() {
-        return None;
-    }
-    let ascender = i16::from_be_bytes([data[table_offset + 68], data[table_offset + 69]]);
-    let descender = i16::from_be_bytes([data[table_offset + 70], data[table_offset + 71]]);
-
-    Some(FontMetrics {
-        ascender: ascender as f32 / units_per_em as f32,
-        descender: descender.unsigned_abs() as f32 / units_per_em as f32,
-    })
-}
-
-/// TTF head tablosundan unitsPerEm oku
-fn read_units_per_em(data: &[u8]) -> Option<u16> {
-    if data.len() < 12 {
-        return None;
-    }
-    let num_tables = u16::from_be_bytes([data[4], data[5]]) as usize;
-    let mut offset = 12;
-    for _ in 0..num_tables {
-        if offset + 16 > data.len() {
-            break;
-        }
-        let tag = &data[offset..offset + 4];
-        if tag == b"head" {
-            let table_offset =
-                u32::from_be_bytes([data[offset + 8], data[offset + 9], data[offset + 10], data[offset + 11]])
-                    as usize;
-            // unitsPerEm: head tablosunda offset 18 (uint16)
-            if table_offset + 20 <= data.len() {
-                return Some(u16::from_be_bytes([data[table_offset + 18], data[table_offset + 19]]));
-            }
-            return None;
-        }
-        offset += 16;
-    }
-    None
-}
-
-/// TTF OS/2 tablosunun offset'ini bul
-fn find_os2_table(data: &[u8]) -> Option<usize> {
-    if data.len() < 12 {
-        return None;
-    }
-    let num_tables = u16::from_be_bytes([data[4], data[5]]) as usize;
-    let mut offset = 12;
-    for _ in 0..num_tables {
-        if offset + 16 > data.len() {
-            break;
-        }
-        let tag = &data[offset..offset + 4];
-        if tag == b"OS/2" {
-            let table_offset =
-                u32::from_be_bytes([data[offset + 8], data[offset + 9], data[offset + 10], data[offset + 11]])
-                    as usize;
-            return Some(table_offset);
-        }
-        offset += 16;
-    }
-    None
-}
-
-/// TTF dosyasının bold olup olmadığını OS/2 tablosundan kontrol et
-fn is_font_bold(data: &[u8]) -> bool {
-    let Some(table_offset) = find_os2_table(data) else {
-        return false;
-    };
-    // usWeightClass is at offset 4 in OS/2 table
-    if table_offset + 6 <= data.len() {
-        let weight_class = u16::from_be_bytes([data[table_offset + 4], data[table_offset + 5]]);
-        return weight_class >= 700;
-    }
-    false
-}
-
-/// TTF dosyasının italic olup olmadığını OS/2 tablosundan kontrol et
-fn is_font_italic(data: &[u8]) -> bool {
-    let Some(table_offset) = find_os2_table(data) else {
-        return false;
-    };
-    // fsSelection is at offset 62 in OS/2 table, bit 0 = ITALIC
-    if table_offset + 64 <= data.len() {
-        let fs_selection = u16::from_be_bytes([data[table_offset + 62], data[table_offset + 63]]);
-        return fs_selection & 0x0001 != 0;
-    }
-    false
-}
+// OS/2 table parsing is now handled by font_meta module.
+// FontData.weight and FontData.italic carry pre-parsed metadata.
 
 /// LayoutResult → PDF bytes
 pub fn render_pdf(layout: &LayoutResult, font_data: &[FontData]) -> Result<Vec<u8>, String> {
@@ -623,6 +536,7 @@ fn render_text(
     let Some(font) = fonts.get(
         style.font_family.as_deref(),
         style.font_weight.as_deref(),
+        style.font_style.as_deref(),
     ) else {
         return;
     };
@@ -631,40 +545,48 @@ fn render_text(
     surface.set_stroke(None);
 
     // Text baseline: CSS line-height 1.2 modeline uygun hesapla
-    let baseline_y = y + fonts.baseline_offset(
+    let baseline_offset = fonts.baseline_offset(
         style.font_family.as_deref(),
         style.font_weight.as_deref(),
         font_size,
     );
 
-    // Hizalama — cosmic-text ile text genişliğini ölçerek gerçek pozisyon hesapla
-    let text_x = match style.text_align.as_deref() {
-        Some("center") | Some("right") => {
-            let (text_width_pt, _) = measurer.measure(
-                text,
-                style.font_family.as_deref(),
-                font_size,
-                style.font_weight.as_deref(),
-                None,
-            );
-
-            if style.text_align.as_deref() == Some("center") {
-                x + (w - text_width_pt) / 2.0
-            } else {
-                x + w - text_width_pt
-            }
-        }
-        _ => x,
-    };
-
-    surface.draw_text(
-        Point::from_xy(text_x, baseline_y),
-        font.clone(),
-        font_size,
+    // cosmic-text ile text'i satırlara böl (wrapping)
+    let lines = measurer.layout_lines(
         text,
-        false,
-        TextDirection::Auto,
+        style.font_family.as_deref(),
+        font_size,
+        style.font_weight.as_deref(),
+        w,
     );
+
+    if lines.is_empty() {
+        return;
+    }
+
+    for line in &lines {
+        if line.text.is_empty() {
+            continue;
+        }
+
+        let line_y = y + line.y_offset_pt + baseline_offset;
+
+        // Hizalama
+        let line_x = match style.text_align.as_deref() {
+            Some("center") => x + (w - line.width_pt) / 2.0,
+            Some("right") => x + w - line.width_pt,
+            _ => x,
+        };
+
+        surface.draw_text(
+            Point::from_xy(line_x, line_y),
+            font.clone(),
+            font_size,
+            &line.text,
+            false,
+            TextDirection::Auto,
+        );
+    }
 }
 
 fn render_rich_text(
@@ -728,7 +650,7 @@ fn render_rich_text(
 
         let color = parse_color(color_str);
 
-        let Some(font) = fonts.get(family, weight) else {
+        let Some(font) = fonts.get(family, weight, None) else {
             continue;
         };
 
@@ -908,7 +830,11 @@ fn render_chart(
     fonts: &FontCollection,
     measurer: &mut TextMeasurer,
 ) {
-    // Tum hesaplar mm cinsinden yapilir, cizim pt'ye cevrilir
+    use crate::chart_layout::{
+        color_at, compute_bar_layout, compute_chart_layout, compute_legend,
+        compute_line_layout, compute_pie_layout, format_value,
+    };
+
     let base_x_mm: f64 = (x / MM_TO_PT) as f64;
     let base_y_mm: f64 = (y / MM_TO_PT) as f64;
     let w_mm: f64 = (w / MM_TO_PT) as f64;
@@ -918,112 +844,166 @@ fn render_chart(
     chart_rect(surface, base_x_mm, base_y_mm, w_mm, h_mm,
         parse_color(data.background_color.as_deref().unwrap_or("#FFFFFF")));
 
-    // Margin hesaplari — SVG renderer ile AYNI mantik
-    let mut margin_top = 2.0_f64;
-    let mut margin_bottom = 4.0_f64;
-    let mut margin_left = 8.0_f64;
-    let margin_right = 4.0_f64;
+    let cl = compute_chart_layout(data, w_mm, h_mm, base_x_mm, base_y_mm);
 
     // Title
-    if let Some(ref title) = data.title_text {
-        if !title.is_empty() {
-            let fs = data.title_font_size.unwrap_or(4.0);
-            margin_top += fs * 0.4 + 2.0;
-            let color = parse_color(data.title_color.as_deref().unwrap_or("#333333"));
-            let font = fonts.get(None, Some("bold"));
-            if let Some(f) = font {
-                surface.set_fill(Some(fill_from_color(color)));
-                surface.set_stroke(None);
-                let fs_pt = pt(fs);
-                let (tw, _) = measurer.measure(title, None, fs_pt, Some("bold"), None);
-                let align = data.title_align.as_deref().unwrap_or("center");
-                let tx = match align {
-                    "left" => pt(base_x_mm + margin_left),
-                    "right" => pt(base_x_mm + w_mm - margin_right) - tw,
-                    _ => pt(base_x_mm + w_mm / 2.0) - tw / 2.0,
+    if let Some(ref title) = cl.title {
+        let color = parse_color(&title.color);
+        let font = fonts.get(None, Some("bold"), None);
+        if let Some(f) = font {
+            surface.set_fill(Some(fill_from_color(color)));
+            surface.set_stroke(None);
+            let fs_pt = pt(title.font_size);
+            let (tw, _) = measurer.measure(&title.text, None, fs_pt, Some("bold"), None);
+            let tx = match title.align.as_str() {
+                "left" => pt(title.x),
+                "right" => pt(title.x) - tw,
+                _ => pt(title.x) - tw / 2.0,
+            };
+            let ty = pt(title.y);
+            surface.draw_text(
+                Point::from_xy(tx, ty),
+                f.clone(), fs_pt, &title.text, false, TextDirection::Auto,
+            );
+        }
+    }
+
+    use dreport_core::models::ChartType;
+    match data.chart_type {
+        ChartType::Bar => {
+            let bl = compute_bar_layout(data, &cl);
+            render_chart_y_axis(surface, &bl.y_axis, fonts, measurer);
+            for bar in &bl.bars {
+                let color = parse_color(color_at(&cl.palette, bar.color_idx));
+                chart_rect(surface, bar.x, bar.y, bar.w, bar.h, color);
+                if bl.show_labels {
+                    if bl.stacked {
+                        if bar.value > 0.0 {
+                            let label = format_value(bar.value);
+                            chart_text_centered(surface, bar.label_x, bar.label_y, &label, bl.label_font, &bl.label_color, fonts, measurer);
+                        }
+                    } else {
+                        let label = format_value(bar.value);
+                        chart_text_centered(surface, bar.label_x, bar.label_y, &label, bl.label_font, &bl.label_color, fonts, measurer);
+                    }
+                }
+            }
+            render_chart_x_labels(surface, &bl.x_labels, fonts, measurer);
+            let ac = parse_color("#9CA3AF");
+            chart_line_seg(surface, bl.x_axis_x1, bl.x_axis_y, bl.x_axis_x2, bl.x_axis_y, ac, 0.8);
+        }
+        ChartType::Line => {
+            let ll = compute_line_layout(data, &cl);
+            render_chart_y_axis(surface, &ll.y_axis, fonts, measurer);
+            for series_layout in &ll.series {
+                let color = parse_color(color_at(&cl.palette, series_layout.color_idx));
+                // Polyline
+                let points: Vec<(f64, f64)> = series_layout.points.iter().map(|p| (p.x, p.y)).collect();
+                surface.set_fill(None);
+                surface.set_stroke(Some(Stroke {
+                    paint: color.into(),
+                    width: pt(ll.line_width),
+                    opacity: NormalizedF32::ONE,
+                    ..Default::default()
+                }));
+                let path = {
+                    let mut pb = PathBuilder::new();
+                    for (i, (lx, ly)) in points.iter().enumerate() {
+                        if i == 0 { pb.move_to(pt(*lx), pt(*ly)); }
+                        else { pb.line_to(pt(*lx), pt(*ly)); }
+                    }
+                    pb.finish()
                 };
-                let ty = pt(base_y_mm + margin_top - 1.0);
-                surface.draw_text(
-                    Point::from_xy(tx, ty),
-                    f.clone(), fs_pt, title, false, TextDirection::Auto,
-                );
+                if let Some(p) = path { surface.draw_path(&p); }
+
+                // Points
+                if ll.show_points {
+                    for (lx, ly) in &points {
+                        let r = pt(0.8);
+                        let cx = pt(*lx);
+                        let cy = pt(*ly);
+                        surface.set_fill(Some(fill_from_color(color)));
+                        surface.set_stroke(None);
+                        let circle = {
+                            let mut pb = PathBuilder::new();
+                            let k = r * 0.5522848;
+                            pb.move_to(cx, cy - r);
+                            pb.cubic_to(cx + k, cy - r, cx + r, cy - k, cx + r, cy);
+                            pb.cubic_to(cx + r, cy + k, cx + k, cy + r, cx, cy + r);
+                            pb.cubic_to(cx - k, cy + r, cx - r, cy + k, cx - r, cy);
+                            pb.cubic_to(cx - r, cy - k, cx - k, cy - r, cx, cy - r);
+                            pb.close();
+                            pb.finish()
+                        };
+                        if let Some(p) = circle { surface.draw_path(&p); }
+                    }
+                }
+
+                // Value labels
+                if ll.show_labels {
+                    for lp in &series_layout.points {
+                        let label = format_value(lp.value);
+                        chart_text_centered(surface, lp.x, lp.y - 1.5, &label, ll.label_font, &ll.label_color, fonts, measurer);
+                    }
+                }
+            }
+            render_chart_x_labels(surface, &ll.x_labels, fonts, measurer);
+            let ac = parse_color("#9CA3AF");
+            chart_line_seg(surface, ll.x_axis_x1, ll.x_axis_y, ll.x_axis_x2, ll.x_axis_y, ac, 0.8);
+        }
+        ChartType::Pie => {
+            let pl = compute_pie_layout(data, &cl);
+            for slice in &pl.slices {
+                let color = parse_color(color_at(&cl.palette, slice.color_idx));
+                surface.set_fill(Some(fill_from_color(color)));
+                surface.set_stroke(Some(Stroke {
+                    paint: rgb::Color::new(255, 255, 255).into(),
+                    width: 0.8,
+                    opacity: NormalizedF32::ONE,
+                    ..Default::default()
+                }));
+                let path = build_arc_path(pl.cx, pl.cy, pl.radius, pl.inner_radius, slice.start_angle, slice.end_angle);
+                if let Some(p) = path { surface.draw_path(&p); }
+
+                if pl.show_labels {
+                    let pct = (slice.fraction * 100.0).round();
+                    let label = format!("{}%", pct);
+                    chart_text_centered(surface, slice.label_x, slice.label_y, &label, pl.label_font, &pl.label_color, fonts, measurer);
+                }
+
+                if !slice.cat_label_text.is_empty() {
+                    chart_line_seg(surface, slice.leader_start_x, slice.leader_start_y, slice.leader_end_x, slice.leader_end_y, parse_color("#999999"), 0.5);
+                    if slice.cat_label_anchor_end {
+                        chart_text_end(surface, slice.cat_label_x, slice.cat_label_y, &slice.cat_label_text, 2.5, "#555555", fonts, measurer);
+                    } else {
+                        chart_text_start(surface, slice.cat_label_x, slice.cat_label_y, &slice.cat_label_text, 2.5, "#555555", fonts, measurer);
+                    }
+                }
             }
         }
     }
 
-    // Legend space
-    let legend_show = data.legend_show;
-    let legend_pos = data.legend_position.as_deref().unwrap_or("bottom");
-    let legend_font = data.legend_font_size.unwrap_or(2.8);
-
-    if legend_show && data.series.len() > 1 {
-        match legend_pos {
-            "top" => margin_top += legend_font + 3.0,
-            "bottom" => margin_bottom += legend_font + 3.0,
-            _ => {} // right — icerde handle edilecek
-        }
-    }
-
-    let is_pie = matches!(data.chart_type, dreport_core::models::ChartType::Pie);
-
-    // Axis labels icin yer ac (bar ve line) — SVG ile ayni
-    if !is_pie {
-        if data.x_label.is_some() {
-            margin_bottom += 4.0;
-        }
-        if data.y_label.is_some() {
-            margin_left += 4.0;
-        }
-        // Category labels icin alt bosluk
-        let max_label_len = data.categories.iter().map(|c| c.len()).max().unwrap_or(0);
-        let n_cats = data.categories.len();
-        let available_w = w_mm - margin_left - margin_right;
-        let cat_width = if n_cats > 0 { available_w / n_cats as f64 } else { available_w };
-        let max_chars_fit = (cat_width / 1.25).max(1.0) as usize;
-        let will_rotate = max_label_len > max_chars_fit;
-        if will_rotate {
-            let char_w_mm = 1.1;
-            let max_text_w = max_label_len as f64 * char_w_mm;
-            let label_v = max_text_w * 0.707;
-            margin_bottom += label_v.min(25.0).max(6.0);
-            let label_h = max_text_w * 0.707;
-            let extra_left = (label_h - cat_width / 2.0).max(0.0);
-            margin_left += extra_left.min(10.0);
-        } else {
-            margin_bottom += 4.0;
-        }
-        // Y-axis value labels icin sol bosluk
-        margin_left += 6.0;
-    }
-
-    let plot_x = base_x_mm + margin_left;
-    let plot_y = base_y_mm + margin_top;
-    let plot_w = (w_mm - margin_left - margin_right).max(1.0);
-    let plot_h = (h_mm - margin_top - margin_bottom).max(1.0);
-
-    use dreport_core::models::ChartType;
-    match data.chart_type {
-        ChartType::Bar => render_chart_bar(surface, data, plot_x, plot_y, plot_w, plot_h, fonts, measurer),
-        ChartType::Line => render_chart_line(surface, data, plot_x, plot_y, plot_w, plot_h, fonts, measurer),
-        ChartType::Pie => render_chart_pie(surface, data, plot_x, plot_y, plot_w, plot_h, fonts, measurer),
-    }
-
     // Legend render
-    if legend_show && data.series.len() > 1 {
-        render_chart_legend(surface, data, legend_pos, legend_font, base_x_mm, base_y_mm, w_mm, h_mm, margin_left, margin_top, plot_w, plot_h, fonts, measurer);
+    if cl.legend_show && data.series.len() > 1 {
+        let legend = compute_legend(data, &cl, base_x_mm, base_y_mm, w_mm, h_mm);
+        for item in &legend.items {
+            let color = parse_color(color_at(&cl.palette, item.color_idx));
+            chart_rect(surface, item.swatch_x, item.swatch_y, legend.swatch_size, legend.swatch_size, color);
+            chart_text_start(surface, item.text_x, item.text_y, &item.name, legend.font_size, "#666666", fonts, measurer);
+        }
     }
 
     // Axis labels
+    let is_pie = matches!(data.chart_type, ChartType::Pie);
     if !is_pie {
         if let Some(ref x_label) = data.x_label {
-            let lx = plot_x + plot_w / 2.0;
+            let lx = cl.plot_x + cl.plot_w / 2.0;
             let ly = base_y_mm + h_mm - 2.0;
             chart_text_centered(surface, lx, ly, x_label, 2.8, "#666666", fonts, measurer);
         }
         if let Some(ref y_label) = data.y_label {
             let lx = base_x_mm + 3.0;
-            let ly = plot_y + plot_h / 2.0;
-            // Rotated text — krilla'da transform ile
+            let ly = cl.plot_y + cl.plot_h / 2.0;
             surface.push_transform(&Transform::from_translate(pt(lx), pt(ly)));
             surface.push_transform(&Transform::from_row(0.0, -1.0, 1.0, 0.0, 0.0, 0.0));
             chart_text_centered(surface, 0.0, 0.0, y_label, 2.8, "#666666", fonts, measurer);
@@ -1078,7 +1058,7 @@ fn chart_text_centered(
     text: &str, font_size_mm: f64, color_hex: &str,
     fonts: &FontCollection, measurer: &mut TextMeasurer,
 ) {
-    let font = fonts.get(None, None);
+    let font = fonts.get(None, None, None);
     let Some(f) = font else { return; };
     let color = parse_color(color_hex);
     let fs_pt = pt(font_size_mm);
@@ -1098,7 +1078,7 @@ fn chart_text_end(
     text: &str, font_size_mm: f64, color_hex: &str,
     fonts: &FontCollection, measurer: &mut TextMeasurer,
 ) {
-    let font = fonts.get(None, None);
+    let font = fonts.get(None, None, None);
     let Some(f) = font else { return; };
     let color = parse_color(color_hex);
     let fs_pt = pt(font_size_mm);
@@ -1118,7 +1098,7 @@ fn chart_text_start(
     text: &str, font_size_mm: f64, color_hex: &str,
     fonts: &FontCollection, _measurer: &mut TextMeasurer,
 ) {
-    let font = fonts.get(None, None);
+    let font = fonts.get(None, None, None);
     let Some(f) = font else { return; };
     let color = parse_color(color_hex);
     let fs_pt = pt(font_size_mm);
@@ -1130,419 +1110,42 @@ fn chart_text_start(
     );
 }
 
-fn chart_format_value(v: f64) -> String {
-    if v.abs() >= 1_000_000.0 {
-        format!("{:.1}M", v / 1_000_000.0)
-    } else if v.abs() >= 1_000.0 {
-        format!("{:.1}K", v / 1_000.0)
-    } else if v.fract().abs() < 1e-10 {
-        format!("{}", v as i64)
-    } else {
-        format!("{:.1}", v)
-    }
-}
-
-/// Y-axis grid + value labels (SVG render_y_axis ile ayni)
+/// Y-axis grid + value labels — consumes shared YAxisLayout
 fn render_chart_y_axis(
     surface: &mut krilla::surface::Surface<'_>,
-    min_val: f64, max_val: f64,
-    px: f64, py: f64, pw: f64, ph: f64,
-    show_grid: bool, grid_color: &str,
+    y_axis: &crate::chart_layout::YAxisLayout,
     fonts: &FontCollection, measurer: &mut TextMeasurer,
 ) {
-    let range = if (max_val - min_val).abs() < 1e-10 { 1.0 } else { max_val - min_val };
-    let tick_count = 5;
-    for i in 0..=tick_count {
-        let frac = i as f64 / tick_count as f64;
-        let val = min_val + frac * range;
-        let y = py + ph - frac * ph;
-
-        // Value label
-        let label = chart_format_value(val);
-        chart_text_end(surface, px - 1.5, y + 0.8, &label, 2.3, "#666666", fonts, measurer);
-
-        // Grid line
-        if show_grid {
-            let gc = parse_color(grid_color);
-            chart_line_seg(surface, px, y, px + pw, y, gc, 0.4);
+    for tick in &y_axis.ticks {
+        chart_text_end(surface, y_axis.axis_x - 1.5, tick.y + 0.8, &tick.label, 2.3, "#666666", fonts, measurer);
+        if y_axis.show_grid {
+            let gc = parse_color(&y_axis.grid_color);
+            chart_line_seg(surface, y_axis.axis_x, tick.y, y_axis.grid_end_x, tick.y, gc, 0.4);
         }
     }
-
     // Y axis line
     let ac = parse_color("#9CA3AF");
-    chart_line_seg(surface, px, py, px, py + ph, ac, 0.8);
+    chart_line_seg(surface, y_axis.axis_x, y_axis.axis_y_start, y_axis.axis_x, y_axis.axis_y_end, ac, 0.8);
 }
 
-/// X-axis category labels — bar chart (slot-based spacing)
+/// X-axis category labels — consumes shared XLabelLayout
 fn render_chart_x_labels(
     surface: &mut krilla::surface::Surface<'_>,
-    categories: &[String],
-    px: f64, baseline_y: f64, pw: f64,
+    x_labels: &crate::chart_layout::XLabelLayout,
     fonts: &FontCollection, measurer: &mut TextMeasurer,
 ) {
-    let n_cats = categories.len();
-    if n_cats == 0 { return; }
-    let cat_width = pw / n_cats as f64;
-    let max_chars = (cat_width / 1.25).max(1.0) as usize;
-    let needs_rotate = categories.iter().any(|c| c.len() > max_chars);
-
-    for (ci, cat) in categories.iter().enumerate() {
-        let x = px + ci as f64 * cat_width + cat_width / 2.0;
-        let y = baseline_y + 2.5;
-        render_chart_single_x_label(surface, cat, x, y, needs_rotate, fonts, measurer);
-    }
-}
-
-/// X-axis category labels — line chart (point-based spacing)
-fn render_chart_x_labels_line(
-    surface: &mut krilla::surface::Surface<'_>,
-    categories: &[String],
-    px: f64, baseline_y: f64, pw: f64,
-    fonts: &FontCollection, measurer: &mut TextMeasurer,
-) {
-    let n_cats = categories.len();
-    if n_cats == 0 { return; }
-    let spacing = if n_cats == 1 { pw } else { pw / (n_cats - 1) as f64 };
-    let max_chars = (spacing / 1.25).max(1.0) as usize;
-    let needs_rotate = categories.iter().any(|c| c.len() > max_chars);
-
-    for (ci, cat) in categories.iter().enumerate() {
-        let x = if n_cats == 1 { px + pw / 2.0 } else { px + ci as f64 * pw / (n_cats - 1) as f64 };
-        let y = baseline_y + 2.5;
-        render_chart_single_x_label(surface, cat, x, y, needs_rotate, fonts, measurer);
-    }
-}
-
-/// Tek bir X-axis label — rotate gerekiyorsa -45° ile
-fn render_chart_single_x_label(
-    surface: &mut krilla::surface::Surface<'_>,
-    text: &str, x_mm: f64, y_mm: f64, rotate: bool,
-    fonts: &FontCollection, measurer: &mut TextMeasurer,
-) {
-    if rotate {
-        // -45° rotate, text-anchor="end"
-        surface.push_transform(&Transform::from_translate(pt(x_mm), pt(y_mm)));
-        // rotate(-45°) = cos(-45), sin(-45), -sin(-45), cos(-45)
-        let c = std::f32::consts::FRAC_PI_4.cos();
-        let s = std::f32::consts::FRAC_PI_4.sin();
-        surface.push_transform(&Transform::from_row(c, -s, s, c, 0.0, 0.0));
-        // end-aligned: text saga hizali (negatif x'e dogru)
-        chart_text_end(surface, 0.0, 0.0, text, 2.2, "#666666", fonts, measurer);
-        surface.pop();
-        surface.pop();
-    } else {
-        chart_text_centered(surface, x_mm, y_mm, text, 2.5, "#666666", fonts, measurer);
-    }
-}
-
-/// Legend render
-fn render_chart_legend(
-    surface: &mut krilla::surface::Surface<'_>,
-    data: &crate::ChartRenderData,
-    position: &str, font_size: f64,
-    base_x: f64, base_y: f64,
-    total_w: f64, total_h: f64,
-    margin_left: f64, margin_top: f64,
-    plot_w: f64, _plot_h: f64,
-    fonts: &FontCollection, measurer: &mut TextMeasurer,
-) {
-    use dreport_core::models::ChartType;
-    let names: Vec<&str> = if matches!(data.chart_type, ChartType::Pie) {
-        data.categories.iter().map(|s| s.as_str()).collect()
-    } else {
-        data.series.iter().map(|s| s.name.as_str()).collect()
-    };
-
-    let swatch_size = 2.5;
-    let item_gap = 3.0 + font_size * 0.4;
-    let spacing = 4.0;
-
-    match position {
-        "top" => {
-            let y = base_y + margin_top - font_size - 1.5;
-            let mut x = base_x + margin_left;
-            for (i, name) in names.iter().enumerate() {
-                let color = parse_color(data.colors.get(i).map(|s| s.as_str()).unwrap_or("#4F46E5"));
-                chart_rect(surface, x, y - font_size * 0.3, swatch_size, swatch_size, color);
-                chart_text_start(surface, x + item_gap, y + font_size * 0.3, name, font_size, "#666666", fonts, measurer);
-                x += item_gap + name.len() as f64 * font_size * 0.5 + spacing;
-            }
+    for label in &x_labels.labels {
+        if x_labels.needs_rotate {
+            surface.push_transform(&Transform::from_translate(pt(label.x), pt(label.y)));
+            let c = std::f32::consts::FRAC_PI_4.cos();
+            let s = std::f32::consts::FRAC_PI_4.sin();
+            surface.push_transform(&Transform::from_row(c, -s, s, c, 0.0, 0.0));
+            chart_text_end(surface, 0.0, 0.0, &label.text, 2.2, "#666666", fonts, measurer);
+            surface.pop();
+            surface.pop();
+        } else {
+            chart_text_centered(surface, label.x, label.y, &label.text, 2.5, "#666666", fonts, measurer);
         }
-        "right" => {
-            let x = base_x + margin_left + plot_w + 4.0;
-            let mut y = base_y + margin_top + 2.0;
-            for (i, name) in names.iter().enumerate() {
-                let color = parse_color(data.colors.get(i).map(|s| s.as_str()).unwrap_or("#4F46E5"));
-                chart_rect(surface, x, y, swatch_size, swatch_size, color);
-                chart_text_start(surface, x + item_gap, y + font_size * 0.7, name, font_size, "#666666", fonts, measurer);
-                y += font_size + 2.0;
-            }
-        }
-        _ => {
-            // bottom (default)
-            let y = base_y + total_h - 3.0;
-            let total_legend_w: f64 = names.iter()
-                .map(|n| item_gap + n.len() as f64 * font_size * 0.5 + spacing)
-                .sum::<f64>() - spacing;
-            let mut x = base_x + (total_w - total_legend_w) / 2.0;
-            for (i, name) in names.iter().enumerate() {
-                let color = parse_color(data.colors.get(i).map(|s| s.as_str()).unwrap_or("#4F46E5"));
-                chart_rect(surface, x, y - font_size * 0.3, swatch_size, swatch_size, color);
-                chart_text_start(surface, x + item_gap, y + font_size * 0.3, name, font_size, "#666666", fonts, measurer);
-                x += item_gap + name.len() as f64 * font_size * 0.5 + spacing;
-            }
-        }
-    }
-}
-
-/// Bar chart — tum koordinatlar mm cinsinden (mutlak sayfa pozisyonu)
-fn render_chart_bar(
-    surface: &mut krilla::surface::Surface<'_>,
-    data: &crate::ChartRenderData,
-    px: f64, py: f64, pw: f64, ph: f64,
-    fonts: &FontCollection, measurer: &mut TextMeasurer,
-) {
-    if data.categories.is_empty() || data.series.is_empty() { return; }
-
-    let (min_val, max_val) = chart_value_range(data);
-    let range = if (max_val - min_val).abs() < 1e-10 { 1.0 } else { max_val - min_val };
-
-    let show_grid = data.show_grid;
-    let grid_color = data.grid_color.as_deref().unwrap_or("#E5E7EB");
-
-    // Grid + Y axis labels
-    render_chart_y_axis(surface, min_val, max_val, px, py, pw, ph, show_grid, grid_color, fonts, measurer);
-
-    let n_cats = data.categories.len();
-    let n_series = data.series.len();
-    let cat_width = pw / n_cats as f64;
-    let bar_gap = data.bar_gap.unwrap_or(0.2).clamp(0.0, 0.8);
-    let group_width = cat_width * (1.0 - bar_gap);
-
-    let show_labels = data.show_labels;
-    let label_font = data.label_font_size.unwrap_or(2.2);
-    let label_color = data.label_color.as_deref().unwrap_or("#333333");
-
-    // Bars
-    if data.stacked {
-        for ci in 0..n_cats {
-            let mut y_off = 0.0_f64;
-            for (si, series) in data.series.iter().enumerate() {
-                let val = series.values.get(ci).copied().unwrap_or(0.0);
-                let bh = (val / range) * ph;
-                let by = py + ph - y_off - bh;
-                let bx = px + ci as f64 * cat_width + cat_width * bar_gap / 2.0;
-                let color = parse_color(data.colors.get(si).map(|s| s.as_str()).unwrap_or("#4F46E5"));
-                chart_rect(surface, bx, by, group_width, bh.max(0.0), color);
-                if show_labels && val > 0.0 {
-                    let label = chart_format_value(val);
-                    chart_text_centered(surface, bx + group_width / 2.0, by + bh / 2.0 + label_font * 0.15, &label, label_font, label_color, fonts, measurer);
-                }
-                y_off += bh;
-            }
-        }
-    } else {
-        let bar_w = group_width / n_series as f64;
-        for ci in 0..n_cats {
-            for (si, series) in data.series.iter().enumerate() {
-                let val = series.values.get(ci).copied().unwrap_or(0.0);
-                let bh = ((val - min_val) / range) * ph;
-                let bx = px + ci as f64 * cat_width + cat_width * bar_gap / 2.0 + si as f64 * bar_w;
-                let by = py + ph - bh;
-                let color = parse_color(data.colors.get(si).map(|s| s.as_str()).unwrap_or("#4F46E5"));
-                chart_rect(surface, bx, by, bar_w.max(0.1), bh.max(0.0), color);
-                if show_labels {
-                    let label = chart_format_value(val);
-                    chart_text_centered(surface, bx + bar_w / 2.0, by - 0.8, &label, label_font, label_color, fonts, measurer);
-                }
-            }
-        }
-    }
-
-    // X axis category labels
-    render_chart_x_labels(surface, &data.categories, px, py + ph, pw, fonts, measurer);
-
-    // X axis line
-    let ac = parse_color("#9CA3AF");
-    chart_line_seg(surface, px, py + ph, px + pw, py + ph, ac, 0.8);
-}
-
-/// Line chart — tum koordinatlar mm cinsinden (mutlak sayfa pozisyonu)
-fn render_chart_line(
-    surface: &mut krilla::surface::Surface<'_>,
-    data: &crate::ChartRenderData,
-    px: f64, py: f64, pw: f64, ph: f64,
-    fonts: &FontCollection, measurer: &mut TextMeasurer,
-) {
-    if data.categories.is_empty() || data.series.is_empty() { return; }
-
-    let (min_val, max_val) = chart_value_range(data);
-    let range = if (max_val - min_val).abs() < 1e-10 { 1.0 } else { max_val - min_val };
-    let n_cats = data.categories.len();
-    let line_w = data.line_width.unwrap_or(0.5);
-    let show_points = data.show_points.unwrap_or(true);
-
-    let show_grid = data.show_grid;
-    let grid_color = data.grid_color.as_deref().unwrap_or("#E5E7EB");
-
-    // Grid + Y axis labels
-    render_chart_y_axis(surface, min_val, max_val, px, py, pw, ph, show_grid, grid_color, fonts, measurer);
-
-    let show_labels = data.show_labels;
-    let label_font = data.label_font_size.unwrap_or(2.2);
-    let label_color = data.label_color.as_deref().unwrap_or("#333333");
-
-    for (si, series) in data.series.iter().enumerate() {
-        let color = parse_color(data.colors.get(si).map(|s| s.as_str()).unwrap_or("#4F46E5"));
-
-        let points: Vec<(f64, f64)> = series.values.iter().enumerate().map(|(ci, val)| {
-            let xp = if n_cats == 1 { px + pw / 2.0 } else { px + ci as f64 * pw / (n_cats - 1) as f64 };
-            let yp = py + ph - ((val - min_val) / range) * ph;
-            (xp, yp)
-        }).collect();
-
-        // Polyline
-        surface.set_fill(None);
-        surface.set_stroke(Some(Stroke {
-            paint: color.into(),
-            width: pt(line_w),
-            opacity: NormalizedF32::ONE,
-            ..Default::default()
-        }));
-        let path = {
-            let mut pb = PathBuilder::new();
-            for (i, (lx, ly)) in points.iter().enumerate() {
-                if i == 0 { pb.move_to(pt(*lx), pt(*ly)); }
-                else { pb.line_to(pt(*lx), pt(*ly)); }
-            }
-            pb.finish()
-        };
-        if let Some(p) = path { surface.draw_path(&p); }
-
-        // Points
-        if show_points {
-            for (lx, ly) in &points {
-                let r = pt(0.8);
-                let cx = pt(*lx);
-                let cy = pt(*ly);
-                surface.set_fill(Some(fill_from_color(color)));
-                surface.set_stroke(None);
-                let circle = {
-                    let mut pb = PathBuilder::new();
-                    let k = r * 0.5522848;
-                    pb.move_to(cx, cy - r);
-                    pb.cubic_to(cx + k, cy - r, cx + r, cy - k, cx + r, cy);
-                    pb.cubic_to(cx + r, cy + k, cx + k, cy + r, cx, cy + r);
-                    pb.cubic_to(cx - k, cy + r, cx - r, cy + k, cx - r, cy);
-                    pb.cubic_to(cx - r, cy - k, cx - k, cy - r, cx, cy - r);
-                    pb.close();
-                    pb.finish()
-                };
-                if let Some(p) = circle { surface.draw_path(&p); }
-            }
-        }
-
-        // Value labels on points
-        if show_labels {
-            for (ci, val) in series.values.iter().enumerate() {
-                let (lx, ly) = points[ci];
-                let label = chart_format_value(*val);
-                chart_text_centered(surface, lx, ly - 1.5, &label, label_font, label_color, fonts, measurer);
-            }
-        }
-    }
-
-    // X axis category labels
-    render_chart_x_labels_line(surface, &data.categories, px, py + ph, pw, fonts, measurer);
-
-    // Axis line
-    let ac = parse_color("#9CA3AF");
-    chart_line_seg(surface, px, py + ph, px + pw, py + ph, ac, 0.8);
-}
-
-/// Pie/donut chart — tum koordinatlar mm cinsinden
-fn render_chart_pie(
-    surface: &mut krilla::surface::Surface<'_>,
-    data: &crate::ChartRenderData,
-    px: f64, py: f64, pw: f64, ph: f64,
-    fonts: &FontCollection, measurer: &mut TextMeasurer,
-) {
-    let values: Vec<f64> = if data.series.len() == 1 {
-        data.series[0].values.clone()
-    } else {
-        data.categories.iter().enumerate().map(|(ci, _)| {
-            data.series.iter().map(|s| s.values.get(ci).copied().unwrap_or(0.0)).sum()
-        }).collect()
-    };
-
-    let total: f64 = values.iter().sum();
-    if total <= 0.0 { return; }
-
-    let cx = px + pw / 2.0;
-    let cy = py + ph / 2.0;
-    let radius = pw.min(ph) / 2.0 * 0.65;
-    let inner_frac = data.inner_radius.unwrap_or(0.0).clamp(0.0, 0.9);
-    let inner_r = radius * inner_frac;
-
-    let show_labels = data.show_labels;
-    let label_font = data.label_font_size.unwrap_or(3.0);
-    let label_color = data.label_color.as_deref().unwrap_or("#333333");
-
-    let mut start_angle = -std::f64::consts::FRAC_PI_2;
-
-    for (i, val) in values.iter().enumerate() {
-        if *val <= 0.0 { continue; }
-        let sweep = (val / total) * std::f64::consts::TAU;
-        let end_angle = start_angle + sweep;
-        let color = parse_color(data.colors.get(i).map(|s| s.as_str()).unwrap_or("#4F46E5"));
-
-        surface.set_fill(Some(fill_from_color(color)));
-        surface.set_stroke(Some(Stroke {
-            paint: rgb::Color::new(255, 255, 255).into(),
-            width: 0.8,
-            opacity: NormalizedF32::ONE,
-            ..Default::default()
-        }));
-
-        let path = build_arc_path(cx, cy, radius, inner_r, start_angle, end_angle);
-        if let Some(p) = path { surface.draw_path(&p); }
-
-        // Percentage label inside slice
-        if show_labels {
-            let mid_angle = start_angle + sweep / 2.0;
-            let label_r = if inner_r > 0.0 { (radius + inner_r) / 2.0 } else { radius * 0.65 };
-            let lx = cx + label_r * mid_angle.cos();
-            let ly = cy + label_r * mid_angle.sin();
-            let pct = (val / total * 100.0).round();
-            let label = format!("{}%", pct);
-            chart_text_centered(surface, lx, ly, &label, label_font, label_color, fonts, measurer);
-        }
-
-        // Category name label outside slice with leader line
-        if i < data.categories.len() {
-            let mid_angle = start_angle + sweep / 2.0;
-            let line_start_r = radius;
-            let line_end_r = radius + 3.0;
-            let text_r = radius + 4.0;
-
-            // Leader line
-            let lx1 = cx + line_start_r * mid_angle.cos();
-            let ly1 = cy + line_start_r * mid_angle.sin();
-            let lx2 = cx + line_end_r * mid_angle.cos();
-            let ly2 = cy + line_end_r * mid_angle.sin();
-            chart_line_seg(surface, lx1, ly1, lx2, ly2, parse_color("#999999"), 0.5);
-
-            // Category text
-            let tx = cx + text_r * mid_angle.cos();
-            let ty = cy + text_r * mid_angle.sin();
-            if mid_angle.cos() >= 0.0 {
-                chart_text_start(surface, tx, ty, &data.categories[i], 2.5, "#555555", fonts, measurer);
-            } else {
-                chart_text_end(surface, tx, ty, &data.categories[i], 2.5, "#555555", fonts, measurer);
-            }
-        }
-
-        start_angle = end_angle;
     }
 }
 
@@ -1604,33 +1207,6 @@ fn approximate_arc(
         let c2y = p2y - k * r * a2.cos();
 
         pb.cubic_to(pt(c1x), pt(c1y), pt(c2x), pt(c2y), pt(p2x), pt(p2y));
-    }
-}
-
-fn chart_value_range(data: &crate::ChartRenderData) -> (f64, f64) {
-    if data.series.is_empty() {
-        return (0.0, 1.0);
-    }
-    if data.stacked {
-        let n = data.categories.len();
-        let mut max_stack = 0.0_f64;
-        for ci in 0..n {
-            let sum: f64 = data.series.iter().map(|s| s.values.get(ci).copied().unwrap_or(0.0)).sum();
-            max_stack = max_stack.max(sum);
-        }
-        (0.0, max_stack * 1.05)
-    } else {
-        let mut min_v = f64::MAX;
-        let mut max_v = f64::MIN;
-        for series in &data.series {
-            for val in &series.values {
-                min_v = min_v.min(*val);
-                max_v = max_v.max(*val);
-            }
-        }
-        if min_v > 0.0 { min_v = 0.0; }
-        max_v *= 1.05;
-        (min_v, max_v)
     }
 }
 
@@ -1731,6 +1307,7 @@ mod tests {
             fonts: vec!["Noto Sans".to_string()],
             header: None,
             footer: None,
+            format_config: None,
             root: ContainerElement {
                 id: "root".to_string(),
                 position: PositionMode::Flow,
@@ -1801,7 +1378,7 @@ mod tests {
         });
 
         let fonts = test_fonts();
-        let layout = crate::compute_layout(&template, &data, &fonts);
+        let layout = crate::compute_layout(&template, &data, &fonts).unwrap();
         let pdf = render_pdf(&layout, &fonts).expect("Full pipeline PDF");
 
         assert!(pdf.starts_with(b"%PDF"));

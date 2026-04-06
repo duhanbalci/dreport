@@ -49,7 +49,7 @@ export function useUndoRedo<T>(source: Ref<T>, maxHistory = 50) {
 
   function applySnapshot(snap: string) {
     skipWatch = true
-    Object.assign(source.value as object, JSON.parse(snap))
+    source.value = JSON.parse(snap)
     skipWatch = false
   }
 

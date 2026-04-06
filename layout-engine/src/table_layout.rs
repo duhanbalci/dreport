@@ -185,6 +185,7 @@ pub fn expand_table(
                 style: TextStyle {
                     font_size: table.style.header_font_size.or(table.style.font_size),
                     font_weight: Some("bold".to_string()),
+                    font_style: None,
                     font_family: None,
                     color: table.style.header_color.clone(),
                     align: Some(col.align.clone()),
@@ -294,6 +295,7 @@ pub fn expand_table(
                     style: TextStyle {
                         font_size: table.style.font_size,
                         font_weight: None,
+                        font_style: None,
                         font_family: None,
                         color: None,
                         align: Some(col.align.clone()),
@@ -446,10 +448,7 @@ mod tests {
             .unwrap()
             .join("backend/fonts/NotoSans-Regular.ttf");
         let font_bytes = std::fs::read(&font_path).expect("Font file not found");
-        let font_data = vec![FontData {
-            family: "Noto Sans".to_string(),
-            data: font_bytes,
-        }];
+        let font_data = vec![FontData::from_bytes(font_bytes).expect("Font parse failed")];
         TextMeasurer::new(&font_data)
     }
 

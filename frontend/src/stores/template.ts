@@ -139,14 +139,27 @@ export const useTemplateStore = defineStore('template', () => {
     }
   }
 
-  /** Element'i başka bir container'a taşı */
+  /** Element'i başka bir container'a taşı (tek layoutVersion bump) */
   function moveElement(elementId: string, targetParentId: string, index?: number) {
     const el = getElementById(elementId)
     if (!el) return
-    // removeElement bump'lar, addChild de bump'lar — ama tek mantıksal operasyon.
-    // Fazladan 1 bump sorun değil (debounce var), ama istersek optimize edebiliriz.
-    removeElement(elementId)
-    addChild(targetParentId, el, index)
+    // Ağaçtan kaldır (bump'sız)
+    const parent = getParent(elementId)
+    if (parent) {
+      const idx = parent.children.findIndex(c => c.id === elementId)
+      if (idx !== -1) parent.children.splice(idx, 1)
+    }
+    // Hedef container'a ekle (bump'sız)
+    const target = getElementById(targetParentId)
+    if (target && isContainer(target)) {
+      if (index !== undefined) {
+        target.children.splice(index, 0, el)
+      } else {
+        target.children.push(el)
+      }
+    }
+    // Tek bump
+    bumpLayoutVersion()
   }
 
   /** Absolute pozisyon güncelle */
@@ -185,14 +198,62 @@ export const useTemplateStore = defineStore('template', () => {
     bumpLayoutVersion()
   }
 
+  /** Bir adım öne getir */
+  function bringForward(elementId: string) {
+    const parent = getParent(elementId)
+    if (!parent) return
+    const idx = parent.children.findIndex(c => c.id === elementId)
+    if (idx < 0 || idx >= parent.children.length - 1) return
+    reorderChild(parent.id, idx, idx + 1)
+  }
+
+  /** Bir adım arkaya gönder */
+  function sendBackward(elementId: string) {
+    const parent = getParent(elementId)
+    if (!parent) return
+    const idx = parent.children.findIndex(c => c.id === elementId)
+    if (idx <= 0) return
+    reorderChild(parent.id, idx, idx - 1)
+  }
+
+  /** En öne getir */
+  function bringToFront(elementId: string) {
+    const parent = getParent(elementId)
+    if (!parent) return
+    const idx = parent.children.findIndex(c => c.id === elementId)
+    if (idx < 0 || idx >= parent.children.length - 1) return
+    reorderChild(parent.id, idx, parent.children.length - 1)
+  }
+
+  /** En arkaya gönder */
+  function sendToBack(elementId: string) {
+    const parent = getParent(elementId)
+    if (!parent) return
+    const idx = parent.children.findIndex(c => c.id === elementId)
+    if (idx <= 0) return
+    reorderChild(parent.id, idx, 0)
+  }
+
   /** Şablonu JSON olarak dışa aktar */
   function exportTemplate(): string {
     return JSON.stringify(template.value, null, 2)
   }
 
-  /** JSON'dan şablon yükle */
+  /** JSON'dan şablon yükle (validasyonlu) */
   function importTemplate(json: string) {
-    const parsed = JSON.parse(json) as Template
+    let parsed: Template
+    try {
+      parsed = JSON.parse(json) as Template
+    } catch (e) {
+      throw new Error(`Geçersiz JSON: ${e instanceof Error ? e.message : String(e)}`)
+    }
+    // Minimum schema doğrulaması
+    if (!parsed.root || parsed.root.type !== 'container') {
+      throw new Error('Geçersiz şablon: root alanı eksik veya container değil')
+    }
+    if (!parsed.page || typeof parsed.page.width !== 'number' || typeof parsed.page.height !== 'number') {
+      throw new Error('Geçersiz şablon: page alanı eksik veya geçersiz')
+    }
     template.value = parsed
     bumpLayoutVersion()
   }
@@ -269,6 +330,10 @@ export const useTemplateStore = defineStore('template', () => {
     updateElementSize,
     updateElement,
     reorderChild,
+    bringForward,
+    sendBackward,
+    bringToFront,
+    sendToBack,
     exportTemplate,
     importTemplate,
     resetTemplate,

@@ -13,7 +13,7 @@ const props = defineProps<{
 const editorStore = useEditorStore()
 const templateStore = useTemplateStore()
 
-const isSelected = computed(() => editorStore.selectedElementId === props.element.id)
+const isSelected = computed(() => editorStore.isSelected(props.element.id))
 const isContainerEl = computed(() => isContainer(props.element))
 const isAbsolute = computed(() => props.element.position.type === 'absolute')
 

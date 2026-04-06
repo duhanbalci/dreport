@@ -7,7 +7,7 @@ use crate::data_resolve::ResolvedData;
 use crate::sizing::{self, mm_to_pt, pt_to_mm};
 use crate::table_layout;
 use crate::text_measure::TextMeasurer;
-use crate::{ElementLayout, LayoutResult, ResolvedContent, ResolvedStyle};
+use crate::{ElementLayout, LayoutError, LayoutResult, ResolvedContent, ResolvedStyle};
 
 /// Taffy node ile dreport element arasındaki mapping
 struct NodeInfo {
@@ -33,20 +33,20 @@ pub fn compute(
     template: &Template,
     resolved: &ResolvedData,
     measurer: &mut TextMeasurer,
-) -> LayoutResult {
+) -> Result<LayoutResult, LayoutError> {
     let page_w_pt = mm_to_pt(template.page.width);
     let page_width_mm = template.page.width;
 
     // --- 1. Header layout (varsa) ---
     let (header_elements, header_height_mm) = if let Some(ref header) = template.header {
-        compute_section(header, page_w_pt, page_width_mm, resolved, measurer)
+        compute_section(header, page_w_pt, page_width_mm, resolved, measurer)?
     } else {
         (vec![], 0.0)
     };
 
     // --- 2. Footer layout (varsa) ---
     let (footer_elements, footer_height_mm) = if let Some(ref footer) = template.footer {
-        compute_section(footer, page_w_pt, page_width_mm, resolved, measurer)
+        compute_section(footer, page_w_pt, page_width_mm, resolved, measurer)?
     } else {
         (vec![], 0.0)
     };
@@ -65,7 +65,7 @@ pub fn compute(
         None,
         measurer,
         page_width_mm,
-    );
+    )?;
 
     // Sayfa wrapper: sayfa genişliğinde ama yükseklik sınırsız (auto)
     let page_style = Style {
@@ -77,7 +77,7 @@ pub fn compute(
         },
         ..Default::default()
     };
-    let page_node = taffy.new_with_children(page_style, &[root_node]).unwrap();
+    let page_node = taffy.new_with_children(page_style, &[root_node])?;
 
     taffy
         .compute_layout_with_measure(
@@ -89,13 +89,15 @@ pub fn compute(
             |known_dimensions, available_space, _node_id, context, _style| {
                 measure_leaf(known_dimensions, available_space, context, measurer)
             },
-        )
-        .unwrap();
+        )?;
 
-    let body_elements = collect_layout(&taffy, root_node, &node_map, resolved, 0.0, 0.0);
+    let body_elements = collect_layout(&taffy, root_node, &node_map, resolved, 0.0, 0.0)?;
 
     // --- 4. Container break modlarını topla ---
     let break_modes = collect_break_modes(&template.root);
+
+    // --- 4b. repeat_header == false olan tablo ID'lerini topla ---
+    let no_repeat_header_tables = collect_no_repeat_header_tables(&template.root);
 
     // --- 5. Sayfalara böl ---
     let input = crate::page_break::PageSplitInput {
@@ -109,11 +111,12 @@ pub fn compute(
         break_modes,
         page_number_formats: resolved.page_number_formats.clone(),
         root_padding_top_mm: template.root.padding.top,
+        no_repeat_header_tables,
     };
 
     let pages = crate::page_break::split_into_pages(input);
 
-    LayoutResult { pages }
+    Ok(LayoutResult { pages })
 }
 
 /// Header veya footer gibi bağımsız bir container section'ı hesapla.
@@ -124,12 +127,12 @@ fn compute_section(
     page_width_mm: f64,
     resolved: &ResolvedData,
     measurer: &mut TextMeasurer,
-) -> (Vec<ElementLayout>, f64) {
+) -> Result<(Vec<ElementLayout>, f64), LayoutError> {
     let mut taffy = TaffyTree::<MeasureContext>::new();
     taffy.disable_rounding();
     let mut node_map: HashMap<NodeId, NodeInfo> = HashMap::new();
 
-    let section_node = build_container(container, &mut taffy, &mut node_map, resolved, None, measurer, page_width_mm);
+    let section_node = build_container(container, &mut taffy, &mut node_map, resolved, None, measurer, page_width_mm)?;
 
     let wrapper_style = Style {
         display: Display::Flex,
@@ -140,7 +143,7 @@ fn compute_section(
         },
         ..Default::default()
     };
-    let wrapper_node = taffy.new_with_children(wrapper_style, &[section_node]).unwrap();
+    let wrapper_node = taffy.new_with_children(wrapper_style, &[section_node])?;
 
     taffy
         .compute_layout_with_measure(
@@ -152,16 +155,15 @@ fn compute_section(
             |known_dimensions, available_space, _node_id, context, _style| {
                 measure_leaf(known_dimensions, available_space, context, measurer)
             },
-        )
-        .unwrap();
+        )?;
 
-    let elements = collect_layout(&taffy, section_node, &node_map, resolved, 0.0, 0.0);
+    let elements = collect_layout(&taffy, section_node, &node_map, resolved, 0.0, 0.0)?;
 
     // Section yüksekliği
-    let section_layout = taffy.layout(section_node).unwrap();
+    let section_layout = taffy.layout(section_node)?;
     let height_mm = pt_to_mm(section_layout.size.height);
 
-    (elements, height_mm)
+    Ok((elements, height_mm))
 }
 
 /// Template ağacındaki tüm container'ların break_inside modlarını topla.
@@ -180,6 +182,29 @@ fn collect_break_modes_recursive(el: &TemplateElement, modes: &mut HashMap<Strin
     }
 }
 
+/// repeat_header == false olan tablo ID'lerini topla.
+fn collect_no_repeat_header_tables(root: &ContainerElement) -> std::collections::HashSet<String> {
+    let mut set = std::collections::HashSet::new();
+    collect_no_repeat_recursive(&TemplateElement::Container(root.clone()), &mut set);
+    set
+}
+
+fn collect_no_repeat_recursive(el: &TemplateElement, set: &mut std::collections::HashSet<String>) {
+    match el {
+        TemplateElement::Container(c) => {
+            for child in &c.children {
+                collect_no_repeat_recursive(child, set);
+            }
+        }
+        TemplateElement::RepeatingTable(t) => {
+            if t.repeat_header == Some(false) {
+                set.insert(t.id.clone());
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Container element'ini taffy node ağacına ekle (recursive)
 fn build_container(
     el: &ContainerElement,
@@ -189,7 +214,7 @@ fn build_container(
     parent_direction: Option<&str>,
     measurer: &mut TextMeasurer,
     page_width_mm: f64,
-) -> NodeId {
+) -> Result<NodeId, LayoutError> {
     let style = sizing::container_to_style(el, parent_direction);
     let direction = el.direction.as_str();
 
@@ -207,12 +232,12 @@ fn build_container(
     let mut children_ids = Vec::new();
 
     for child in &el.children {
-        let child_node = build_element(child, taffy, node_map, resolved, Some(direction), measurer, content_width_mm);
+        let child_node = build_element(child, taffy, node_map, resolved, Some(direction), measurer, content_width_mm)?;
         child_nodes.push(child_node);
         children_ids.push(child.id().to_string());
     }
 
-    let node = taffy.new_with_children(style, &child_nodes).unwrap();
+    let node = taffy.new_with_children(style, &child_nodes)?;
 
     node_map.insert(
         node,
@@ -232,7 +257,7 @@ fn build_container(
         },
     );
 
-    node
+    Ok(node)
 }
 
 /// Herhangi bir element tipini taffy node'a çevir
@@ -244,7 +269,7 @@ fn build_element(
     parent_direction: Option<&str>,
     measurer: &mut TextMeasurer,
     page_width_mm: f64,
-) -> NodeId {
+) -> Result<NodeId, LayoutError> {
     match el {
         TemplateElement::Container(e) => {
             build_container(e, taffy, node_map, resolved, parent_direction, measurer, page_width_mm)
@@ -342,7 +367,7 @@ fn build_element(
                 leaf_style.size.height = Dimension::length(mm_to_pt(stroke_w));
             }
 
-            let node = taffy.new_leaf(leaf_style).unwrap();
+            let node = taffy.new_leaf(leaf_style)?;
             node_map.insert(
                 node,
                 NodeInfo {
@@ -357,13 +382,13 @@ fn build_element(
                     children_ids: vec![],
                 },
             );
-            node
+            Ok(node)
         }
         TemplateElement::Image(e) => {
             let style = sizing::leaf_style(&e.size, &e.position, parent_direction);
             let src = resolved.images.get(&e.id).cloned().unwrap_or_default();
 
-            let node = taffy.new_leaf(style).unwrap();
+            let node = taffy.new_leaf(style)?;
             node_map.insert(
                 node,
                 NodeInfo {
@@ -377,7 +402,7 @@ fn build_element(
                     children_ids: vec![],
                 },
             );
-            node
+            Ok(node)
         }
         TemplateElement::Barcode(e) => {
             let mut style = sizing::leaf_style(&e.size, &e.position, parent_direction);
@@ -394,7 +419,7 @@ fn build_element(
                 style.min_size.width = Dimension::length(mm_to_pt(default_w));
             }
 
-            let node = taffy.new_leaf(style).unwrap();
+            let node = taffy.new_leaf(style)?;
             node_map.insert(
                 node,
                 NodeInfo {
@@ -412,7 +437,7 @@ fn build_element(
                     children_ids: vec![],
                 },
             );
-            node
+            Ok(node)
         }
         TemplateElement::RepeatingTable(e) => {
             // Tabloyu container ağacına expand et (measurer ile auto sütun genişlikleri hesaplanır)
@@ -439,7 +464,7 @@ fn build_element(
         }
         TemplateElement::Shape(e) => {
             let style = sizing::leaf_style(&e.size, &e.position, parent_direction);
-            let node = taffy.new_leaf(style).unwrap();
+            let node = taffy.new_leaf(style)?;
             node_map.insert(
                 node,
                 NodeInfo {
@@ -458,7 +483,7 @@ fn build_element(
                     children_ids: vec![],
                 },
             );
-            node
+            Ok(node)
         }
         TemplateElement::Checkbox(e) => {
             let checked_str = resolved.texts.get(&e.id).map(|s| s.as_str()).unwrap_or("false");
@@ -475,7 +500,7 @@ fn build_element(
                 leaf_style.size.height = Dimension::length(mm_to_pt(box_size_mm));
             }
 
-            let node = taffy.new_leaf(leaf_style).unwrap();
+            let node = taffy.new_leaf(leaf_style)?;
             node_map.insert(
                 node,
                 NodeInfo {
@@ -491,7 +516,7 @@ fn build_element(
                     children_ids: vec![],
                 },
             );
-            node
+            Ok(node)
         }
         TemplateElement::RichText(e) => {
             let spans = resolved.rich_texts.get(&e.id).cloned().unwrap_or_default();
@@ -520,7 +545,7 @@ fn build_element(
                 rich_spans: Some(rich_span_measures),
             };
 
-            let node = taffy.new_leaf_with_context(style, context).unwrap();
+            let node = taffy.new_leaf_with_context(style, context)?;
 
             // ResolvedContent::RichText span'ları oluştur
             let resolved_spans: Vec<crate::ResolvedRichSpan> = spans
@@ -551,7 +576,7 @@ fn build_element(
                     children_ids: vec![],
                 },
             );
-            node
+            Ok(node)
         }
         TemplateElement::Chart(e) => {
             let mut style = sizing::leaf_style(&e.size, &e.position, parent_direction);
@@ -562,7 +587,7 @@ fn build_element(
             if matches!(e.size.height, SizeValue::Auto) {
                 style.min_size.height = Dimension::length(mm_to_pt(60.0));
             }
-            let node = taffy.new_leaf(style).unwrap();
+            let node = taffy.new_leaf(style)?;
             node_map.insert(
                 node,
                 NodeInfo {
@@ -573,7 +598,7 @@ fn build_element(
                     children_ids: vec![],
                 },
             );
-            node
+            Ok(node)
         }
         TemplateElement::PageBreak(e) => {
             // Küçük yükseklik — editörde görünür olması için (0.5mm ≈ 1.4pt)
@@ -584,7 +609,7 @@ fn build_element(
                 },
                 ..Default::default()
             };
-            let node = taffy.new_leaf(style).unwrap();
+            let node = taffy.new_leaf(style)?;
             node_map.insert(
                 node,
                 NodeInfo {
@@ -595,7 +620,7 @@ fn build_element(
                     children_ids: vec![],
                 },
             );
-            node
+            Ok(node)
         }
     }
 }
@@ -626,7 +651,7 @@ fn build_text_leaf(
     size: &SizeConstraint,
     position: &PositionMode,
     parent_direction: Option<&str>,
-) -> NodeId {
+) -> Result<NodeId, LayoutError> {
     let style = sizing::leaf_style(size, position, parent_direction);
     let font_size_pt = text_style.font_size.unwrap_or(11.0) as f32;
 
@@ -638,7 +663,7 @@ fn build_text_leaf(
         rich_spans: None,
     };
 
-    let node = taffy.new_leaf_with_context(style, context).unwrap();
+    let node = taffy.new_leaf_with_context(style, context)?;
 
     node_map.insert(
         node,
@@ -651,6 +676,7 @@ fn build_text_leaf(
             style: ResolvedStyle {
                 font_size: text_style.font_size,
                 font_weight: text_style.font_weight.clone(),
+                font_style: text_style.font_style.clone(),
                 font_family: text_style.font_family.clone(),
                 color: text_style.color.clone(),
                 text_align: text_style.align.clone(),
@@ -660,7 +686,7 @@ fn build_text_leaf(
         },
     );
 
-    node
+    Ok(node)
 }
 
 /// Taffy MeasureFunc: text leaf node'ları ölç
@@ -719,14 +745,14 @@ fn collect_layout(
     resolved: &ResolvedData,
     parent_x_mm: f64,
     parent_y_mm: f64,
-) -> Vec<ElementLayout> {
+) -> Result<Vec<ElementLayout>, LayoutError> {
     let mut elements = Vec::new();
 
     let Some(info) = node_map.get(&node) else {
-        return elements;
+        return Ok(elements);
     };
 
-    let layout = taffy.layout(node).unwrap();
+    let layout = taffy.layout(node)?;
     let x_mm = parent_x_mm + pt_to_mm(layout.location.x);
     let y_mm = parent_y_mm + pt_to_mm(layout.location.y);
     let w_mm = pt_to_mm(layout.size.width);
@@ -736,7 +762,7 @@ fn collect_layout(
     let content = if info.element_type == "chart" {
         resolved.charts.get(&info.element_id).map(|cd| {
             use crate::{ChartRenderData, ChartSeriesData};
-            use crate::chart_render::DEFAULT_COLORS;
+            use crate::chart_layout::DEFAULT_COLORS;
 
             // Renk paleti olustur
             let n_colors = cd.categories.len().max(cd.series.len()).max(1);
@@ -798,13 +824,13 @@ fn collect_layout(
     });
 
     // Child node'ları da topla
-    let children = taffy.children(node).unwrap();
+    let children = taffy.children(node)?;
     for child_node in children {
-        let child_elements = collect_layout(taffy, child_node, node_map, resolved, x_mm, y_mm);
+        let child_elements = collect_layout(taffy, child_node, node_map, resolved, x_mm, y_mm)?;
         elements.extend(child_elements);
     }
 
-    elements
+    Ok(elements)
 }
 
 #[cfg(test)]
@@ -823,6 +849,7 @@ mod tests {
             fonts: vec!["Noto Sans".to_string()],
             header: None,
             footer: None,
+            format_config: None,
             root: ContainerElement {
                 id: "root".to_string(),
                 position: PositionMode::Flow,
@@ -911,7 +938,7 @@ mod tests {
         let fonts = crate::text_measure::load_test_fonts();
         let mut measurer = TextMeasurer::new(&fonts);
 
-        let result = compute(&template, &resolved, &mut measurer);
+        let result = compute(&template, &resolved, &mut measurer).unwrap();
 
         assert_eq!(result.pages.len(), 1);
         let page = &result.pages[0];
@@ -966,6 +993,7 @@ mod tests {
             fonts: vec![],
             header: None,
             footer: None,
+            format_config: None,
             root: ContainerElement {
                 id: "root".to_string(),
                 position: PositionMode::Flow,
@@ -1056,7 +1084,7 @@ mod tests {
         let resolved = crate::data_resolve::resolve_template(&template, &data);
         let fonts = crate::text_measure::load_test_fonts();
         let mut measurer = TextMeasurer::new(&fonts);
-        let result = compute(&template, &resolved, &mut measurer);
+        let result = compute(&template, &resolved, &mut measurer).unwrap();
 
         let page = &result.pages[0];
         let left = page.elements.iter().find(|e| e.id == "left").unwrap();
@@ -1093,6 +1121,7 @@ mod tests {
             fonts: vec![],
             header: None,
             footer: None,
+            format_config: None,
             root: ContainerElement {
                 id: "root".to_string(),
                 position: PositionMode::Flow,
@@ -1140,7 +1169,7 @@ mod tests {
         let resolved = crate::data_resolve::resolve_template(&template, &data);
         let fonts = crate::text_measure::load_test_fonts();
         let mut measurer = TextMeasurer::new(&fonts);
-        let result = compute(&template, &resolved, &mut measurer);
+        let result = compute(&template, &resolved, &mut measurer).unwrap();
 
         let page = &result.pages[0];
         let abs = page.elements.iter().find(|e| e.id == "abs_text").unwrap();
@@ -1181,6 +1210,7 @@ mod tests {
             fonts: vec!["Noto Sans".to_string()],
             header: None,
             footer: None,
+            format_config: None,
             root: ContainerElement {
                 id: "root".to_string(),
                 position: PositionMode::Flow,
@@ -1354,7 +1384,7 @@ mod tests {
         let resolved = crate::data_resolve::resolve_template(&template, &data);
         let fonts = crate::text_measure::load_test_fonts();
         let mut measurer = TextMeasurer::new(&fonts);
-        let result = compute(&template, &resolved, &mut measurer);
+        let result = compute(&template, &resolved, &mut measurer).unwrap();
 
         let page = &result.pages[0];
         println!("\n=== FATURA HEADER LAYOUT ===");

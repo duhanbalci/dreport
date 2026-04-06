@@ -17,26 +17,10 @@ fn load_test_fonts() -> Vec<FontData> {
         let entry = entry.unwrap();
         let path = entry.path();
         if path.extension().is_some_and(|e| e == "ttf") {
-            let family = path
-                .file_stem()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .split('-')
-                .next()
-                .unwrap_or("Unknown")
-                .to_string();
-            let family = if family == "NotoSansMono" {
-                "Noto Sans Mono".to_string()
-            } else if family == "NotoSans" {
-                "Noto Sans".to_string()
-            } else {
-                family
-            };
-            fonts.push(FontData {
-                family,
-                data: std::fs::read(&path).unwrap(),
-            });
+            let data = std::fs::read(&path).unwrap();
+            if let Some(fd) = FontData::from_bytes(data) {
+                fonts.push(fd);
+            }
         }
     }
     fonts
@@ -53,6 +37,7 @@ fn simple_template() -> Template {
         fonts: vec!["Noto Sans".to_string()],
         header: None,
         footer: None,
+        format_config: None,
         root: ContainerElement {
             id: "root".to_string(),
             position: PositionMode::Flow,
@@ -94,7 +79,7 @@ fn test_render_pdf_produces_valid_output() {
     let data = serde_json::json!({});
     let fonts = load_test_fonts();
 
-    let layout = compute_layout(&template, &data, &fonts);
+    let layout = compute_layout(&template, &data, &fonts).unwrap();
     let pdf_bytes = dreport_layout::pdf_render::render_pdf(&layout, &fonts).unwrap();
 
     // PDF should not be empty
@@ -123,6 +108,7 @@ fn test_render_pdf_with_multiple_elements() {
         fonts: vec!["Noto Sans".to_string()],
         header: None,
         footer: None,
+        format_config: None,
         root: ContainerElement {
             id: "root".to_string(),
             position: PositionMode::Flow,
@@ -189,7 +175,7 @@ fn test_render_pdf_with_multiple_elements() {
     let data = serde_json::json!({});
     let fonts = load_test_fonts();
 
-    let layout = compute_layout(&template, &data, &fonts);
+    let layout = compute_layout(&template, &data, &fonts).unwrap();
     let pdf_bytes = dreport_layout::pdf_render::render_pdf(&layout, &fonts).unwrap();
 
     assert!(!pdf_bytes.is_empty());
@@ -215,6 +201,7 @@ fn test_render_pdf_with_container_styles() {
         fonts: vec!["Noto Sans".to_string()],
         header: None,
         footer: None,
+        format_config: None,
         root: ContainerElement {
             id: "root".to_string(),
             position: PositionMode::Flow,
@@ -257,7 +244,7 @@ fn test_render_pdf_with_container_styles() {
     let data = serde_json::json!({});
     let fonts = load_test_fonts();
 
-    let layout = compute_layout(&template, &data, &fonts);
+    let layout = compute_layout(&template, &data, &fonts).unwrap();
     let pdf_bytes = dreport_layout::pdf_render::render_pdf(&layout, &fonts).unwrap();
 
     assert!(!pdf_bytes.is_empty());
@@ -273,6 +260,7 @@ fn test_page_break_produces_multiple_pages() {
         fonts: vec!["Noto Sans".to_string()],
         header: None,
         footer: None,
+        format_config: None,
         root: ContainerElement {
             id: "root".to_string(),
             position: PositionMode::Flow,
@@ -307,7 +295,7 @@ fn test_page_break_produces_multiple_pages() {
     let data = serde_json::json!({});
     let fonts = load_test_fonts();
     
-    let layout = compute_layout(&template, &data, &fonts);
+    let layout = compute_layout(&template, &data, &fonts).unwrap();
     
     println!("Layout pages: {}", layout.pages.len());
     for (i, page) in layout.pages.iter().enumerate() {

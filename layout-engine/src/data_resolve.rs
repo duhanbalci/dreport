@@ -204,7 +204,13 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
                                 .iter()
                                 .map(|col| {
                                     let v = resolve_path(item, &col.field);
-                                    value_to_string(v)
+                                    let raw = value_to_string(v);
+                                    // Sütun formatı varsa uygula (currency, percentage, number, date)
+                                    if let Some(ref fmt) = col.format {
+                                        crate::expr_eval::apply_format(&raw, Some(fmt.as_str()))
+                                    } else {
+                                        raw
+                                    }
                                 })
                                 .collect()
                         })
@@ -449,6 +455,7 @@ mod tests {
             fonts: vec![],
             header: None,
             footer: None,
+            format_config: None,
             root: ContainerElement {
                 id: "root".to_string(),
                 position: PositionMode::Flow,
@@ -493,6 +500,7 @@ mod tests {
             fonts: vec![],
             header: None,
             footer: None,
+            format_config: None,
             root: ContainerElement {
                 id: "root".to_string(),
                 position: PositionMode::Flow,
@@ -537,6 +545,7 @@ mod tests {
             fonts: vec![],
             header: None,
             footer: None,
+            format_config: None,
             root: ContainerElement {
                 id: "root".to_string(),
                 position: PositionMode::Flow,
@@ -573,6 +582,7 @@ mod tests {
             fonts: vec![],
             header: None,
             footer: None,
+            format_config: None,
             root: ContainerElement {
                 id: "root".to_string(),
                 position: PositionMode::Flow,
@@ -638,6 +648,7 @@ mod tests {
             fonts: vec![],
             header: None,
             footer: None,
+            format_config: None,
             root: ContainerElement {
                 id: "root".to_string(),
                 position: PositionMode::Flow,
@@ -687,6 +698,7 @@ mod tests {
             fonts: vec![],
             header: None,
             footer: None,
+            format_config: None,
             root: ContainerElement {
                 id: "root".to_string(),
                 position: PositionMode::Flow,

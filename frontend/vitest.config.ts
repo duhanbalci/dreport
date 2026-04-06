@@ -5,5 +5,10 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     environment: 'happy-dom',
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      'tests/visual/**',
+    ],
   },
 })

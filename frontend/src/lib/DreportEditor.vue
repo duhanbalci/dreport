@@ -87,14 +87,14 @@ function onKeyDown(e: KeyboardEvent) {
   const tag = target?.tagName
   const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable
 
-  // Delete / Backspace
-  if ((e.key === 'Delete' || e.key === 'Backspace') && editorStore.selectedElementId) {
+  // Delete / Backspace — çoklu seçim desteği
+  if ((e.key === 'Delete' || e.key === 'Backspace') && editorStore.selectedElementIds.size > 0) {
     if (isInput) return
     e.preventDefault()
-    const id = editorStore.selectedElementId
-    if (id && id !== 'root') {
-      editorStore.clearSelection()
-      templateStore.removeElement(id)
+    const ids = [...editorStore.selectedElementIds]
+    editorStore.clearSelection()
+    for (const id of ids) {
+      if (id !== 'root') templateStore.removeElement(id)
     }
   }
 
@@ -113,6 +113,23 @@ function onKeyDown(e: KeyboardEvent) {
   if ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) {
     e.preventDefault()
     templateStore.redo()
+  }
+
+  // Z-Order kısayolları
+  if ((e.ctrlKey || e.metaKey) && editorStore.selectedElementId && editorStore.selectedElementId !== 'root') {
+    if (e.key === ']' && e.shiftKey) {
+      e.preventDefault()
+      templateStore.bringToFront(editorStore.selectedElementId)
+    } else if (e.key === ']') {
+      e.preventDefault()
+      templateStore.bringForward(editorStore.selectedElementId)
+    } else if (e.key === '[' && e.shiftKey) {
+      e.preventDefault()
+      templateStore.sendToBack(editorStore.selectedElementId)
+    } else if (e.key === '[') {
+      e.preventDefault()
+      templateStore.sendBackward(editorStore.selectedElementId)
+    }
   }
 }
 

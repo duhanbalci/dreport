@@ -7,7 +7,7 @@
 
 ## 1. Kritik Buglar
 
-### 1.1 Undo/Redo `Object.assign` Hatasi `[IMPLEMENTE EDILMEDI]`
+### 1.1 Undo/Redo `Object.assign` Hatasi `[IMPLEMENTE EDILDI]`
 
 **Dosya:** `frontend/src/composables/useUndoRedo.ts` (satir 52)
 
@@ -35,7 +35,7 @@ Undo/redo watcher'da 300ms debounce var. Kullanici hizli bir edit yapip 300ms ic
 
 ---
 
-### 1.2 PDF'te Text Wrapping Yok `[IMPLEMENTE EDILMEDI]`
+### 1.2 PDF'te Text Wrapping Yok `[IMPLEMENTE EDILDI]`
 
 **Dosya:** `layout-engine/src/pdf_render.rs` (satir ~487)
 
@@ -52,7 +52,7 @@ Bu, projenin temel vaadi olan "editorde gordugum = PDF'te aldigim" WYSIWYG garan
 
 ---
 
-### 1.3 Image objectFit Hardcoded `[IMPLEMENTE EDILMEDI]`
+### 1.3 Image objectFit Hardcoded `[IMPLEMENTE EDILDI]`
 
 **Dosya:** `frontend/src/components/editor/LayoutRenderer.vue` (satir ~229)
 
@@ -74,7 +74,7 @@ objectFit: el.style.objectFit || 'fill',
 
 ---
 
-### 1.4 PDF'te Italic Font Secilmiyor `[IMPLEMENTE EDILMEDI]`
+### 1.4 PDF'te Italic Font Secilmiyor `[IMPLEMENTE EDILDI]`
 
 **Dosya:** `layout-engine/src/pdf_render.rs` (satir ~104)
 
@@ -286,7 +286,7 @@ Ayri bir message type namespace kullanmak — `msg.type` alani ile ayristirma za
 
 ## 3. Eksik Ozellikler (CLAUDE.md'de Tanimli)
 
-### 3.1 Coklu Secim (Multi-Selection) `[IMPLEMENTE EDILMEDI]`
+### 3.1 Coklu Secim (Multi-Selection) `[IMPLEMENTE EDILDI]`
 
 **Referans:** CLAUDE.md — "Shift+tiklama ile coklu secim"
 
@@ -302,7 +302,7 @@ Ayri bir message type namespace kullanmak — `msg.type` alani ile ayristirma za
 
 ---
 
-### 3.2 Z-Order Kontrolleri `[IMPLEMENTE EDILMEDI]`
+### 3.2 Z-Order Kontrolleri `[IMPLEMENTE EDILDI]`
 
 **Referans:** CLAUDE.md — "One Getir / Arkaya Gonder"
 
@@ -316,7 +316,7 @@ Ayri bir message type namespace kullanmak — `msg.type` alani ile ayristirma za
 
 ---
 
-### 3.3 Dinamik Image Binding UI `[IMPLEMENTE EDILMEDI]`
+### 3.3 Dinamik Image Binding UI `[IMPLEMENTE EDILDI]`
 
 **Referans:** CLAUDE.md — "image: Statik veya dinamik gorsel, Opsiyonel scalar binding"
 
@@ -330,7 +330,7 @@ Ayri bir message type namespace kullanmak — `msg.type` alani ile ayristirma za
 
 ---
 
-### 3.4 RulerBar (Cetvel) `[IMPLEMENTE EDILMEDI]`
+### 3.4 RulerBar (Cetvel) `[IMPLEMENTE EDILDI]`
 
 **Referans:** CLAUDE.md proje yapisi — `components/editor/RulerBar.vue`
 
@@ -346,7 +346,7 @@ Component dosyasi olusturulmamis, hicbir yerde import edilmiyor.
 
 ---
 
-### 3.5 Format Fonksiyonlari (Tablo Sutunlari) `[IMPLEMENTE EDILMEDI]`
+### 3.5 Format Fonksiyonlari (Tablo Sutunlari) `[IMPLEMENTE EDILDI]`
 
 **Referans:** CLAUDE.md roadmap — "Format fonksiyonlari (currency, date)"
 
@@ -421,7 +421,7 @@ Buyuk tablolarda layout hesaplama suresi ve bellek kullanimi artar. Editorde her
 
 ---
 
-### 4.4 Font Loader Iyilestirmesi (Backend) `[IMPLEMENTE EDILMEDI]`
+### 4.4 Font Loader Iyilestirmesi (Backend) `[font loader implementasyonu yapıldı. check edilmesi gerek bu sorunun tekrar]`
 
 **Dosya:** `backend/src/main.rs` (satirlar 44-53)
 
@@ -444,7 +444,7 @@ TTF/OTF `name` tablosunu okuyarak font ailesini (family name) metadata'dan almak
 `1.005` gibi degerler icin floating-point representation kaybi nedeniyle kusurat 0 veya 1 olarak yanlis yuvarlanabilir.
 
 **Cozum:**
-`Decimal` arithmetic kullanmak veya en azindan `format!("{:.2}", value)` ile string uzerinden islem yapmak.
+`Decimal` arithmetic kullanmak.
 
 ---
 

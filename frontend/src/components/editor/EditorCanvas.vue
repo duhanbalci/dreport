@@ -6,6 +6,7 @@ import { useEditorStore } from '../../stores/editor'
 import { useLayoutEngine } from '../../composables/useLayoutEngine'
 import LayoutRenderer from './LayoutRenderer.vue'
 import InteractionOverlay from './InteractionOverlay.vue'
+import RulerBar from './RulerBar.vue'
 
 const props = withDefaults(defineProps<{
   handleErrors?: boolean
@@ -204,6 +205,15 @@ function onPointerUp(e: PointerEvent) {
 
 <template>
   <div class="editor-canvas-wrapper">
+    <!-- Cetvel -->
+    <RulerBar
+      :page-width="templateStore.template.page.width"
+      :page-height="templateStore.template.page.height"
+      :scale="scale"
+      :pan-x="editorStore.panX"
+      :pan-y="editorStore.panY"
+    />
+
     <!-- Scroll alanı -->
     <div
       class="editor-canvas"
@@ -252,6 +262,8 @@ function onPointerUp(e: PointerEvent) {
   align-items: flex-start;
   justify-content: center;
   padding: 40px;
+  padding-top: 60px; /* cetvel için üstten ek boşluk */
+  padding-left: 60px; /* cetvel için soldan ek boşluk */
 }
 
 .editor-canvas__pages {

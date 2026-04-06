@@ -74,6 +74,7 @@ pub enum PositionMode {
 pub struct TextStyle {
     pub font_size: Option<f64>,
     pub font_weight: Option<String>,
+    pub font_style: Option<String>,
     pub font_family: Option<String>,
     pub color: Option<String>,
     pub align: Option<String>,
@@ -559,4 +560,42 @@ pub struct Template {
     #[serde(default)]
     pub footer: Option<ContainerElement>,
     pub root: ContainerElement,
+    #[serde(default)]
+    pub format_config: Option<FormatConfig>,
+}
+
+/// Sayı/para birimi formatlama ayarları.
+/// Belirtilmezse Türk Lirası varsayılan (. binlik, , ondalık, ₺ sembol).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FormatConfig {
+    /// Binlik ayırıcı (varsayılan ".")
+    #[serde(default = "FormatConfig::default_thousands_sep")]
+    pub thousands_separator: String,
+    /// Ondalık ayırıcı (varsayılan ",")
+    #[serde(default = "FormatConfig::default_decimal_sep")]
+    pub decimal_separator: String,
+    /// Para birimi sembolü (varsayılan "₺")
+    #[serde(default = "FormatConfig::default_currency_symbol")]
+    pub currency_symbol: String,
+    /// Para birimi sembolü pozisyonu: "suffix" (varsayılan) veya "prefix"
+    #[serde(default = "FormatConfig::default_currency_position")]
+    pub currency_position: String,
+}
+
+impl FormatConfig {
+    fn default_thousands_sep() -> String { ".".to_string() }
+    fn default_decimal_sep() -> String { ",".to_string() }
+    fn default_currency_symbol() -> String { "₺".to_string() }
+    fn default_currency_position() -> String { "suffix".to_string() }
+}
+
+impl Default for FormatConfig {
+    fn default() -> Self {
+        Self {
+            thousands_separator: Self::default_thousands_sep(),
+            decimal_separator: Self::default_decimal_sep(),
+            currency_symbol: Self::default_currency_symbol(),
+            currency_position: Self::default_currency_position(),
+        }
+    }
 }

@@ -4,10 +4,16 @@ import type { LayoutResult, LayoutMapEntry } from '../core/layout-types'
 
 export type { LayoutMapEntry }
 
+export interface LayoutEngineOptions {
+  /** Font API base URL. Default: '/api/fonts' */
+  fontApiBase?: string
+}
+
 export function useLayoutEngine(
   template: Ref<Template>,
   data: Ref<Record<string, unknown>>,
   layoutVersion?: Ref<number>,
+  options?: LayoutEngineOptions,
 ) {
   const layout = ref<LayoutResult | null>(null)
   const error = ref<string | null>(null)
@@ -23,6 +29,11 @@ export function useLayoutEngine(
     worker = new Worker(new URL('../workers/layout.worker.ts', import.meta.url), {
       type: 'module',
     })
+
+    // Configure font API base if provided
+    if (options?.fontApiBase) {
+      worker.postMessage({ type: 'configure', fontApiBase: options.fontApiBase })
+    }
 
     worker.onmessage = (e: MessageEvent<any>) => {
       const msg = e.data
@@ -105,8 +116,15 @@ export function useLayoutEngine(
     if (!worker) initWorker()
     return new Promise(resolve => {
       barcodeReqId++
-      const id = barcodeReqId + 100000 // compile id'leriyle çakışmasın
-      barcodeCallbacks.set(id, resolve)
+      const id = barcodeReqId
+      const timeout = setTimeout(() => {
+        barcodeCallbacks.delete(id)
+        resolve(null)
+      }, 5000)
+      barcodeCallbacks.set(id, (result) => {
+        clearTimeout(timeout)
+        resolve(result)
+      })
       worker!.postMessage({ type: 'barcode', format, value, width, height, includeText, id })
     })
   }
@@ -124,6 +142,10 @@ export function useLayoutEngine(
   function dispose() {
     worker?.terminate()
     worker = null
+    // Bekleyen barcode promise'lerini null ile resolve et
+    for (const cb of barcodeCallbacks.values()) {
+      cb(null)
+    }
     barcodeCallbacks.clear()
   }
 

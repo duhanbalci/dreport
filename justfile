@@ -25,17 +25,50 @@ wasm:
 wasm-watch:
     watchexec -w layout-engine/src -w core/src -e rs -- just wasm
 
+# --- Test Komutlari ---
+
+# Rust testleri (core + layout-engine + backend)
+test-rust:
+    cargo test
+
+# Frontend unit testleri (Vitest)
+test-front:
+    cd frontend && bun run test:run
+
 # Generate PDF reference PNGs for cross-renderer visual tests
 visual-refs:
     cargo test -p dreport-layout --test visual_test -- generate_cross_renderer --ignored
 
-# Run cross-renderer visual tests (Playwright vs PDF)
-visual-test: visual-refs
+# Rust visual snapshot testleri
+test-visual-rust:
+    cargo test -p dreport-layout --test visual_test
+
+# Cross-renderer visual testleri (Playwright: HTML vs PDF)
+test-visual-cross: visual-refs
     cd frontend && bun run test:visual -- --project=cross-renderer
 
-# Run all visual tests (editor + cross-renderer)
-visual-test-all: visual-refs
+# Editor visual testleri (Playwright)
+test-visual-editor:
+    cd frontend && bun run test:visual -- --project=editor
+
+# Tum visual testler (Playwright: editor + cross-renderer)
+test-visual: visual-refs
     cd frontend && bun run test:visual
+
+# Tum testler (Rust + frontend unit + visual)
+test-all: test-rust test-front test-visual
+
+# Visual diff sonuclarini ac (cross-renderer)
+diff-open:
+    #!/usr/bin/env bash
+    DIFF_DIR="frontend/tests/visual/cross-renderer-diffs"
+    if [ -z "$(ls -A "$DIFF_DIR" 2>/dev/null)" ]; then
+        echo "Diff klasoru bos — once 'just test-visual-cross' calistirin."
+        exit 1
+    fi
+    open "$DIFF_DIR"/*_diff.png "$DIFF_DIR"/*_html.png 2>/dev/null || xdg-open "$DIFF_DIR" 2>/dev/null || echo "Dosyalar: $DIFF_DIR"
+
+# --- Publish ---
 
 # Publish dreport-core to Gitea
 publish-core:

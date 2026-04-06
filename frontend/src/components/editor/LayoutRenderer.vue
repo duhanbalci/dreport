@@ -234,7 +234,7 @@ watch(
             :style="{
               width: '100%',
               height: '100%',
-              objectFit: 'fill',
+              objectFit: el.style.objectFit || 'fill',
             }"
           />
           <div v-else class="layout-el__placeholder">Görsel</div>

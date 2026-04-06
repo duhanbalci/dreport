@@ -14,27 +14,10 @@ fn load_test_fonts() -> Vec<FontData> {
         let entry = entry.unwrap();
         let path = entry.path();
         if path.extension().is_some_and(|e| e == "ttf") {
-            let family = path
-                .file_stem()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .split('-')
-                .next()
-                .unwrap_or("Unknown")
-                .to_string();
-            // Map NotoSans → "Noto Sans", NotoSansMono → "Noto Sans Mono"
-            let family = if family == "NotoSansMono" {
-                "Noto Sans Mono".to_string()
-            } else if family == "NotoSans" {
-                "Noto Sans".to_string()
-            } else {
-                family
-            };
-            fonts.push(FontData {
-                family,
-                data: std::fs::read(&path).unwrap(),
-            });
+            let data = std::fs::read(&path).unwrap();
+            if let Some(fd) = FontData::from_bytes(data) {
+                fonts.push(fd);
+            }
         }
     }
     fonts
@@ -51,6 +34,7 @@ fn simple_template() -> Template {
         fonts: vec!["Noto Sans".to_string()],
         header: None,
         footer: None,
+        format_config: None,
         root: ContainerElement {
             id: "root".to_string(),
             position: PositionMode::Flow,
@@ -92,7 +76,7 @@ fn test_compute_layout_single_page() {
     let data = serde_json::json!({});
     let fonts = load_test_fonts();
 
-    let result: LayoutResult = compute_layout(&template, &data, &fonts);
+    let result: LayoutResult = compute_layout(&template, &data, &fonts).unwrap();
 
     assert_eq!(result.pages.len(), 1);
     let page = &result.pages[0];
@@ -106,7 +90,7 @@ fn test_compute_layout_elements_within_page() {
     let data = serde_json::json!({});
     let fonts = load_test_fonts();
 
-    let result = compute_layout(&template, &data, &fonts);
+    let result = compute_layout(&template, &data, &fonts).unwrap();
     let page = &result.pages[0];
 
     // Should have at least root + title = 2 elements
@@ -169,7 +153,7 @@ fn test_compute_layout_text_content_resolved() {
     let data = serde_json::json!({});
     let fonts = load_test_fonts();
 
-    let result = compute_layout(&template, &data, &fonts);
+    let result = compute_layout(&template, &data, &fonts).unwrap();
     let page = &result.pages[0];
 
     let title = page.elements.iter().find(|e| e.id == "title").unwrap();
@@ -193,6 +177,7 @@ fn test_compute_layout_with_data_binding() {
         fonts: vec!["Noto Sans".to_string()],
         header: None,
         footer: None,
+        format_config: None,
         root: ContainerElement {
             id: "root".to_string(),
             position: PositionMode::Flow,
@@ -234,7 +219,7 @@ fn test_compute_layout_with_data_binding() {
     });
     let fonts = load_test_fonts();
 
-    let result = compute_layout(&template, &data, &fonts);
+    let result = compute_layout(&template, &data, &fonts).unwrap();
     let page = &result.pages[0];
 
     let bound = page
@@ -262,6 +247,7 @@ fn test_compute_layout_multiple_children_ordering() {
         fonts: vec!["Noto Sans".to_string()],
         header: None,
         footer: None,
+        format_config: None,
         root: ContainerElement {
             id: "root".to_string(),
             position: PositionMode::Flow,
@@ -314,7 +300,7 @@ fn test_compute_layout_multiple_children_ordering() {
     let data = serde_json::json!({});
     let fonts = load_test_fonts();
 
-    let result = compute_layout(&template, &data, &fonts);
+    let result = compute_layout(&template, &data, &fonts).unwrap();
     let page = &result.pages[0];
 
     let first = page.elements.iter().find(|e| e.id == "first").unwrap();
