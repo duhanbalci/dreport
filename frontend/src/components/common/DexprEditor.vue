@@ -2,8 +2,8 @@
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { EditorView, lineNumbers } from '@codemirror/view'
 import { EditorState } from '@codemirror/state'
-import { dexpr } from 'codemirror-lang-dexpr'
-import type { DexprLanguageInfo } from 'codemirror-lang-dexpr'
+import { dexpr } from '@duhanbalci/codemirror-lang-dexpr'
+import type { DexprLanguageInfo } from '@duhanbalci/codemirror-lang-dexpr'
 import { useSchemaStore } from '../../stores/schema'
 import type { SchemaNode } from '../../core/schema-parser'
 

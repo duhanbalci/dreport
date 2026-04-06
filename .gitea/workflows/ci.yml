@@ -28,6 +28,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Build WASM
+        run: wasm-pack build layout-engine --target web --release --out-dir ../frontend/src/core/wasm-layout
       - name: Install dependencies
         run: cd frontend && bun install
       - name: Type check
