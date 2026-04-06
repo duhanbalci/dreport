@@ -84,9 +84,9 @@ function shapeStyle(el: ElementLayout): Record<string, string> {
 function lineStyle(el: ElementLayout): Record<string, string> {
   const st = el.style
   return {
-    borderTop: `${(st.strokeWidth ?? 0.5) * props.scale}px solid ${st.strokeColor ?? '#000'}`,
+    backgroundColor: st.strokeColor ?? '#000',
     width: '100%',
-    height: '0',
+    height: '100%',
   }
 }
 
@@ -96,12 +96,17 @@ async function renderBarcodeToCanvas(canvas: HTMLCanvasElement, format: string, 
   if (!value || !generateBarcode) return
 
   try {
-    // WASM'dan yüksek çözünürlüklü pixel verisi al
-    // QR her zaman kare
+    // Eleman boyutlarından piksel boyutlarını hesapla (PDF ile aynı mantık: pt * 4)
+    // data-el-w ve data-el-h mm cinsinden, MM_TO_PT = 72/25.4 = 2.83465
+    const elWmm = parseFloat(canvas.dataset.elW || '30')
+    const elHmm = parseFloat(canvas.dataset.elH || '15')
+    const MM_TO_PT = 72 / 25.4
     const isQr = format === 'qr'
-    const size = isQr ? 300 : 400
-    const height = isQr ? 300 : 150
-    const result = await generateBarcode(format, value, size, height, isQr ? false : includeText)
+    const wPt = elWmm * MM_TO_PT
+    const hPt = elHmm * MM_TO_PT
+    const size = Math.max(1, Math.round(wPt * 4))
+    const barcodeHeight = Math.max(1, Math.round(hPt * 4))
+    const result = await generateBarcode(format, value, size, barcodeHeight, isQr ? false : includeText)
     if (!result) return
 
     // Canvas boyutlarını WASM çıktısına ayarla (crisp rendering)
@@ -248,6 +253,8 @@ watch(
             :data-format="el.content.format"
             :data-value="el.content.value"
             :data-include-text="el.style.barcodeIncludeText ?? (el.content.format === 'ean13' || el.content.format === 'ean8')"
+            :data-el-w="el.width_mm"
+            :data-el-h="el.height_mm"
             :style="{ width: '100%', height: '100%', display: 'block' }"
           />
           <div v-else class="layout-el__placeholder">

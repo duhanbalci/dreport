@@ -46,6 +46,52 @@ fn parse_color(hex: &str) -> rgb::Color {
     rgb::Color::new(r, g, b)
 }
 
+/// Rounded rectangle path oluştur. radius 0 ise düz dikdörtgen.
+fn build_rect_path(x: f32, y: f32, w: f32, h: f32, radius: f32) -> Option<krilla::geom::Path> {
+    let mut pb = PathBuilder::new();
+    if radius <= 0.0 {
+        if let Some(rect) = krilla::geom::Rect::from_xywh(x, y, w, h) {
+            pb.push_rect(rect);
+        }
+    } else {
+        // Radius'u yarım kenar uzunluğuyla sınırla
+        let r = radius.min(w / 2.0).min(h / 2.0);
+        // Cubic bezier kappa faktörü (daire yaklaşımı)
+        let k = r * 0.5522848;
+
+        // Sağ üst köşeden başla, saat yönünde
+        pb.move_to(x + r, y);
+        pb.line_to(x + w - r, y);
+        pb.cubic_to(x + w - r + k, y, x + w, y + r - k, x + w, y + r);
+        pb.line_to(x + w, y + h - r);
+        pb.cubic_to(x + w, y + h - r + k, x + w - r + k, y + h, x + w - r, y + h);
+        pb.line_to(x + r, y + h);
+        pb.cubic_to(x + r - k, y + h, x, y + h - r + k, x, y + h - r);
+        pb.line_to(x, y + r);
+        pb.cubic_to(x, y + r - k, x + r - k, y, x + r, y);
+        pb.close();
+    }
+    pb.finish()
+}
+
+/// Ellipse path oluştur (4 cubic bezier ile)
+fn build_ellipse_path(x: f32, y: f32, w: f32, h: f32) -> Option<krilla::geom::Path> {
+    let mut pb = PathBuilder::new();
+    let cx = x + w / 2.0;
+    let cy = y + h / 2.0;
+    let rx = w / 2.0;
+    let ry = h / 2.0;
+    let kx = rx * 0.5522848;
+    let ky = ry * 0.5522848;
+    pb.move_to(cx, cy - ry);
+    pb.cubic_to(cx + kx, cy - ry, cx + rx, cy - ky, cx + rx, cy);
+    pb.cubic_to(cx + rx, cy + ky, cx + kx, cy + ry, cx, cy + ry);
+    pb.cubic_to(cx - kx, cy + ry, cx - rx, cy + ky, cx - rx, cy);
+    pb.cubic_to(cx - rx, cy - ky, cx - kx, cy - ry, cx, cy - ry);
+    pb.close();
+    pb.finish()
+}
+
 fn fill_from_color(color: rgb::Color) -> Fill {
     Fill {
         paint: color.into(),
@@ -54,18 +100,30 @@ fn fill_from_color(color: rgb::Color) -> Fill {
     }
 }
 
+/// Font metrikleri — ascender ve descender oranları (unitsPerEm'e bölünmüş)
+#[derive(Clone, Copy)]
+struct FontMetrics {
+    /// sTypoAscender / unitsPerEm (pozitif, genelde 0.7–1.1)
+    ascender: f32,
+    /// |sTypoDescender| / unitsPerEm (pozitif, genelde 0.2–0.4)
+    descender: f32,
+}
+
 /// Font koleksiyonu — family + weight + italic → KrillaFont mapping
 struct FontCollection {
     /// (family_lower, is_bold, is_italic) → KrillaFont
     fonts: HashMap<(String, bool, bool), KrillaFont>,
     /// Fallback font (ilk yüklenen regular)
     default: Option<KrillaFont>,
+    /// Font metrikleri: (family_lower, is_bold) → FontMetrics
+    metrics: HashMap<(String, bool), FontMetrics>,
 }
 
 impl FontCollection {
     fn new(font_data: &[FontData]) -> Self {
         let mut fonts = HashMap::new();
         let mut default = None;
+        let mut metrics = HashMap::new();
 
         for fd in font_data {
             let Some(font) = KrillaFont::new(
@@ -84,6 +142,11 @@ impl FontCollection {
                 default = Some(font.clone());
             }
 
+            // Font metriklerini OS/2 tablosundan oku
+            if let Some(m) = read_font_metrics(&fd.data) {
+                metrics.insert((family_lower.clone(), is_bold), m);
+            }
+
             fonts.insert((family_lower.clone(), is_bold, is_italic), font);
         }
 
@@ -94,7 +157,7 @@ impl FontCollection {
             }
         }
 
-        Self { fonts, default }
+        Self { fonts, default, metrics }
     }
 
     fn get(&self, family: Option<&str>, weight: Option<&str>) -> Option<&KrillaFont> {
@@ -107,6 +170,80 @@ impl FontCollection {
             .or_else(|| self.fonts.get(&(family_lower, false, false)))
             .or(self.default.as_ref())
     }
+
+    /// CSS line-height: 1.2 modeline uygun baseline offset hesapla (pt cinsinden).
+    ///
+    /// CSS modeli:
+    ///   content_height = (ascender + |descender|) * font_size
+    ///   half_leading = (line_height - content_height) / 2
+    ///   baseline_from_top = half_leading + ascender * font_size
+    fn baseline_offset(&self, family: Option<&str>, weight: Option<&str>, font_size: f32) -> f32 {
+        let is_bold = matches!(weight, Some("bold"));
+        let family_lower = family.unwrap_or("noto sans").to_lowercase();
+
+        let m = self.metrics
+            .get(&(family_lower.clone(), is_bold))
+            .or_else(|| self.metrics.get(&(family_lower, false)))
+            .copied();
+
+        match m {
+            Some(m) => {
+                let content_height = (m.ascender + m.descender) * font_size;
+                let line_height = font_size * 1.2;
+                let half_leading = (line_height - content_height) / 2.0;
+                half_leading + m.ascender * font_size
+            }
+            None => font_size * 0.8, // Fallback
+        }
+    }
+}
+
+/// TTF OS/2 tablosundan font metriklerini oku
+fn read_font_metrics(data: &[u8]) -> Option<FontMetrics> {
+    let units_per_em = read_units_per_em(data)?;
+    if units_per_em == 0 {
+        return None;
+    }
+
+    let table_offset = find_os2_table(data)?;
+    // sTypoAscender: offset 68 (int16), sTypoDescender: offset 70 (int16, negatif)
+    if table_offset + 72 > data.len() {
+        return None;
+    }
+    let ascender = i16::from_be_bytes([data[table_offset + 68], data[table_offset + 69]]);
+    let descender = i16::from_be_bytes([data[table_offset + 70], data[table_offset + 71]]);
+
+    Some(FontMetrics {
+        ascender: ascender as f32 / units_per_em as f32,
+        descender: descender.unsigned_abs() as f32 / units_per_em as f32,
+    })
+}
+
+/// TTF head tablosundan unitsPerEm oku
+fn read_units_per_em(data: &[u8]) -> Option<u16> {
+    if data.len() < 12 {
+        return None;
+    }
+    let num_tables = u16::from_be_bytes([data[4], data[5]]) as usize;
+    let mut offset = 12;
+    for _ in 0..num_tables {
+        if offset + 16 > data.len() {
+            break;
+        }
+        let tag = &data[offset..offset + 4];
+        if tag == b"head" {
+            let table_offset =
+                u32::from_be_bytes([data[offset + 8], data[offset + 9], data[offset + 10], data[offset + 11]])
+                    as usize;
+            // unitsPerEm: head tablosunda offset 18 (uint16)
+            if table_offset + 20 <= data.len() {
+                return Some(u16::from_be_bytes([data[table_offset + 18], data[table_offset + 19]]));
+            }
+            return None;
+        }
+        offset += 16;
+    }
+    None
 }
 
 /// TTF OS/2 tablosunun offset'ini bul
@@ -228,7 +365,7 @@ fn render_element(
             render_text(surface, x, y, w, h, value, &el.style, fonts, measurer);
         }
         ResolvedContent::Line => {
-            render_line(surface, x, y, w, &el.style);
+            render_line(surface, x, y, w, h, &el.style);
         }
         ResolvedContent::Image { src } => {
             render_image(surface, x, y, w, h, src);
@@ -275,60 +412,68 @@ fn render_shape(
         return;
     }
 
-    if let Some(ref bg) = style.background_color {
-        surface.set_fill(Some(fill_from_color(parse_color(bg))));
-    } else {
-        surface.set_fill(None);
-    }
+    let shape_type = match content {
+        Some(ResolvedContent::Shape { shape_type }) => shape_type.as_str(),
+        _ => "rectangle",
+    };
+
+    let rect_radius = |s: &ResolvedStyle| -> f32 {
+        if shape_type == "rounded_rectangle" {
+            s.border_radius.map(|r| mm(r)).unwrap_or(mm(3.0))
+        } else {
+            s.border_radius.map(|r| mm(r)).unwrap_or(0.0)
+        }
+    };
 
     if has_border {
-        let border_color = parse_color(style.border_color.as_deref().unwrap_or("#000000"));
         let border_width = mm(style.border_width.unwrap_or(0.5));
+        let border_color = parse_color(style.border_color.as_deref().unwrap_or("#000000"));
+        let inset = border_width / 2.0;
+
+        // Fill + stroke tek path ile — anti-aliasing uyumu
+        if let Some(ref bg) = style.background_color {
+            surface.set_fill(Some(fill_from_color(parse_color(bg))));
+        } else {
+            surface.set_fill(None);
+        }
         surface.set_stroke(Some(Stroke {
             paint: border_color.into(),
             width: border_width,
             opacity: NormalizedF32::ONE,
             ..Default::default()
         }));
-    } else {
-        surface.set_stroke(None);
-    }
 
-    let shape_type = match content {
-        Some(ResolvedContent::Shape { shape_type }) => shape_type.as_str(),
-        _ => "rectangle",
-    };
-
-    let path = match shape_type {
-        "ellipse" => {
-            let mut pb = PathBuilder::new();
-            let cx = x + w / 2.0;
-            let cy = y + h / 2.0;
-            let rx = w / 2.0;
-            let ry = h / 2.0;
-            // Approximate ellipse with 4 cubic bezier curves
-            let kx = rx * 0.5522848;
-            let ky = ry * 0.5522848;
-            pb.move_to(cx, cy - ry);
-            pb.cubic_to(cx + kx, cy - ry, cx + rx, cy - ky, cx + rx, cy);
-            pb.cubic_to(cx + rx, cy + ky, cx + kx, cy + ry, cx, cy + ry);
-            pb.cubic_to(cx - kx, cy + ry, cx - rx, cy + ky, cx - rx, cy);
-            pb.cubic_to(cx - rx, cy - ky, cx - kx, cy - ry, cx, cy - ry);
-            pb.close();
-            pb.finish()
-        }
-        _ => {
-            // rectangle / rounded_rectangle
-            let mut pb = PathBuilder::new();
-            if let Some(rect) = krilla::geom::Rect::from_xywh(x, y, w, h) {
-                pb.push_rect(rect);
+        let path = match shape_type {
+            "ellipse" => build_ellipse_path(
+                x + inset, y + inset,
+                w - border_width, h - border_width,
+            ),
+            _ => {
+                let radius = rect_radius(style);
+                build_rect_path(
+                    x + inset, y + inset,
+                    w - border_width, h - border_width,
+                    (radius - inset).max(0.0),
+                )
             }
-            pb.finish()
+        };
+        if let Some(p) = path {
+            surface.draw_path(&p);
         }
-    };
+    } else {
+        // Sadece fill, border yok
+        surface.set_fill(Some(fill_from_color(parse_color(
+            style.background_color.as_deref().unwrap_or("#ffffff"),
+        ))));
+        surface.set_stroke(None);
 
-    if let Some(p) = path {
-        surface.draw_path(&p);
+        let path = match shape_type {
+            "ellipse" => build_ellipse_path(x, y, w, h),
+            _ => build_rect_path(x, y, w, h, rect_radius(style)),
+        };
+        if let Some(p) = path {
+            surface.draw_path(&p);
+        }
     }
 
     surface.set_fill(None);
@@ -346,8 +491,9 @@ fn render_checkbox(
 ) {
     let border_color = parse_color(style.border_color.as_deref().unwrap_or("#333333"));
     let border_width = mm(style.border_width.unwrap_or(0.3));
+    let inset = border_width / 2.0;
 
-    // Draw box outline
+    // Draw box outline (inset for CSS border-box match)
     surface.set_fill(None);
     surface.set_stroke(Some(Stroke {
         paint: border_color.into(),
@@ -356,14 +502,11 @@ fn render_checkbox(
         ..Default::default()
     }));
 
-    let rect_path = {
-        let mut pb = PathBuilder::new();
-        if let Some(rect) = krilla::geom::Rect::from_xywh(x, y, w, h) {
-            pb.push_rect(rect);
-        }
-        pb.finish()
-    };
-    if let Some(p) = rect_path {
+    if let Some(p) = build_rect_path(
+        x + inset, y + inset,
+        w - border_width, h - border_width,
+        0.0,
+    ) {
         surface.draw_path(&p);
     }
 
@@ -413,40 +556,44 @@ fn render_container_bg(
         return;
     }
 
-    // Fill
-    if let Some(ref bg) = style.background_color {
-        surface.set_fill(Some(fill_from_color(parse_color(bg))));
-    } else {
-        surface.set_fill(None);
-    }
+    let radius = style.border_radius.map(|r| mm(r)).unwrap_or(0.0);
 
-    // Stroke
     if has_border {
-        let border_color = parse_color(style.border_color.as_deref().unwrap_or("#000000"));
         let border_width = mm(style.border_width.unwrap_or(0.5));
+        let border_color = parse_color(style.border_color.as_deref().unwrap_or("#000000"));
+        let inset = border_width / 2.0;
+
+        // CSS border-box: stroke path'i border_width/2 içeri çek.
+        // Tek draw_path ile hem fill hem stroke çizerek anti-aliasing uyumunu sağla.
+        if let Some(ref bg) = style.background_color {
+            surface.set_fill(Some(fill_from_color(parse_color(bg))));
+        } else {
+            surface.set_fill(None);
+        }
         surface.set_stroke(Some(Stroke {
             paint: border_color.into(),
             width: border_width,
             opacity: NormalizedF32::ONE,
             ..Default::default()
         }));
-    } else {
-        surface.set_stroke(None);
-    }
-
-    let rect_path = {
-        let mut pb = PathBuilder::new();
-        if let Some(rect) = krilla::geom::Rect::from_xywh(x, y, w, h) {
-            pb.push_rect(rect);
+        if let Some(path) = build_rect_path(
+            x + inset, y + inset,
+            w - border_width, h - border_width,
+            (radius - inset).max(0.0),
+        ) {
+            surface.draw_path(&path);
         }
-        pb.finish()
-    };
-
-    if let Some(path) = rect_path {
-        surface.draw_path(&path);
+    } else {
+        // Sadece background, border yok
+        surface.set_fill(Some(fill_from_color(parse_color(
+            style.background_color.as_deref().unwrap_or("#ffffff"),
+        ))));
+        surface.set_stroke(None);
+        if let Some(path) = build_rect_path(x, y, w, h, radius) {
+            surface.draw_path(&path);
+        }
     }
 
-    // Reset
     surface.set_fill(None);
     surface.set_stroke(None);
 }
@@ -483,8 +630,12 @@ fn render_text(
     surface.set_fill(Some(fill_from_color(color)));
     surface.set_stroke(None);
 
-    // Text baseline: y + ascent (yaklaşık font_size * 0.8)
-    let baseline_y = y + font_size * 0.8;
+    // Text baseline: CSS line-height 1.2 modeline uygun hesapla
+    let baseline_y = y + fonts.baseline_offset(
+        style.font_family.as_deref(),
+        style.font_weight.as_deref(),
+        font_size,
+    );
 
     // Hizalama — cosmic-text ile text genişliğini ölçerek gerçek pozisyon hesapla
     let text_x = match style.text_align.as_deref() {
@@ -561,7 +712,7 @@ fn render_rich_text(
         .iter()
         .map(|s| s.font_size.map(|f| f as f32).unwrap_or(default_font_size))
         .fold(0.0f32, f32::max);
-    let baseline_y = y + max_font_size * 0.8;
+    let baseline_y = y + fonts.baseline_offset(default_family, default_weight, max_font_size);
 
     let mut cursor_x = line_start_x;
 
@@ -607,6 +758,7 @@ fn render_line(
     x: f32,
     y: f32,
     w: f32,
+    h: f32,
     style: &ResolvedStyle,
 ) {
     let stroke_color = style
@@ -614,29 +766,27 @@ fn render_line(
         .as_deref()
         .map(parse_color)
         .unwrap_or(rgb::Color::new(0, 0, 0));
-    let stroke_width = mm(style.stroke_width.unwrap_or(0.5));
 
-    surface.set_fill(None);
-    surface.set_stroke(Some(Stroke {
-        paint: stroke_color.into(),
-        width: stroke_width,
-        opacity: NormalizedF32::ONE,
-        ..Default::default()
-    }));
+    // Çizgiyi filled rectangle olarak çiz — CSS borderTop ile aynı davranış.
+    // Stroke kullanmak sub-pixel anti-aliasing farkları yaratır.
+    surface.set_fill(Some(fill_from_color(stroke_color)));
+    surface.set_stroke(None);
 
-    let line_y = y + stroke_width / 2.0;
-    let path = {
+    let rect_path = {
         let mut pb = PathBuilder::new();
-        pb.move_to(x, line_y);
-        pb.line_to(x + w, line_y);
+        // Eleman yüksekliği layout engine tarafından stroke_width olarak hesaplandı.
+        // Tüm eleman alanını dolduran ince dikdörtgen çiz.
+        if let Some(rect) = krilla::geom::Rect::from_xywh(x, y, w, h) {
+            pb.push_rect(rect);
+        }
         pb.finish()
     };
 
-    if let Some(p) = path {
+    if let Some(p) = rect_path {
         surface.draw_path(&p);
     }
 
-    surface.set_stroke(None);
+    surface.set_fill(None);
 }
 
 fn render_image(
