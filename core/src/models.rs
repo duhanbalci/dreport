@@ -97,6 +97,20 @@ pub struct ContainerStyle {
     pub border_style: Option<String>,
 }
 
+// --- Condition (v-if benzeri koşullu gösterim) ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Condition {
+    /// Data JSON'daki alan yolu (ör: "toplamlar.iskonto")
+    pub path: String,
+    /// Karşılaştırma operatörü: eq, neq, gt, gte, lt, lte, empty, not_empty
+    pub operator: String,
+    /// Karşılaştırılacak değer (empty/not_empty için gerekmez)
+    #[serde(default)]
+    pub value: Option<serde_json::Value>,
+}
+
 // --- Binding ---
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -234,6 +248,8 @@ pub struct ChartStyle {
 #[serde(rename_all = "camelCase")]
 pub struct ChartElement {
     pub id: String,
+    #[serde(default)]
+    pub condition: Option<Condition>,
     pub position: PositionMode,
     pub size: SizeConstraint,
     pub chart_type: ChartType,
@@ -340,6 +356,26 @@ impl TemplateElement {
         }
     }
 
+    pub fn condition(&self) -> Option<&Condition> {
+        match self {
+            Self::Container(e) => e.condition.as_ref(),
+            Self::StaticText(e) => e.condition.as_ref(),
+            Self::Text(e) => e.condition.as_ref(),
+            Self::Line(e) => e.condition.as_ref(),
+            Self::RepeatingTable(e) => e.condition.as_ref(),
+            Self::Image(e) => e.condition.as_ref(),
+            Self::PageNumber(e) => e.condition.as_ref(),
+            Self::Barcode(e) => e.condition.as_ref(),
+            Self::PageBreak(e) => e.condition.as_ref(),
+            Self::CurrentDate(e) => e.condition.as_ref(),
+            Self::Shape(e) => e.condition.as_ref(),
+            Self::Checkbox(e) => e.condition.as_ref(),
+            Self::CalculatedText(e) => e.condition.as_ref(),
+            Self::RichText(e) => e.condition.as_ref(),
+            Self::Chart(e) => e.condition.as_ref(),
+        }
+    }
+
     pub fn size(&self) -> &SizeConstraint {
         static DEFAULT_SIZE: SizeConstraint = SizeConstraint {
             width: SizeValue::Auto,
@@ -373,6 +409,8 @@ impl TemplateElement {
 #[serde(rename_all = "camelCase")]
 pub struct RichTextElement {
     pub id: String,
+    #[serde(default)]
+    pub condition: Option<Condition>,
     pub position: PositionMode,
     pub size: SizeConstraint,
     #[serde(default)]
@@ -384,6 +422,8 @@ pub struct RichTextElement {
 #[serde(rename_all = "camelCase")]
 pub struct ContainerElement {
     pub id: String,
+    #[serde(default)]
+    pub condition: Option<Condition>,
     #[serde(default)]
     pub position: PositionMode,
     #[serde(default)]
@@ -424,6 +464,8 @@ fn default_start() -> String {
 #[serde(rename_all = "camelCase")]
 pub struct StaticTextElement {
     pub id: String,
+    #[serde(default)]
+    pub condition: Option<Condition>,
     pub position: PositionMode,
     pub size: SizeConstraint,
     pub style: TextStyle,
@@ -434,6 +476,8 @@ pub struct StaticTextElement {
 #[serde(rename_all = "camelCase")]
 pub struct TextElement {
     pub id: String,
+    #[serde(default)]
+    pub condition: Option<Condition>,
     pub position: PositionMode,
     pub size: SizeConstraint,
     pub style: TextStyle,
@@ -445,6 +489,8 @@ pub struct TextElement {
 #[serde(rename_all = "camelCase")]
 pub struct LineElement {
     pub id: String,
+    #[serde(default)]
+    pub condition: Option<Condition>,
     pub position: PositionMode,
     pub size: SizeConstraint,
     pub style: LineStyle,
@@ -454,6 +500,8 @@ pub struct LineElement {
 #[serde(rename_all = "camelCase")]
 pub struct ImageElement {
     pub id: String,
+    #[serde(default)]
+    pub condition: Option<Condition>,
     pub position: PositionMode,
     pub size: SizeConstraint,
     pub src: Option<String>,
@@ -465,6 +513,8 @@ pub struct ImageElement {
 #[serde(rename_all = "camelCase")]
 pub struct PageNumberElement {
     pub id: String,
+    #[serde(default)]
+    pub condition: Option<Condition>,
     pub position: PositionMode,
     pub size: SizeConstraint,
     pub style: TextStyle,
@@ -475,6 +525,8 @@ pub struct PageNumberElement {
 #[serde(rename_all = "camelCase")]
 pub struct BarcodeElement {
     pub id: String,
+    #[serde(default)]
+    pub condition: Option<Condition>,
     pub position: PositionMode,
     pub size: SizeConstraint,
     pub format: String, // qr, ean13, ean8, code128, code39
@@ -487,6 +539,8 @@ pub struct BarcodeElement {
 #[serde(rename_all = "camelCase")]
 pub struct RepeatingTableElement {
     pub id: String,
+    #[serde(default)]
+    pub condition: Option<Condition>,
     pub position: PositionMode,
     pub size: SizeConstraint,
     pub data_source: ArrayBinding,
@@ -504,12 +558,16 @@ fn default_true() -> Option<bool> {
 #[serde(rename_all = "camelCase")]
 pub struct PageBreakElement {
     pub id: String,
+    #[serde(default)]
+    pub condition: Option<Condition>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CurrentDateElement {
     pub id: String,
+    #[serde(default)]
+    pub condition: Option<Condition>,
     pub position: PositionMode,
     pub size: SizeConstraint,
     pub style: TextStyle,
@@ -520,6 +578,8 @@ pub struct CurrentDateElement {
 #[serde(rename_all = "camelCase")]
 pub struct ShapeElement {
     pub id: String,
+    #[serde(default)]
+    pub condition: Option<Condition>,
     pub position: PositionMode,
     pub size: SizeConstraint,
     pub shape_type: String, // rectangle, ellipse, rounded_rectangle
@@ -539,6 +599,8 @@ pub struct CheckboxStyle {
 #[serde(rename_all = "camelCase")]
 pub struct CheckboxElement {
     pub id: String,
+    #[serde(default)]
+    pub condition: Option<Condition>,
     pub position: PositionMode,
     pub size: SizeConstraint,
     pub checked: Option<bool>,          // statik değer
@@ -550,6 +612,8 @@ pub struct CheckboxElement {
 #[serde(rename_all = "camelCase")]
 pub struct CalculatedTextElement {
     pub id: String,
+    #[serde(default)]
+    pub condition: Option<Condition>,
     pub position: PositionMode,
     pub size: SizeConstraint,
     pub style: TextStyle,
@@ -572,6 +636,10 @@ pub struct Template {
     pub root: ContainerElement,
     #[serde(default)]
     pub format_config: Option<FormatConfig>,
+    /// Lokalizasyon: "tr-TR", "en-US", "de-DE", "fr-FR" vb.
+    /// Belirtilirse ve format_config yoksa, locale'den FormatConfig türetilir.
+    #[serde(default)]
+    pub locale: Option<String>,
 }
 
 /// Sayı/para birimi formatlama ayarları.
@@ -614,6 +682,56 @@ impl Default for FormatConfig {
             decimal_separator: Self::default_decimal_sep(),
             currency_symbol: Self::default_currency_symbol(),
             currency_position: Self::default_currency_position(),
+        }
+    }
+}
+
+impl FormatConfig {
+    /// Locale string'inden FormatConfig türet.
+    /// Desteklenen locale'ler: tr-TR, en-US, de-DE, fr-FR.
+    /// Bilinmeyen locale → Türk formatı (varsayılan).
+    pub fn from_locale(locale: &str) -> Self {
+        match locale {
+            "en-US" | "en" => Self {
+                thousands_separator: ",".to_string(),
+                decimal_separator: ".".to_string(),
+                currency_symbol: "$".to_string(),
+                currency_position: "prefix".to_string(),
+            },
+            "de-DE" | "de" => Self {
+                thousands_separator: ".".to_string(),
+                decimal_separator: ",".to_string(),
+                currency_symbol: "€".to_string(),
+                currency_position: "suffix".to_string(),
+            },
+            "fr-FR" | "fr" => Self {
+                thousands_separator: " ".to_string(),
+                decimal_separator: ",".to_string(),
+                currency_symbol: "€".to_string(),
+                currency_position: "suffix".to_string(),
+            },
+            "en-GB" | "gb" => Self {
+                thousands_separator: ",".to_string(),
+                decimal_separator: ".".to_string(),
+                currency_symbol: "£".to_string(),
+                currency_position: "prefix".to_string(),
+            },
+            // tr-TR veya bilinmeyen → Türk formatı
+            _ => Self::default(),
+        }
+    }
+}
+
+impl Template {
+    /// Template'in etkin FormatConfig'ini döndür.
+    /// Öncelik: format_config > locale > varsayılan (tr-TR).
+    pub fn effective_format_config(&self) -> FormatConfig {
+        if let Some(ref fc) = self.format_config {
+            fc.clone()
+        } else if let Some(ref locale) = self.locale {
+            FormatConfig::from_locale(locale)
+        } else {
+            FormatConfig::default()
         }
     }
 }

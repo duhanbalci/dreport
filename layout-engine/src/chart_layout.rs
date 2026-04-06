@@ -162,6 +162,8 @@ pub struct PieChartLayout {
     pub inner_radius: f64,
     pub slices: Vec<PieSlice>,
     pub show_labels: bool,
+    /// Category name labels + leader lines outside slices
+    pub show_cat_labels: bool,
     pub label_font: f64,
     pub label_color: String,
 }
@@ -955,6 +957,7 @@ pub fn compute_pie_layout(data: &dyn ChartDataSource, cl: &ChartLayout) -> PieCh
         inner_radius: inner_r,
         slices,
         show_labels,
+        show_cat_labels: show_labels,
         label_font,
         label_color,
     }

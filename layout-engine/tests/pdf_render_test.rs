@@ -21,8 +21,10 @@ fn simple_template() -> Template {
         header: None,
         footer: None,
         format_config: None,
+        locale: None,
         root: ContainerElement {
             id: "root".to_string(),
+            condition: None,
             position: PositionMode::Flow,
             size: SizeConstraint::default(),
             direction: "column".to_string(),
@@ -39,6 +41,7 @@ fn simple_template() -> Template {
             break_inside: "auto".to_string(),
             children: vec![TemplateElement::StaticText(StaticTextElement {
                 id: "title".to_string(),
+                condition: None,
                 position: PositionMode::Flow,
                 size: SizeConstraint {
                     width: SizeValue::Fr { value: 1.0 },
@@ -89,8 +92,10 @@ fn test_render_pdf_with_multiple_elements() {
         header: None,
         footer: None,
         format_config: None,
+        locale: None,
         root: ContainerElement {
             id: "root".to_string(),
+            condition: None,
             position: PositionMode::Flow,
             size: SizeConstraint::default(),
             direction: "column".to_string(),
@@ -108,6 +113,7 @@ fn test_render_pdf_with_multiple_elements() {
             children: vec![
                 TemplateElement::StaticText(StaticTextElement {
                     id: "header".to_string(),
+                    condition: None,
                     position: PositionMode::Flow,
                     size: SizeConstraint {
                         width: SizeValue::Fr { value: 1.0 },
@@ -123,6 +129,7 @@ fn test_render_pdf_with_multiple_elements() {
                 }),
                 TemplateElement::Line(LineElement {
                     id: "sep".to_string(),
+                    condition: None,
                     position: PositionMode::Flow,
                     size: SizeConstraint {
                         width: SizeValue::Fr { value: 1.0 },
@@ -136,6 +143,7 @@ fn test_render_pdf_with_multiple_elements() {
                 }),
                 TemplateElement::StaticText(StaticTextElement {
                     id: "body".to_string(),
+                    condition: None,
                     position: PositionMode::Flow,
                     size: SizeConstraint {
                         width: SizeValue::Fr { value: 1.0 },
@@ -182,8 +190,10 @@ fn test_render_pdf_with_container_styles() {
         header: None,
         footer: None,
         format_config: None,
+        locale: None,
         root: ContainerElement {
             id: "root".to_string(),
+            condition: None,
             position: PositionMode::Flow,
             size: SizeConstraint::default(),
             direction: "column".to_string(),
@@ -205,6 +215,7 @@ fn test_render_pdf_with_container_styles() {
             break_inside: "auto".to_string(),
             children: vec![TemplateElement::StaticText(StaticTextElement {
                 id: "text".to_string(),
+                condition: None,
                 position: PositionMode::Flow,
                 size: SizeConstraint {
                     width: SizeValue::Fr { value: 1.0 },
@@ -244,8 +255,10 @@ fn test_page_break_produces_multiple_pages() {
         header: None,
         footer: None,
         format_config: None,
+        locale: None,
         root: ContainerElement {
             id: "root".to_string(),
+            condition: None,
             position: PositionMode::Flow,
             size: SizeConstraint::default(),
             direction: "column".to_string(),
@@ -263,6 +276,7 @@ fn test_page_break_produces_multiple_pages() {
             children: vec![
                 TemplateElement::StaticText(StaticTextElement {
                     id: "t1".to_string(),
+                    condition: None,
                     position: PositionMode::Flow,
                     size: SizeConstraint {
                         width: SizeValue::Fr { value: 1.0 },
@@ -277,9 +291,11 @@ fn test_page_break_produces_multiple_pages() {
                 }),
                 TemplateElement::PageBreak(PageBreakElement {
                     id: "pb1".to_string(),
+                    condition: None,
                 }),
                 TemplateElement::StaticText(StaticTextElement {
                     id: "t2".to_string(),
+                    condition: None,
                     position: PositionMode::Flow,
                     size: SizeConstraint {
                         width: SizeValue::Fr { value: 1.0 },

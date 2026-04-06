@@ -233,6 +233,7 @@ pub fn expand_table(
         .map(|(i, col)| {
             let text = TemplateElement::StaticText(StaticTextElement {
                 id: format!("{}_hdr_{}", table.id, i),
+                condition: None,
                 position: PositionMode::Flow,
                 size: SizeConstraint {
                     width: SizeValue::Fr { value: 1.0 },
@@ -254,6 +255,7 @@ pub fn expand_table(
             });
             TemplateElement::Container(ContainerElement {
                 id: format!("{}_hdr_{}_wrap", table.id, i),
+                condition: None,
                 position: PositionMode::Flow,
                 size: SizeConstraint {
                     width: effective_widths[i].clone(),
@@ -282,6 +284,7 @@ pub fn expand_table(
 
     children.push(TemplateElement::Container(ContainerElement {
         id: format!("{}_header", table.id),
+        condition: None,
         position: PositionMode::Flow,
         size: SizeConstraint {
             width: SizeValue::Fr { value: 1.0 },
@@ -313,6 +316,7 @@ pub fn expand_table(
     if table.style.border_color.is_some() {
         children.push(TemplateElement::Line(LineElement {
             id: format!("{}_header_line", table.id),
+            condition: None,
             position: PositionMode::Flow,
             size: SizeConstraint {
                 width: SizeValue::Fr { value: 1.0 },
@@ -340,6 +344,7 @@ pub fn expand_table(
 
                 let text = TemplateElement::StaticText(StaticTextElement {
                     id: format!("{}_r{}c{}", table.id, row_idx, col_idx),
+                    condition: None,
                     position: PositionMode::Flow,
                     size: SizeConstraint {
                         width: SizeValue::Fr { value: 1.0 },
@@ -361,6 +366,7 @@ pub fn expand_table(
                 });
                 TemplateElement::Container(ContainerElement {
                     id: format!("{}_r{}c{}_wrap", table.id, row_idx, col_idx),
+                    condition: None,
                     position: PositionMode::Flow,
                     size: SizeConstraint {
                         width: effective_widths[col_idx].clone(),
@@ -396,6 +402,7 @@ pub fn expand_table(
 
         children.push(TemplateElement::Container(ContainerElement {
             id: format!("{}_row_{}", table.id, row_idx),
+            condition: None,
             position: PositionMode::Flow,
             size: SizeConstraint {
                 width: SizeValue::Fr { value: 1.0 },
@@ -427,6 +434,7 @@ pub fn expand_table(
     // Wrapper container (column direction, tüm tablo)
     ContainerElement {
         id: table.id.clone(),
+        condition: None,
         position: table.position.clone(),
         size: table.size.clone(),
         direction: "column".to_string(),
@@ -471,6 +479,7 @@ mod tests {
 
         RepeatingTableElement {
             id: "tbl".to_string(),
+            condition: None,
             position: PositionMode::Flow,
             size: SizeConstraint {
                 width: SizeValue::Fr { value: 1.0 },
@@ -497,6 +506,7 @@ mod tests {
             page_number_formats: HashMap::new(),
             rich_texts: HashMap::new(),
             charts: HashMap::new(),
+            hidden_elements: std::collections::HashSet::new(),
         }
     }
 
@@ -729,6 +739,7 @@ mod tests {
 
         let table = RepeatingTableElement {
             id: "tbl".to_string(),
+            condition: None,
             position: PositionMode::Flow,
             size: SizeConstraint {
                 width: SizeValue::Fr { value: 1.0 },

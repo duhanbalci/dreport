@@ -1126,7 +1126,7 @@ fn render_chart(
                     );
                 }
 
-                if !slice.cat_label_text.is_empty() {
+                if pl.show_cat_labels && !slice.cat_label_text.is_empty() {
                     chart_line_seg(
                         surface,
                         slice.leader_start_x,
@@ -1165,7 +1165,7 @@ fn render_chart(
     }
 
     // Legend render
-    if cl.legend_show && data.series.len() > 1 {
+    if cl.legend_show {
         let legend = compute_legend(data, &cl, base_x_mm, base_y_mm, w_mm, h_mm);
         for item in &legend.items {
             let color = parse_color(color_at(&cl.palette, item.color_idx));
@@ -1599,8 +1599,10 @@ mod tests {
             header: None,
             footer: None,
             format_config: None,
+            locale: None,
             root: ContainerElement {
                 id: "root".to_string(),
+                condition: None,
                 position: PositionMode::Flow,
                 size: SizeConstraint {
                     width: SizeValue::Auto,
@@ -1625,6 +1627,7 @@ mod tests {
                 children: vec![
                     TemplateElement::StaticText(StaticTextElement {
                         id: "title".to_string(),
+                        condition: None,
                         position: PositionMode::Flow,
                         size: SizeConstraint {
                             width: SizeValue::Fr { value: 1.0 },
@@ -1643,6 +1646,7 @@ mod tests {
                     }),
                     TemplateElement::Line(LineElement {
                         id: "line1".to_string(),
+                        condition: None,
                         position: PositionMode::Flow,
                         size: SizeConstraint {
                             width: SizeValue::Fr { value: 1.0 },
@@ -1659,6 +1663,7 @@ mod tests {
                     }),
                     TemplateElement::Text(TextElement {
                         id: "firma".to_string(),
+                        condition: None,
                         position: PositionMode::Flow,
                         size: SizeConstraint {
                             width: SizeValue::Fr { value: 1.0 },
@@ -1699,6 +1704,300 @@ mod tests {
         std::fs::write(&out_path, &pdf).unwrap();
         println!("Full pipeline PDF: {}", out_path.display());
     }
+
+    // --- parse_color tests ---
+
+    #[test]
+    fn test_parse_color_6_digit_hex() {
+        let c = parse_color("#FF8800");
+        assert_eq!(c, rgb::Color::new(255, 136, 0));
+    }
+
+    #[test]
+    fn test_parse_color_3_digit_hex() {
+        let c = parse_color("#F80");
+        assert_eq!(c, rgb::Color::new(255, 136, 0)); // F*17=255, 8*17=136, 0*17=0
+    }
+
+    #[test]
+    fn test_parse_color_without_hash() {
+        let c = parse_color("00FF00");
+        assert_eq!(c, rgb::Color::new(0, 255, 0));
+    }
+
+    #[test]
+    fn test_parse_color_black() {
+        let c = parse_color("#000000");
+        assert_eq!(c, rgb::Color::new(0, 0, 0));
+    }
+
+    #[test]
+    fn test_parse_color_white() {
+        let c = parse_color("#FFFFFF");
+        assert_eq!(c, rgb::Color::new(255, 255, 255));
+    }
+
+    #[test]
+    fn test_parse_color_invalid_length() {
+        // Invalid length → defaults to (0,0,0)
+        let c = parse_color("#ABCD");
+        assert_eq!(c, rgb::Color::new(0, 0, 0));
+    }
+
+    #[test]
+    fn test_parse_color_empty() {
+        let c = parse_color("");
+        assert_eq!(c, rgb::Color::new(0, 0, 0));
+    }
+
+    // --- build_rect_path tests ---
+
+    #[test]
+    fn test_build_rect_path_no_radius() {
+        let path = build_rect_path(10.0, 20.0, 100.0, 50.0, 0.0);
+        assert!(path.is_some(), "should produce valid rect path with no radius");
+    }
+
+    #[test]
+    fn test_build_rect_path_with_radius() {
+        let path = build_rect_path(0.0, 0.0, 100.0, 50.0, 5.0);
+        assert!(path.is_some(), "should produce valid rounded rect path");
+    }
+
+    #[test]
+    fn test_build_rect_path_radius_clamped() {
+        // Radius larger than half the smaller dimension → should be clamped
+        let path = build_rect_path(0.0, 0.0, 20.0, 10.0, 100.0);
+        assert!(path.is_some(), "should clamp radius and produce valid path");
+    }
+
+    // --- build_ellipse_path tests ---
+
+    #[test]
+    fn test_build_ellipse_path() {
+        let path = build_ellipse_path(10.0, 20.0, 60.0, 40.0);
+        assert!(path.is_some(), "should produce valid ellipse path");
+    }
+
+    #[test]
+    fn test_build_ellipse_path_circle() {
+        // Equal width and height → circle
+        let path = build_ellipse_path(0.0, 0.0, 50.0, 50.0);
+        assert!(path.is_some(), "should produce valid circle path");
+    }
+
+    // --- mm/pt conversion tests ---
+
+    #[test]
+    fn test_mm_to_pt_conversion() {
+        // 25.4mm = 72pt (1 inch)
+        let result = mm(25.4);
+        assert!((result - 72.0).abs() < 0.01, "25.4mm should be ~72pt, got {}", result);
+    }
+
+    #[test]
+    fn test_mm_zero() {
+        assert_eq!(mm(0.0), 0.0);
+    }
+
+    #[test]
+    fn test_pt_conversion() {
+        let result = pt(25.4);
+        assert!((result - 72.0).abs() < 0.01);
+    }
+
+    // --- render_pdf integration with various element types ---
+
+    #[test]
+    fn test_render_pdf_with_line_element() {
+        let layout = LayoutResult {
+            pages: vec![PageLayout {
+                page_index: 0,
+                width_mm: 210.0,
+                height_mm: 297.0,
+                elements: vec![ElementLayout {
+                    id: "line1".to_string(),
+                    x_mm: 15.0,
+                    y_mm: 50.0,
+                    width_mm: 180.0,
+                    height_mm: 0.5,
+                    element_type: "line".to_string(),
+                    content: Some(ResolvedContent::Line),
+                    style: ResolvedStyle {
+                        stroke_color: Some("#FF0000".to_string()),
+                        stroke_width: Some(1.0),
+                        ..Default::default()
+                    },
+                    children: vec![],
+                }],
+            }],
+        };
+        let fonts = test_fonts();
+        let pdf = render_pdf(&layout, &fonts).expect("should render line element");
+        assert!(pdf.starts_with(b"%PDF"));
+    }
+
+    #[test]
+    fn test_render_pdf_with_container_background() {
+        let layout = LayoutResult {
+            pages: vec![PageLayout {
+                page_index: 0,
+                width_mm: 210.0,
+                height_mm: 297.0,
+                elements: vec![ElementLayout {
+                    id: "box".to_string(),
+                    x_mm: 20.0,
+                    y_mm: 20.0,
+                    width_mm: 170.0,
+                    height_mm: 100.0,
+                    element_type: "container".to_string(),
+                    content: None,
+                    style: ResolvedStyle {
+                        background_color: Some("#E0E0E0".to_string()),
+                        border_color: Some("#333333".to_string()),
+                        border_width: Some(0.5),
+                        border_radius: Some(3.0),
+                        ..Default::default()
+                    },
+                    children: vec![],
+                }],
+            }],
+        };
+        let fonts = test_fonts();
+        let pdf = render_pdf(&layout, &fonts).expect("should render container bg");
+        assert!(pdf.starts_with(b"%PDF"));
+    }
+
+    #[test]
+    fn test_render_pdf_with_shape_element() {
+        let layout = LayoutResult {
+            pages: vec![PageLayout {
+                page_index: 0,
+                width_mm: 210.0,
+                height_mm: 297.0,
+                elements: vec![ElementLayout {
+                    id: "shape1".to_string(),
+                    x_mm: 50.0,
+                    y_mm: 50.0,
+                    width_mm: 40.0,
+                    height_mm: 40.0,
+                    element_type: "shape".to_string(),
+                    content: Some(ResolvedContent::Shape {
+                        shape_type: "ellipse".to_string(),
+                    }),
+                    style: ResolvedStyle {
+                        background_color: Some("#3366FF".to_string()),
+                        border_color: Some("#000000".to_string()),
+                        border_width: Some(1.0),
+                        ..Default::default()
+                    },
+                    children: vec![],
+                }],
+            }],
+        };
+        let fonts = test_fonts();
+        let pdf = render_pdf(&layout, &fonts).expect("should render shape element");
+        assert!(pdf.starts_with(b"%PDF"));
+    }
+
+    #[test]
+    fn test_render_pdf_with_checkbox() {
+        let layout = LayoutResult {
+            pages: vec![PageLayout {
+                page_index: 0,
+                width_mm: 210.0,
+                height_mm: 297.0,
+                elements: vec![
+                    ElementLayout {
+                        id: "cb_checked".to_string(),
+                        x_mm: 15.0,
+                        y_mm: 15.0,
+                        width_mm: 5.0,
+                        height_mm: 5.0,
+                        element_type: "checkbox".to_string(),
+                        content: Some(ResolvedContent::Checkbox { checked: true }),
+                        style: ResolvedStyle::default(),
+                        children: vec![],
+                    },
+                    ElementLayout {
+                        id: "cb_unchecked".to_string(),
+                        x_mm: 15.0,
+                        y_mm: 25.0,
+                        width_mm: 5.0,
+                        height_mm: 5.0,
+                        element_type: "checkbox".to_string(),
+                        content: Some(ResolvedContent::Checkbox { checked: false }),
+                        style: ResolvedStyle::default(),
+                        children: vec![],
+                    },
+                ],
+            }],
+        };
+        let fonts = test_fonts();
+        let pdf = render_pdf(&layout, &fonts).expect("should render checkbox elements");
+        assert!(pdf.starts_with(b"%PDF"));
+    }
+
+    #[test]
+    fn test_render_pdf_empty_page() {
+        let layout = LayoutResult {
+            pages: vec![PageLayout {
+                page_index: 0,
+                width_mm: 210.0,
+                height_mm: 297.0,
+                elements: vec![],
+            }],
+        };
+        let fonts = test_fonts();
+        let pdf = render_pdf(&layout, &fonts).expect("empty page should still render");
+        assert!(pdf.starts_with(b"%PDF"));
+    }
+
+    #[test]
+    fn test_render_pdf_multi_page() {
+        let layout = LayoutResult {
+            pages: vec![
+                PageLayout {
+                    page_index: 0,
+                    width_mm: 210.0,
+                    height_mm: 297.0,
+                    elements: vec![ElementLayout {
+                        id: "p1".to_string(),
+                        x_mm: 15.0,
+                        y_mm: 15.0,
+                        width_mm: 180.0,
+                        height_mm: 10.0,
+                        element_type: "static_text".to_string(),
+                        content: Some(ResolvedContent::Text { value: "Page 1".to_string() }),
+                        style: ResolvedStyle { font_size: Some(12.0), ..Default::default() },
+                        children: vec![],
+                    }],
+                },
+                PageLayout {
+                    page_index: 1,
+                    width_mm: 210.0,
+                    height_mm: 297.0,
+                    elements: vec![ElementLayout {
+                        id: "p2".to_string(),
+                        x_mm: 15.0,
+                        y_mm: 15.0,
+                        width_mm: 180.0,
+                        height_mm: 10.0,
+                        element_type: "static_text".to_string(),
+                        content: Some(ResolvedContent::Text { value: "Page 2".to_string() }),
+                        style: ResolvedStyle { font_size: Some(12.0), ..Default::default() },
+                        children: vec![],
+                    }],
+                },
+            ],
+        };
+        let fonts = test_fonts();
+        let pdf = render_pdf(&layout, &fonts).expect("multi-page should render");
+        assert!(pdf.starts_with(b"%PDF"));
+        assert!(pdf.len() > 200, "multi-page PDF should have reasonable size");
+    }
+
+    // --- detect_image_format tests ---
 
     #[test]
     fn test_detect_png() {

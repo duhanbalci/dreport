@@ -657,7 +657,7 @@ pub fn load_test_fonts() -> Vec<FontData> { ... }
 
 ## 7. Yeni Ozellik Onerileri
 
-### 7.1 Conditional Rendering `[IMPLEMENTE EDILMEDI]`
+### 7.1 Conditional Rendering `[IMPLEMENTE EDILDI]`
 
 **Aciklama:**
 Template'te `v-if` benzeri kosullu gosterim. Data'daki bir alana gore eleman goster/gizle.
@@ -714,7 +714,7 @@ Tablo disinda array verisiyle tekrarlayan serbest-form container. Ornegin bir ka
 
 ---
 
-### 7.5 Coklu Dil / Lokalizasyon Destegi `[IMPLEMENTE EDILMEDI]`
+### 7.5 Coklu Dil / Lokalizasyon Destegi `[IMPLEMENTE EDILDI]`
 
 **Aciklama:**
 Currency, date ve sayi formatlama icin lokalizasyon. Su an Turk lokali hardcoded.
@@ -745,7 +745,7 @@ Template'te header/footer tanimi icin `condition` alani:
 
 ---
 
-### 7.7 QR Code Eleman Tipi `[IMPLEMENTE EDILMEDI]`
+### 7.7 QR Code Eleman Tipi `[bu var zaten, barcode özelliklerinden barkod tipi seçilebiliyor qr olarak]`
 
 **Mevcut Durum:**
 `rxing` crate'i barcode uretimi icin zaten kullaniliyor ve QR Code destegi var. Ancak UI tarafinda ayri bir QR Code eleman tipi tanimlanmamis.
@@ -773,7 +773,7 @@ Hazir sablon galerisi — kullanici sifirdan tasarlamak yerine bir sablon secip 
 
 ## 8. Kucuk Ama Degerli Iyilestirmeler
 
-### 8.1 Chart Legend Tek Seri Durumu `[IMPLEMENTE EDILMEDI]`
+### 8.1 Chart Legend Tek Seri Durumu `[IMPLEMENTE EDILDI]`
 
 **Dosya:** `layout-engine/src/chart_render.rs`
 
@@ -781,7 +781,7 @@ Hazir sablon galerisi — kullanici sifirdan tasarlamak yerine bir sablon secip 
 
 ---
 
-### 8.2 Pie Chart Label Kontrolu `[IMPLEMENTE EDILMEDI]`
+### 8.2 Pie Chart Label Kontrolu `[IMPLEMENTE EDILDI]`
 
 **Dosya:** `layout-engine/src/chart_render.rs` (satirlar 521-551)
 

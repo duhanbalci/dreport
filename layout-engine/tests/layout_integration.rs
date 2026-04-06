@@ -18,8 +18,10 @@ fn simple_template() -> Template {
         header: None,
         footer: None,
         format_config: None,
+        locale: None,
         root: ContainerElement {
             id: "root".to_string(),
+            condition: None,
             position: PositionMode::Flow,
             size: SizeConstraint::default(),
             direction: "column".to_string(),
@@ -36,6 +38,7 @@ fn simple_template() -> Template {
             break_inside: "auto".to_string(),
             children: vec![TemplateElement::StaticText(StaticTextElement {
                 id: "title".to_string(),
+                condition: None,
                 position: PositionMode::Flow,
                 size: SizeConstraint {
                     width: SizeValue::Fr { value: 1.0 },
@@ -161,8 +164,10 @@ fn test_compute_layout_with_data_binding() {
         header: None,
         footer: None,
         format_config: None,
+        locale: None,
         root: ContainerElement {
             id: "root".to_string(),
+            condition: None,
             position: PositionMode::Flow,
             size: SizeConstraint::default(),
             direction: "column".to_string(),
@@ -179,6 +184,7 @@ fn test_compute_layout_with_data_binding() {
             break_inside: "auto".to_string(),
             children: vec![TemplateElement::Text(TextElement {
                 id: "bound_text".to_string(),
+                condition: None,
                 position: PositionMode::Flow,
                 size: SizeConstraint {
                     width: SizeValue::Fr { value: 1.0 },
@@ -227,8 +233,10 @@ fn test_compute_layout_multiple_children_ordering() {
         header: None,
         footer: None,
         format_config: None,
+        locale: None,
         root: ContainerElement {
             id: "root".to_string(),
+            condition: None,
             position: PositionMode::Flow,
             size: SizeConstraint::default(),
             direction: "column".to_string(),
@@ -246,6 +254,7 @@ fn test_compute_layout_multiple_children_ordering() {
             children: vec![
                 TemplateElement::StaticText(StaticTextElement {
                     id: "first".to_string(),
+                    condition: None,
                     position: PositionMode::Flow,
                     size: SizeConstraint {
                         width: SizeValue::Fr { value: 1.0 },
@@ -260,6 +269,7 @@ fn test_compute_layout_multiple_children_ordering() {
                 }),
                 TemplateElement::StaticText(StaticTextElement {
                     id: "second".to_string(),
+                    condition: None,
                     position: PositionMode::Flow,
                     size: SizeConstraint {
                         width: SizeValue::Fr { value: 1.0 },

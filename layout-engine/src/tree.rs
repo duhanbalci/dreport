@@ -245,6 +245,10 @@ fn build_container(
     let mut children_ids = Vec::new();
 
     for child in &el.children {
+        // Koşullu render: hidden_elements'te olan elemanları atla
+        if resolved.hidden_elements.contains(child.id()) {
+            continue;
+        }
         let child_node = build_element(
             child,
             taffy,
@@ -896,8 +900,10 @@ mod tests {
             header: None,
             footer: None,
             format_config: None,
+            locale: None,
             root: ContainerElement {
                 id: "root".to_string(),
+                condition: None,
                 position: PositionMode::Flow,
                 size: SizeConstraint {
                     width: SizeValue::Auto,
@@ -922,6 +928,7 @@ mod tests {
                 children: vec![
                     TemplateElement::StaticText(StaticTextElement {
                         id: "title".to_string(),
+                        condition: None,
                         position: PositionMode::Flow,
                         size: SizeConstraint {
                             width: SizeValue::Fr { value: 1.0 },
@@ -940,6 +947,7 @@ mod tests {
                     }),
                     TemplateElement::Line(LineElement {
                         id: "line1".to_string(),
+                        condition: None,
                         position: PositionMode::Flow,
                         size: SizeConstraint {
                             width: SizeValue::Fr { value: 1.0 },
@@ -956,6 +964,7 @@ mod tests {
                     }),
                     TemplateElement::StaticText(StaticTextElement {
                         id: "body".to_string(),
+                        condition: None,
                         position: PositionMode::Flow,
                         size: SizeConstraint {
                             width: SizeValue::Fr { value: 1.0 },
@@ -1040,8 +1049,10 @@ mod tests {
             header: None,
             footer: None,
             format_config: None,
+            locale: None,
             root: ContainerElement {
                 id: "root".to_string(),
+                condition: None,
                 position: PositionMode::Flow,
                 size: SizeConstraint {
                     width: SizeValue::Auto,
@@ -1065,6 +1076,7 @@ mod tests {
                 break_inside: "auto".to_string(),
                 children: vec![TemplateElement::Container(ContainerElement {
                     id: "row".to_string(),
+                    condition: None,
                     position: PositionMode::Flow,
                     size: SizeConstraint {
                         width: SizeValue::Fr { value: 1.0 },
@@ -1089,6 +1101,7 @@ mod tests {
                     children: vec![
                         TemplateElement::StaticText(StaticTextElement {
                             id: "left".to_string(),
+                            condition: None,
                             position: PositionMode::Flow,
                             size: SizeConstraint {
                                 width: SizeValue::Fr { value: 1.0 },
@@ -1106,6 +1119,7 @@ mod tests {
                         }),
                         TemplateElement::StaticText(StaticTextElement {
                             id: "right".to_string(),
+                            condition: None,
                             position: PositionMode::Flow,
                             size: SizeConstraint {
                                 width: SizeValue::Fr { value: 1.0 },
@@ -1168,8 +1182,10 @@ mod tests {
             header: None,
             footer: None,
             format_config: None,
+            locale: None,
             root: ContainerElement {
                 id: "root".to_string(),
+                condition: None,
                 position: PositionMode::Flow,
                 size: SizeConstraint {
                     width: SizeValue::Auto,
@@ -1193,6 +1209,7 @@ mod tests {
                 break_inside: "auto".to_string(),
                 children: vec![TemplateElement::StaticText(StaticTextElement {
                     id: "abs_text".to_string(),
+                    condition: None,
                     position: PositionMode::Absolute { x: 50.0, y: 80.0 },
                     size: SizeConstraint {
                         width: SizeValue::Fixed { value: 100.0 },
@@ -1257,8 +1274,10 @@ mod tests {
             header: None,
             footer: None,
             format_config: None,
+            locale: None,
             root: ContainerElement {
                 id: "root".to_string(),
+                condition: None,
                 position: PositionMode::Flow,
                 size: sz_auto.clone(),
                 direction: "column".to_string(),
@@ -1277,6 +1296,7 @@ mod tests {
                     // Header row
                     TemplateElement::Container(ContainerElement {
                         id: "c_header".to_string(),
+                        condition: None,
                         position: PositionMode::Flow,
                         size: sz_fr_auto.clone(),
                         direction: "row".to_string(),
@@ -1290,6 +1310,7 @@ mod tests {
                             // Sol: firma bilgileri
                             TemplateElement::Container(ContainerElement {
                                 id: "c_firma".to_string(),
+                                condition: None,
                                 position: PositionMode::Flow,
                                 size: sz_fr_auto.clone(),
                                 direction: "column".to_string(),
@@ -1302,6 +1323,7 @@ mod tests {
                                 children: vec![
                                     TemplateElement::StaticText(StaticTextElement {
                                         id: "el_firma_unvan".to_string(),
+                                        condition: None,
                                         position: PositionMode::Flow,
                                         size: sz_auto.clone(),
                                         style: TextStyle {
@@ -1313,6 +1335,7 @@ mod tests {
                                     }),
                                     TemplateElement::StaticText(StaticTextElement {
                                         id: "el_firma_adres".to_string(),
+                                        condition: None,
                                         position: PositionMode::Flow,
                                         size: sz_auto.clone(),
                                         style: TextStyle {
@@ -1324,6 +1347,7 @@ mod tests {
                                     }),
                                     TemplateElement::StaticText(StaticTextElement {
                                         id: "el_firma_il".to_string(),
+                                        condition: None,
                                         position: PositionMode::Flow,
                                         size: sz_auto.clone(),
                                         style: TextStyle {
@@ -1334,6 +1358,7 @@ mod tests {
                                     }),
                                     TemplateElement::StaticText(StaticTextElement {
                                         id: "el_firma_tel".to_string(),
+                                        condition: None,
                                         position: PositionMode::Flow,
                                         size: sz_auto.clone(),
                                         style: TextStyle {
@@ -1344,6 +1369,7 @@ mod tests {
                                     }),
                                     TemplateElement::StaticText(StaticTextElement {
                                         id: "el_firma_vd".to_string(),
+                                        condition: None,
                                         position: PositionMode::Flow,
                                         size: sz_auto.clone(),
                                         style: TextStyle {
@@ -1354,6 +1380,7 @@ mod tests {
                                     }),
                                     TemplateElement::StaticText(StaticTextElement {
                                         id: "el_firma_vn".to_string(),
+                                        condition: None,
                                         position: PositionMode::Flow,
                                         size: sz_auto.clone(),
                                         style: TextStyle {
@@ -1367,6 +1394,7 @@ mod tests {
                             // Sağ: fatura başlığı
                             TemplateElement::Container(ContainerElement {
                                 id: "c_fatura_baslik".to_string(),
+                                condition: None,
                                 position: PositionMode::Flow,
                                 size: sz_auto.clone(),
                                 direction: "column".to_string(),
@@ -1379,6 +1407,7 @@ mod tests {
                                 children: vec![
                                     TemplateElement::StaticText(StaticTextElement {
                                         id: "el_fatura_baslik".to_string(),
+                                        condition: None,
                                         position: PositionMode::Flow,
                                         size: sz_auto.clone(),
                                         style: TextStyle {
@@ -1390,6 +1419,7 @@ mod tests {
                                     }),
                                     TemplateElement::StaticText(StaticTextElement {
                                         id: "el_fatura_no".to_string(),
+                                        condition: None,
                                         position: PositionMode::Flow,
                                         size: sz_auto.clone(),
                                         style: TextStyle {
@@ -1400,6 +1430,7 @@ mod tests {
                                     }),
                                     TemplateElement::StaticText(StaticTextElement {
                                         id: "el_fatura_tarih".to_string(),
+                                        condition: None,
                                         position: PositionMode::Flow,
                                         size: sz_auto.clone(),
                                         style: TextStyle {
@@ -1410,6 +1441,7 @@ mod tests {
                                     }),
                                     TemplateElement::StaticText(StaticTextElement {
                                         id: "el_fatura_vade".to_string(),
+                                        condition: None,
                                         position: PositionMode::Flow,
                                         size: sz_auto.clone(),
                                         style: TextStyle {

@@ -106,6 +106,8 @@ pub struct ResolvedData {
     pub rich_texts: HashMap<String, Vec<ResolvedRichSpan>>,
     /// element_id → çözümlenmiş chart verisi
     pub charts: HashMap<String, ResolvedChartData>,
+    /// Koşulu sağlamayan (gizlenmesi gereken) element ID'leri
+    pub hidden_elements: std::collections::HashSet<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -146,30 +148,91 @@ pub fn resolve_template(template: &Template, data: &Value) -> ResolvedData {
         page_number_formats: HashMap::new(),
         rich_texts: HashMap::new(),
         charts: HashMap::new(),
+        hidden_elements: std::collections::HashSet::new(),
     };
+    let fc = template.effective_format_config();
     if let Some(ref header) = template.header {
         resolve_element(
             &TemplateElement::Container(header.clone()),
             data,
             &mut resolved,
+            &fc,
         );
     }
     resolve_element(
         &TemplateElement::Container(template.root.clone()),
         data,
         &mut resolved,
+        &fc,
     );
     if let Some(ref footer) = template.footer {
         resolve_element(
             &TemplateElement::Container(footer.clone()),
             data,
             &mut resolved,
+            &fc,
         );
     }
     resolved
 }
 
-fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedData) {
+/// Koşul değerlendirme: Condition struct'ındaki path, operator, value ile data'yı karşılaştır.
+fn evaluate_condition(condition: &dreport_core::models::Condition, data: &Value) -> bool {
+    let actual = resolve_path(data, &condition.path);
+    match condition.operator.as_str() {
+        "empty" => matches!(actual, Value::Null) || actual.as_str().is_some_and(|s| s.is_empty()),
+        "not_empty" => !matches!(actual, Value::Null) && !actual.as_str().is_some_and(|s| s.is_empty()),
+        "eq" => {
+            if let Some(ref expected) = condition.value {
+                json_values_eq(actual, expected)
+            } else {
+                actual.is_null()
+            }
+        }
+        "neq" => {
+            if let Some(ref expected) = condition.value {
+                !json_values_eq(actual, expected)
+            } else {
+                !actual.is_null()
+            }
+        }
+        op @ ("gt" | "gte" | "lt" | "lte") => {
+            let a = actual.as_f64().unwrap_or(0.0);
+            let b = condition.value.as_ref().and_then(|v| v.as_f64()).unwrap_or(0.0);
+            match op {
+                "gt" => a > b,
+                "gte" => a >= b,
+                "lt" => a < b,
+                "lte" => a <= b,
+                _ => unreachable!(),
+            }
+        }
+        _ => true, // bilinmeyen operator → göster
+    }
+}
+
+/// İki JSON değerini karşılaştır (tip dönüşümlü).
+fn json_values_eq(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Number(a), Value::Number(b)) => a.as_f64() == b.as_f64(),
+        (Value::String(a), Value::String(b)) => a == b,
+        (Value::Bool(a), Value::Bool(b)) => a == b,
+        (Value::Null, Value::Null) => true,
+        // Çapraz tip karşılaştırma: sayı string vs sayı
+        (Value::String(s), Value::Number(n)) | (Value::Number(n), Value::String(s)) => {
+            s.parse::<f64>().ok() == n.as_f64()
+        }
+        _ => a == b,
+    }
+}
+
+fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedData, format_config: &dreport_core::models::FormatConfig) {
+    // Koşul kontrolü: condition varsa ve sağlanmıyorsa, hidden olarak işaretle ve çık
+    if let Some(condition) = el.condition() && !evaluate_condition(condition, data) {
+        resolved.hidden_elements.insert(el.id().to_string());
+        return;
+    }
+
     match el {
         TemplateElement::StaticText(e) => {
             resolved.texts.insert(e.id.clone(), e.content.clone());
@@ -228,7 +291,7 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
                                     let raw = value_to_string(v);
                                     // Sütun formatı varsa uygula (currency, percentage, number, date)
                                     if let Some(ref fmt) = col.format {
-                                        crate::expr_eval::apply_format(&raw, Some(fmt.as_str()))
+                                        crate::expr_eval::apply_format_with_config(&raw, Some(fmt.as_str()), format_config)
                                     } else {
                                         raw
                                     }
@@ -243,7 +306,7 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
         }
         TemplateElement::Container(e) => {
             for child in &e.children {
-                resolve_element(child, data, resolved);
+                resolve_element(child, data, resolved, format_config);
             }
         }
         TemplateElement::CurrentDate(e) => {
@@ -268,7 +331,7 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
         }
         TemplateElement::CalculatedText(e) => {
             let result = crate::expr_eval::evaluate_expression(&e.expression, data);
-            let formatted = crate::expr_eval::apply_format(&result, e.format.as_deref());
+            let formatted = crate::expr_eval::apply_format_with_config(&result, e.format.as_deref(), format_config);
             // Bos ifade veya hata durumunda placeholder goster — element 0 yukseklige dusmesin
             let text = if formatted.is_empty() {
                 " ".to_string()
@@ -477,8 +540,10 @@ mod tests {
             header: None,
             footer: None,
             format_config: None,
+            locale: None,
             root: ContainerElement {
                 id: "root".to_string(),
+                condition: None,
                 position: PositionMode::Flow,
                 size: SizeConstraint::default(),
                 direction: "column".to_string(),
@@ -490,6 +555,7 @@ mod tests {
                 break_inside: "auto".to_string(),
                 children: vec![TemplateElement::Text(TextElement {
                     id: "el_name".to_string(),
+                    condition: None,
                     position: PositionMode::Flow,
                     size: SizeConstraint::default(),
                     style: TextStyle::default(),
@@ -525,8 +591,10 @@ mod tests {
             header: None,
             footer: None,
             format_config: None,
+            locale: None,
             root: ContainerElement {
                 id: "root".to_string(),
+                condition: None,
                 position: PositionMode::Flow,
                 size: SizeConstraint::default(),
                 direction: "column".to_string(),
@@ -538,6 +606,7 @@ mod tests {
                 break_inside: "auto".to_string(),
                 children: vec![TemplateElement::Text(TextElement {
                     id: "el_no".to_string(),
+                    condition: None,
                     position: PositionMode::Flow,
                     size: SizeConstraint::default(),
                     style: TextStyle::default(),
@@ -570,8 +639,10 @@ mod tests {
             header: None,
             footer: None,
             format_config: None,
+            locale: None,
             root: ContainerElement {
                 id: "root".to_string(),
+                condition: None,
                 position: PositionMode::Flow,
                 size: SizeConstraint::default(),
                 direction: "column".to_string(),
@@ -583,6 +654,7 @@ mod tests {
                 break_inside: "auto".to_string(),
                 children: vec![TemplateElement::StaticText(StaticTextElement {
                     id: "title".to_string(),
+                    condition: None,
                     position: PositionMode::Flow,
                     size: SizeConstraint::default(),
                     style: TextStyle::default(),
@@ -608,8 +680,10 @@ mod tests {
             header: None,
             footer: None,
             format_config: None,
+            locale: None,
             root: ContainerElement {
                 id: "root".to_string(),
+                condition: None,
                 position: PositionMode::Flow,
                 size: SizeConstraint::default(),
                 direction: "column".to_string(),
@@ -621,6 +695,7 @@ mod tests {
                 break_inside: "auto".to_string(),
                 children: vec![TemplateElement::RepeatingTable(RepeatingTableElement {
                     id: "tbl".to_string(),
+                    condition: None,
                     position: PositionMode::Flow,
                     size: SizeConstraint::default(),
                     data_source: ArrayBinding {
@@ -677,8 +752,10 @@ mod tests {
             header: None,
             footer: None,
             format_config: None,
+            locale: None,
             root: ContainerElement {
                 id: "root".to_string(),
+                condition: None,
                 position: PositionMode::Flow,
                 size: SizeConstraint::default(),
                 direction: "column".to_string(),
@@ -690,6 +767,7 @@ mod tests {
                 break_inside: "auto".to_string(),
                 children: vec![TemplateElement::RepeatingTable(RepeatingTableElement {
                     id: "tbl".to_string(),
+                    condition: None,
                     position: PositionMode::Flow,
                     size: SizeConstraint::default(),
                     data_source: ArrayBinding {
@@ -728,8 +806,10 @@ mod tests {
             header: None,
             footer: None,
             format_config: None,
+            locale: None,
             root: ContainerElement {
                 id: "root".to_string(),
+                condition: None,
                 position: PositionMode::Flow,
                 size: SizeConstraint::default(),
                 direction: "column".to_string(),
@@ -741,6 +821,7 @@ mod tests {
                 break_inside: "auto".to_string(),
                 children: vec![TemplateElement::Text(TextElement {
                     id: "el_missing".to_string(),
+                    condition: None,
                     position: PositionMode::Flow,
                     size: SizeConstraint::default(),
                     style: TextStyle::default(),

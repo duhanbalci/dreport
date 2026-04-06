@@ -897,6 +897,261 @@ mod tests {
     }
 
     #[test]
+    fn test_break_inside_avoid_group_moves_to_new_page() {
+        // break_inside: avoid olan container grubunun mevcut sayfaya sığmadığında
+        // komple yeni sayfaya taşınması gerekir.
+        let mut break_modes = HashMap::new();
+        break_modes.insert("group".to_string(), "avoid".to_string());
+
+        // group container: y=250, h=80 → bottom=330 > 297 (sayfa yüksekliği)
+        // ama 80mm tek sayfaya sığar → yeni sayfaya geçmeli
+        let mut group = make_element("group", 250.0, 80.0, "container");
+        group.children = vec!["g_child1".to_string(), "g_child2".to_string()];
+
+        let input = PageSplitInput {
+            body_elements: vec![
+                make_element("el1", 0.0, 250.0, "text"),
+                group,
+                make_element("g_child1", 250.0, 40.0, "text"),
+                make_element("g_child2", 290.0, 40.0, "text"),
+            ],
+            page_height_mm: 297.0,
+            header_height_mm: 0.0,
+            footer_height_mm: 0.0,
+            header_elements: vec![],
+            footer_elements: vec![],
+            page_width_mm: 210.0,
+            break_modes,
+            page_number_formats: HashMap::new(),
+            root_padding_top_mm: 0.0,
+            no_repeat_header_tables: HashSet::new(),
+        };
+
+        let pages = split_into_pages(input);
+        assert_eq!(pages.len(), 2, "avoid group should cause a new page");
+        // el1 sayfada 1, group + children sayfada 2
+        assert!(pages[0].elements.iter().any(|e| e.id == "el1"));
+        assert!(pages[1].elements.iter().any(|e| e.id == "group"));
+        assert!(pages[1].elements.iter().any(|e| e.id == "g_child1"));
+        assert!(pages[1].elements.iter().any(|e| e.id == "g_child2"));
+    }
+
+    #[test]
+    fn test_avoid_group_larger_than_page_stays_in_flow() {
+        // break_inside: avoid olan container sayfadan büyükse, normal akışa devam etmeli.
+        // Yeni sayfaya atlamamalı çünkü zaten sığmıyor.
+        let mut break_modes = HashMap::new();
+        break_modes.insert("big_group".to_string(), "avoid".to_string());
+
+        let mut big = make_element("big_group", 0.0, 400.0, "container");
+        big.children = vec!["bg_child".to_string()];
+
+        let input = PageSplitInput {
+            body_elements: vec![
+                big,
+                make_element("bg_child", 0.0, 400.0, "text"),
+            ],
+            page_height_mm: 297.0,
+            header_height_mm: 0.0,
+            footer_height_mm: 0.0,
+            header_elements: vec![],
+            footer_elements: vec![],
+            page_width_mm: 210.0,
+            break_modes,
+            page_number_formats: HashMap::new(),
+            root_padding_top_mm: 0.0,
+            no_repeat_header_tables: HashSet::new(),
+        };
+
+        let pages = split_into_pages(input);
+        // Sayfa 1'de grup başlamalı (sığmasa da mecbur)
+        assert!(pages[0].elements.iter().any(|e| e.id == "big_group"));
+    }
+
+    #[test]
+    fn test_element_exactly_at_page_boundary() {
+        // Eleman tam sayfa sınırına denk geldiğinde doğru sayfalanmalı.
+        // İki eleman: 148.5mm + 148.5mm = 297mm → tam sığar, tek sayfa.
+        let input = PageSplitInput {
+            body_elements: vec![
+                make_element("el1", 0.0, 148.5, "text"),
+                make_element("el2", 148.5, 148.5, "text"),
+            ],
+            page_height_mm: 297.0,
+            header_height_mm: 0.0,
+            footer_height_mm: 0.0,
+            header_elements: vec![],
+            footer_elements: vec![],
+            page_width_mm: 210.0,
+            break_modes: HashMap::new(),
+            page_number_formats: HashMap::new(),
+            root_padding_top_mm: 0.0,
+            no_repeat_header_tables: HashSet::new(),
+        };
+
+        let pages = split_into_pages(input);
+        assert_eq!(pages.len(), 1, "elements exactly filling page should fit in 1 page");
+        assert_eq!(pages[0].elements.len(), 2);
+    }
+
+    #[test]
+    fn test_element_one_mm_over_page_boundary() {
+        // Eleman sayfa sınırını 1mm aşıyorsa yeni sayfaya geçmeli.
+        let input = PageSplitInput {
+            body_elements: vec![
+                make_element("el1", 0.0, 148.5, "text"),
+                make_element("el2", 148.5, 149.5, "text"), // bottom = 298 > 297
+            ],
+            page_height_mm: 297.0,
+            header_height_mm: 0.0,
+            footer_height_mm: 0.0,
+            header_elements: vec![],
+            footer_elements: vec![],
+            page_width_mm: 210.0,
+            break_modes: HashMap::new(),
+            page_number_formats: HashMap::new(),
+            root_padding_top_mm: 0.0,
+            no_repeat_header_tables: HashSet::new(),
+        };
+
+        let pages = split_into_pages(input);
+        assert_eq!(pages.len(), 2, "element exceeding page by 1mm should go to page 2");
+        assert!(pages[0].elements.iter().any(|e| e.id == "el1"));
+        assert!(pages[1].elements.iter().any(|e| e.id == "el2"));
+    }
+
+    #[test]
+    fn test_single_element_larger_than_page() {
+        // Sayfadan büyük tek eleman — mecburen sayfa 1'de kalmalı.
+        let input = PageSplitInput {
+            body_elements: vec![
+                make_element("huge", 0.0, 500.0, "text"),
+            ],
+            page_height_mm: 297.0,
+            header_height_mm: 0.0,
+            footer_height_mm: 0.0,
+            header_elements: vec![],
+            footer_elements: vec![],
+            page_width_mm: 210.0,
+            break_modes: HashMap::new(),
+            page_number_formats: HashMap::new(),
+            root_padding_top_mm: 0.0,
+            no_repeat_header_tables: HashSet::new(),
+        };
+
+        let pages = split_into_pages(input);
+        assert_eq!(pages.len(), 1, "single oversized element should stay on page 1");
+        assert_eq!(pages[0].elements[0].id, "huge");
+    }
+
+    #[test]
+    fn test_no_repeat_header_tables_suppresses_header() {
+        // no_repeat_header_tables'a eklenen tablonun header'ı tekrarlanmamalı.
+        let mut tbl_wrapper = make_element("tbl", 0.0, 200.0, "container");
+        tbl_wrapper.children = vec![
+            "tbl_header".to_string(),
+            "tbl_row_0".to_string(),
+            "tbl_row_1".to_string(),
+            "tbl_row_2".to_string(),
+            "tbl_row_3".to_string(),
+            "tbl_row_4".to_string(),
+        ];
+
+        let tbl_header = {
+            let mut el = make_element("tbl_header", 0.0, 20.0, "container");
+            el.children = vec!["tbl_hdr_0".to_string()];
+            el
+        };
+        let tbl_hdr_0 = make_element("tbl_hdr_0", 0.0, 20.0, "static_text");
+
+        let rows: Vec<ElementLayout> = (0..5)
+            .flat_map(|i| {
+                let y = 20.0 + (i as f64) * 30.0;
+                let mut row = make_element(&format!("tbl_row_{}", i), y, 30.0, "container");
+                row.children = vec![format!("tbl_r{}c0", i)];
+                let cell = make_element(&format!("tbl_r{}c0", i), y, 30.0, "static_text");
+                vec![row, cell]
+            })
+            .collect();
+
+        let mut body_elements = vec![tbl_wrapper, tbl_header, tbl_hdr_0];
+        body_elements.extend(rows);
+
+        let mut no_repeat = HashSet::new();
+        no_repeat.insert("tbl".to_string());
+
+        let input = PageSplitInput {
+            body_elements,
+            page_height_mm: 120.0,
+            header_height_mm: 0.0,
+            footer_height_mm: 0.0,
+            header_elements: vec![],
+            footer_elements: vec![],
+            page_width_mm: 210.0,
+            break_modes: HashMap::new(),
+            page_number_formats: HashMap::new(),
+            root_padding_top_mm: 0.0,
+            no_repeat_header_tables: no_repeat,
+        };
+
+        let pages = split_into_pages(input);
+        assert!(pages.len() >= 2, "table should split across pages");
+
+        // Sayfa 2'de tekrarlanan header OLMAMALI
+        let page2_has_repeated_header = pages[1]
+            .elements
+            .iter()
+            .any(|e| e.id.starts_with("tbl_header") && e.id != "tbl_header");
+        assert!(
+            !page2_has_repeated_header,
+            "no_repeat_header_tables should suppress header repetition on page 2"
+        );
+    }
+
+    #[test]
+    fn test_empty_body_produces_single_page() {
+        let input = PageSplitInput {
+            body_elements: vec![],
+            page_height_mm: 297.0,
+            header_height_mm: 0.0,
+            footer_height_mm: 0.0,
+            header_elements: vec![],
+            footer_elements: vec![],
+            page_width_mm: 210.0,
+            break_modes: HashMap::new(),
+            page_number_formats: HashMap::new(),
+            root_padding_top_mm: 0.0,
+            no_repeat_header_tables: HashSet::new(),
+        };
+
+        let pages = split_into_pages(input);
+        assert_eq!(pages.len(), 1, "empty body should produce 1 page");
+    }
+
+    #[test]
+    fn test_content_height_zero_returns_single_page() {
+        // Header + footer sayfayı dolduruyor → content_height <= 0
+        let input = PageSplitInput {
+            body_elements: vec![
+                make_element("el1", 0.0, 50.0, "text"),
+            ],
+            page_height_mm: 100.0,
+            header_height_mm: 60.0,
+            footer_height_mm: 50.0,
+            header_elements: vec![make_element("hdr", 0.0, 60.0, "text")],
+            footer_elements: vec![make_element("ftr", 0.0, 50.0, "text")],
+            page_width_mm: 210.0,
+            break_modes: HashMap::new(),
+            page_number_formats: HashMap::new(),
+            root_padding_top_mm: 0.0,
+            no_repeat_header_tables: HashSet::new(),
+        };
+
+        let pages = split_into_pages(input);
+        assert_eq!(pages.len(), 1, "zero content height should produce 1 page");
+    }
+
+    #[test]
     fn test_repeated_header_no_gap_with_rows() {
         // Tekrarlanan header ile ilk satır arasında boşluk olmamalı.
         // Header'ın y pozisyonu yeni sayfanın başlangıcına relocate edilmeli.

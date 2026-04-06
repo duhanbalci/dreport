@@ -48,7 +48,7 @@ pub fn render_svg(data: &ResolvedChartData, width_mm: f64, height_mm: f64) -> St
     }
 
     // Legend render
-    if cl.legend_show && data.series.len() > 1 {
+    if cl.legend_show {
         render_legend(&mut svg, data, &cl, width_mm, height_mm);
     }
 
@@ -251,7 +251,7 @@ fn render_pie(svg: &mut String, data: &ResolvedChartData, cl: &ChartLayout) {
         }
 
         // Category name label outside slice with leader line
-        if !slice.cat_label_text.is_empty() {
+        if pl.show_cat_labels && !slice.cat_label_text.is_empty() {
             write!(
                 svg,
                 r##"<line x1="{:.2}" y1="{:.2}" x2="{:.2}" y2="{:.2}" stroke="#999" stroke-width="0.2"/>"##,
@@ -361,4 +361,251 @@ fn escape_xml(s: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::data_resolve::{ChartSeries, ResolvedChartData};
+    use dreport_core::models::{ChartAxis, ChartLabels, ChartLegend, ChartStyle, ChartTitle, ChartType};
+
+    fn make_bar_data(categories: Vec<&str>, series: Vec<(&str, Vec<f64>)>) -> ResolvedChartData {
+        ResolvedChartData {
+            chart_type: ChartType::Bar,
+            categories: categories.into_iter().map(|s| s.to_string()).collect(),
+            series: series
+                .into_iter()
+                .map(|(name, values)| ChartSeries {
+                    name: name.to_string(),
+                    values,
+                })
+                .collect(),
+            title: None,
+            legend: None,
+            labels: None,
+            axis: None,
+            style: ChartStyle::default(),
+            group_mode: None,
+        }
+    }
+
+    fn make_line_data(categories: Vec<&str>, series: Vec<(&str, Vec<f64>)>) -> ResolvedChartData {
+        let mut data = make_bar_data(categories, series);
+        data.chart_type = ChartType::Line;
+        data
+    }
+
+    fn make_pie_data(categories: Vec<&str>, values: Vec<f64>) -> ResolvedChartData {
+        ResolvedChartData {
+            chart_type: ChartType::Pie,
+            categories: categories.into_iter().map(|s| s.to_string()).collect(),
+            series: vec![ChartSeries {
+                name: "data".to_string(),
+                values,
+            }],
+            title: None,
+            legend: None,
+            labels: None,
+            axis: None,
+            style: ChartStyle::default(),
+            group_mode: None,
+        }
+    }
+
+    #[test]
+    fn test_bar_chart_svg_structure() {
+        let data = make_bar_data(vec!["A", "B", "C"], vec![("Sales", vec![10.0, 20.0, 30.0])]);
+        let svg = render_svg(&data, 100.0, 60.0);
+
+        assert!(svg.starts_with("<svg"));
+        assert!(svg.ends_with("</svg>"));
+        // 3 categories × 1 series = 3 bars (each with rx="0.5")
+        let bar_count = svg.matches(r#"rx="0.5""#).count();
+        assert_eq!(bar_count, 3, "expected 3 bars for 3 categories, got {}", bar_count);
+    }
+
+    #[test]
+    fn test_bar_chart_with_labels() {
+        let mut data = make_bar_data(vec!["A", "B"], vec![("S1", vec![10.0, 20.0])]);
+        data.labels = Some(ChartLabels {
+            show: true,
+            font_size: None,
+            color: None,
+        });
+        let svg = render_svg(&data, 100.0, 60.0);
+
+        // Labels shown → should contain text elements with formatted values
+        assert!(svg.contains("<text"), "labels enabled but no text elements found");
+    }
+
+    #[test]
+    fn test_line_chart_svg_structure() {
+        let data = make_line_data(vec!["Jan", "Feb", "Mar"], vec![("Revenue", vec![5.0, 15.0, 10.0])]);
+        let svg = render_svg(&data, 100.0, 60.0);
+
+        assert!(svg.starts_with("<svg"));
+        // Should contain polyline for the series
+        assert!(svg.contains("<polyline"), "line chart should contain polyline");
+    }
+
+    #[test]
+    fn test_line_chart_with_points() {
+        let mut data = make_line_data(vec!["A", "B", "C"], vec![("S1", vec![1.0, 2.0, 3.0])]);
+        data.style.show_points = Some(true);
+        let svg = render_svg(&data, 100.0, 60.0);
+
+        // 3 data points → 3 circles
+        let circle_count = svg.matches("<circle").count();
+        assert_eq!(circle_count, 3, "expected 3 circles for 3 data points, got {}", circle_count);
+    }
+
+    #[test]
+    fn test_pie_chart_svg_structure() {
+        let data = make_pie_data(vec!["A", "B", "C"], vec![50.0, 30.0, 20.0]);
+        let svg = render_svg(&data, 80.0, 80.0);
+
+        assert!(svg.starts_with("<svg"));
+        // 3 slices → 3 path elements
+        let path_count = svg.matches("<path d=").count();
+        assert_eq!(path_count, 3, "expected 3 pie slices, got {}", path_count);
+    }
+
+    #[test]
+    fn test_pie_chart_percentage_labels() {
+        let mut data = make_pie_data(vec!["A", "B"], vec![75.0, 25.0]);
+        data.labels = Some(ChartLabels {
+            show: true,
+            font_size: None,
+            color: None,
+        });
+        let svg = render_svg(&data, 80.0, 80.0);
+
+        assert!(svg.contains("75%"), "should show 75% label");
+        assert!(svg.contains("25%"), "should show 25% label");
+    }
+
+    #[test]
+    fn test_legend_renders_for_multi_series() {
+        let mut data = make_bar_data(
+            vec!["A", "B"],
+            vec![("Series 1", vec![10.0, 20.0]), ("Series 2", vec![15.0, 25.0])],
+        );
+        data.legend = Some(ChartLegend {
+            show: true,
+            position: None,
+            font_size: None,
+        });
+        let svg = render_svg(&data, 100.0, 60.0);
+
+        // Multi-series + legend.show → legend should render
+        assert!(svg.contains("Series 1"), "legend should show series name");
+        assert!(svg.contains("Series 2"), "legend should show second series name");
+    }
+
+    #[test]
+    fn test_legend_hidden_for_single_series() {
+        let data = make_bar_data(vec!["A", "B"], vec![("Only", vec![10.0, 20.0])]);
+        let svg = render_svg(&data, 100.0, 60.0);
+
+        // legend: None → legend_show=false → legend not rendered
+        // The text "Only" might appear in x-axis labels, so check for legend swatch rect pattern
+        // Legend renders swatch rects with width="2.5" height="2.5"
+        let legend_swatch = svg.contains(r#"width="2.5" height="2.5""#);
+        assert!(!legend_swatch, "single series should not render legend swatches");
+    }
+
+    #[test]
+    fn test_empty_categories_bar_chart() {
+        let data = make_bar_data(vec![], vec![("S", vec![])]);
+        let svg = render_svg(&data, 100.0, 60.0);
+
+        // Should still produce valid SVG (bg rect + no bars)
+        assert!(svg.starts_with("<svg"));
+        assert!(svg.ends_with("</svg>"));
+    }
+
+    #[test]
+    fn test_empty_series_bar_chart() {
+        let data = make_bar_data(vec!["A", "B"], vec![]);
+        let svg = render_svg(&data, 100.0, 60.0);
+
+        assert!(svg.starts_with("<svg"));
+        assert!(svg.ends_with("</svg>"));
+    }
+
+    #[test]
+    fn test_empty_pie_chart() {
+        let data = make_pie_data(vec![], vec![]);
+        let svg = render_svg(&data, 80.0, 80.0);
+
+        assert!(svg.starts_with("<svg"));
+        assert!(svg.ends_with("</svg>"));
+        // No slices
+        assert!(!svg.contains("<path d="), "empty pie should have no slices");
+    }
+
+    #[test]
+    fn test_title_rendered() {
+        let mut data = make_bar_data(vec!["A"], vec![("S", vec![10.0])]);
+        data.title = Some(ChartTitle {
+            text: "My Chart Title".to_string(),
+            font_size: Some(4.0),
+            color: Some("#333".to_string()),
+            align: None,
+        });
+        let svg = render_svg(&data, 100.0, 60.0);
+
+        assert!(svg.contains("My Chart Title"), "title should be rendered");
+    }
+
+    #[test]
+    fn test_axis_labels_rendered() {
+        let mut data = make_bar_data(vec!["Q1", "Q2"], vec![("Sales", vec![100.0, 200.0])]);
+        data.axis = Some(ChartAxis {
+            x_label: Some("Quarter".to_string()),
+            y_label: Some("Revenue".to_string()),
+            show_grid: None,
+            grid_color: None,
+        });
+        let svg = render_svg(&data, 100.0, 60.0);
+
+        assert!(svg.contains("Quarter"), "x axis label should be rendered");
+        assert!(svg.contains("Revenue"), "y axis label should be rendered");
+    }
+
+    #[test]
+    fn test_axis_labels_not_on_pie() {
+        let mut data = make_pie_data(vec!["A", "B"], vec![50.0, 50.0]);
+        data.axis = Some(ChartAxis {
+            x_label: Some("X Label".to_string()),
+            y_label: Some("Y Label".to_string()),
+            show_grid: None,
+            grid_color: None,
+        });
+        let svg = render_svg(&data, 80.0, 80.0);
+
+        // Pie charts should not render axis labels
+        assert!(!svg.contains("X Label"), "pie chart should not have x axis label");
+        assert!(!svg.contains("Y Label"), "pie chart should not have y axis label");
+    }
+
+    #[test]
+    fn test_escape_xml_special_chars() {
+        assert_eq!(escape_xml("a & b"), "a &amp; b");
+        assert_eq!(escape_xml("<script>"), "&lt;script&gt;");
+        assert_eq!(escape_xml(r#"say "hi""#), "say &quot;hi&quot;");
+        assert_eq!(escape_xml("normal"), "normal");
+    }
+
+    #[test]
+    fn test_donut_chart_inner_radius() {
+        let mut data = make_pie_data(vec!["A", "B"], vec![60.0, 40.0]);
+        data.style.inner_radius = Some(0.5);
+        let svg = render_svg(&data, 80.0, 80.0);
+
+        // Donut chart uses arc paths with inner radius → the path should contain "A" commands
+        // for both outer and inner arcs
+        let path_count = svg.matches("<path d=").count();
+        assert_eq!(path_count, 2, "donut chart should have 2 slices");
+    }
 }

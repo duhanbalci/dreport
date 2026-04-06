@@ -328,6 +328,7 @@ mod tests {
     fn test_container_to_style_direction() {
         let el = ContainerElement {
             id: "test".to_string(),
+            condition: None,
             position: PositionMode::Flow,
             size: SizeConstraint::default(),
             direction: "row".to_string(),
@@ -354,6 +355,7 @@ mod tests {
     fn test_container_to_style_absolute() {
         let el = ContainerElement {
             id: "test".to_string(),
+            condition: None,
             position: PositionMode::Absolute { x: 20.0, y: 30.0 },
             size: SizeConstraint::default(),
             direction: "column".to_string(),

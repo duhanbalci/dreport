@@ -25,12 +25,14 @@ fn base_template() -> Template {
         header: None,
         footer: None,
         format_config: None,
+        locale: None,
         root: ContainerElement {
             id: "root".to_string(),
             position: PositionMode::Flow,
             size: SizeConstraint::default(),
             direction: "column".to_string(),
             gap: 5.0,
+            condition: None,
             padding: Padding {
                 top: 15.0,
                 right: 15.0,
@@ -57,6 +59,7 @@ fn test_1_2_text_wrapping_layout_height() {
     tpl.root.children.push(TemplateElement::StaticText(StaticTextElement {
         id: "long_text".to_string(),
         position: PositionMode::Flow,
+        condition: None,
         size: SizeConstraint {
             width: SizeValue::Fixed { value: 40.0 }, // 40mm genişlik — kısa
             height: SizeValue::Auto,
@@ -92,6 +95,7 @@ fn test_1_2_text_wrapping_pdf_renders() {
     let mut tpl = base_template();
     tpl.root.children.push(TemplateElement::StaticText(StaticTextElement {
         id: "wrap_pdf".to_string(),
+        condition: None,
         position: PositionMode::Flow,
         size: SizeConstraint {
             width: SizeValue::Fixed { value: 50.0 },
@@ -123,6 +127,7 @@ fn test_1_3_image_object_fit_in_layout() {
     tpl.root.children.push(TemplateElement::Image(ImageElement {
         id: "img_contain".to_string(),
         position: PositionMode::Flow,
+        condition: None,
         size: SizeConstraint {
             width: SizeValue::Fixed { value: 40.0 },
             height: SizeValue::Fixed { value: 30.0 },
@@ -164,6 +169,7 @@ fn test_1_4_italic_font_in_pdf() {
         .push(TemplateElement::StaticText(StaticTextElement {
             id: "italic_text".to_string(),
             position: PositionMode::Flow,
+            condition: None,
             size: SizeConstraint {
                 width: SizeValue::Fr { value: 1.0 },
                 height: SizeValue::Auto,
@@ -201,6 +207,7 @@ fn test_1_4_bold_italic_font_in_pdf() {
         .push(TemplateElement::StaticText(StaticTextElement {
             id: "bold_italic".to_string(),
             position: PositionMode::Flow,
+            condition: None,
             size: SizeConstraint {
                 width: SizeValue::Fr { value: 1.0 },
                 height: SizeValue::Auto,
@@ -234,6 +241,7 @@ fn test_2_1_repeat_header_false_no_repeat_on_second_page() {
         .push(TemplateElement::RepeatingTable(RepeatingTableElement {
             id: "tbl_no_repeat".to_string(),
             position: PositionMode::Flow,
+            condition: None,
             size: SizeConstraint {
                 width: SizeValue::Fr { value: 1.0 },
                 height: SizeValue::Auto,
@@ -299,6 +307,7 @@ fn test_2_1_repeat_header_true_repeats_on_second_page() {
         .push(TemplateElement::RepeatingTable(RepeatingTableElement {
             id: "tbl_repeat".to_string(),
             position: PositionMode::Flow,
+            condition: None,
             size: SizeConstraint {
                 width: SizeValue::Fr { value: 1.0 },
                 height: SizeValue::Auto,
@@ -382,6 +391,7 @@ fn test_2_2_table_column_format_currency() {
         .push(TemplateElement::RepeatingTable(RepeatingTableElement {
             id: "tbl_fmt".to_string(),
             position: PositionMode::Flow,
+            condition: None,
             size: SizeConstraint {
                 width: SizeValue::Fr { value: 1.0 },
                 height: SizeValue::Auto,
@@ -451,6 +461,7 @@ fn test_2_3_rounded_rectangle_renders() {
     tpl.root.children.push(TemplateElement::Shape(ShapeElement {
         id: "rounded_shape".to_string(),
         position: PositionMode::Flow,
+        condition: None,
         size: SizeConstraint {
             width: SizeValue::Fixed { value: 50.0 },
             height: SizeValue::Fixed { value: 30.0 },
@@ -496,6 +507,7 @@ fn test_2_3_container_border_radius_renders() {
         .push(TemplateElement::StaticText(StaticTextElement {
             id: "text_in_rounded".to_string(),
             position: PositionMode::Flow,
+            condition: None,
             size: SizeConstraint {
                 width: SizeValue::Fr { value: 1.0 },
                 height: SizeValue::Auto,
@@ -594,6 +606,7 @@ fn test_ellipse_shape_renders() {
     tpl.root.children.push(TemplateElement::Shape(ShapeElement {
         id: "ellipse".to_string(),
         position: PositionMode::Flow,
+        condition: None,
         size: SizeConstraint {
             width: SizeValue::Fixed { value: 40.0 },
             height: SizeValue::Fixed { value: 20.0 },
@@ -612,4 +625,438 @@ fn test_ellipse_shape_renders() {
     let layout = compute_layout(&tpl, &serde_json::json!({}), &fonts).unwrap();
     let pdf = dreport_layout::pdf_render::render_pdf(&layout, &fonts).unwrap();
     assert!(pdf.starts_with(b"%PDF"));
+}
+
+// =============================================================================
+// 7.1 Conditional Rendering
+// =============================================================================
+
+#[test]
+fn test_7_1_condition_gt_hides_element() {
+    let mut tpl = base_template();
+    tpl.root.children.push(TemplateElement::StaticText(StaticTextElement {
+        id: "always_visible".to_string(),
+        condition: None,
+        position: PositionMode::Flow,
+        size: SizeConstraint::default(),
+        style: TextStyle { font_size: Some(10.0), ..Default::default() },
+        content: "Visible".to_string(),
+    }));
+    tpl.root.children.push(TemplateElement::Text(TextElement {
+        id: "conditional_text".to_string(),
+        condition: Some(Condition {
+            path: "toplamlar.iskonto".to_string(),
+            operator: "gt".to_string(),
+            value: Some(serde_json::json!(0)),
+        }),
+        position: PositionMode::Flow,
+        size: SizeConstraint::default(),
+        style: TextStyle { font_size: Some(10.0), ..Default::default() },
+        content: None,
+        binding: ScalarBinding { path: "toplamlar.iskonto".to_string() },
+    }));
+
+    let fonts = load_test_fonts();
+
+    // iskonto = 0 → koşul sağlanmaz, element gizlenmeli
+    let data_no_iskonto = serde_json::json!({ "toplamlar": { "iskonto": 0 } });
+    let layout = compute_layout(&tpl, &data_no_iskonto, &fonts).unwrap();
+    let page = &layout.pages[0];
+    assert!(
+        !page.elements.iter().any(|e| e.id == "conditional_text"),
+        "iskonto=0 durumunda conditional_text gizlenmeli"
+    );
+    assert!(
+        page.elements.iter().any(|e| e.id == "always_visible"),
+        "koşulsuz eleman her zaman görünmeli"
+    );
+}
+
+#[test]
+fn test_7_1_condition_gt_shows_element() {
+    let mut tpl = base_template();
+    tpl.root.children.push(TemplateElement::Text(TextElement {
+        id: "conditional_text".to_string(),
+        condition: Some(Condition {
+            path: "toplamlar.iskonto".to_string(),
+            operator: "gt".to_string(),
+            value: Some(serde_json::json!(0)),
+        }),
+        position: PositionMode::Flow,
+        size: SizeConstraint::default(),
+        style: TextStyle { font_size: Some(10.0), ..Default::default() },
+        content: None,
+        binding: ScalarBinding { path: "toplamlar.iskonto".to_string() },
+    }));
+
+    let fonts = load_test_fonts();
+
+    // iskonto = 500 → koşul sağlanır, element görünmeli
+    let data_with_iskonto = serde_json::json!({ "toplamlar": { "iskonto": 500 } });
+    let layout = compute_layout(&tpl, &data_with_iskonto, &fonts).unwrap();
+    let page = &layout.pages[0];
+    assert!(
+        page.elements.iter().any(|e| e.id == "conditional_text"),
+        "iskonto>0 durumunda conditional_text görünmeli"
+    );
+}
+
+#[test]
+fn test_7_1_condition_eq_operator() {
+    let mut tpl = base_template();
+    tpl.root.children.push(TemplateElement::StaticText(StaticTextElement {
+        id: "status_text".to_string(),
+        condition: Some(Condition {
+            path: "durum".to_string(),
+            operator: "eq".to_string(),
+            value: Some(serde_json::json!("aktif")),
+        }),
+        position: PositionMode::Flow,
+        size: SizeConstraint::default(),
+        style: TextStyle { font_size: Some(10.0), ..Default::default() },
+        content: "Aktif".to_string(),
+    }));
+
+    let fonts = load_test_fonts();
+
+    // durum = "aktif" → görünür
+    let layout = compute_layout(&tpl, &serde_json::json!({"durum": "aktif"}), &fonts).unwrap();
+    assert!(layout.pages[0].elements.iter().any(|e| e.id == "status_text"));
+
+    // durum = "pasif" → gizli
+    let layout = compute_layout(&tpl, &serde_json::json!({"durum": "pasif"}), &fonts).unwrap();
+    assert!(!layout.pages[0].elements.iter().any(|e| e.id == "status_text"));
+}
+
+#[test]
+fn test_7_1_condition_empty_not_empty() {
+    let mut tpl = base_template();
+    tpl.root.children.push(TemplateElement::StaticText(StaticTextElement {
+        id: "show_if_exists".to_string(),
+        condition: Some(Condition {
+            path: "note".to_string(),
+            operator: "not_empty".to_string(),
+            value: None,
+        }),
+        position: PositionMode::Flow,
+        size: SizeConstraint::default(),
+        style: TextStyle { font_size: Some(10.0), ..Default::default() },
+        content: "Has note".to_string(),
+    }));
+
+    let fonts = load_test_fonts();
+
+    // note yok → gizli
+    let layout = compute_layout(&tpl, &serde_json::json!({}), &fonts).unwrap();
+    assert!(!layout.pages[0].elements.iter().any(|e| e.id == "show_if_exists"));
+
+    // note var → görünür
+    let layout = compute_layout(&tpl, &serde_json::json!({"note": "merhaba"}), &fonts).unwrap();
+    assert!(layout.pages[0].elements.iter().any(|e| e.id == "show_if_exists"));
+
+    // note boş string → gizli
+    let layout = compute_layout(&tpl, &serde_json::json!({"note": ""}), &fonts).unwrap();
+    assert!(!layout.pages[0].elements.iter().any(|e| e.id == "show_if_exists"));
+}
+
+#[test]
+fn test_7_1_condition_on_container_hides_children() {
+    let mut tpl = base_template();
+    tpl.root.children.push(TemplateElement::Container(ContainerElement {
+        id: "cond_container".to_string(),
+        condition: Some(Condition {
+            path: "show".to_string(),
+            operator: "eq".to_string(),
+            value: Some(serde_json::json!(true)),
+        }),
+        position: PositionMode::Flow,
+        size: SizeConstraint::default(),
+        direction: "column".to_string(),
+        gap: 0.0,
+        padding: Padding::default(),
+        align: "stretch".to_string(),
+        justify: "start".to_string(),
+        style: ContainerStyle::default(),
+        break_inside: "auto".to_string(),
+        children: vec![TemplateElement::StaticText(StaticTextElement {
+            id: "child_text".to_string(),
+            condition: None,
+            position: PositionMode::Flow,
+            size: SizeConstraint::default(),
+            style: TextStyle { font_size: Some(10.0), ..Default::default() },
+            content: "Child".to_string(),
+        })],
+    }));
+
+    let fonts = load_test_fonts();
+
+    // show=false → container ve çocukları gizli
+    let layout = compute_layout(&tpl, &serde_json::json!({"show": false}), &fonts).unwrap();
+    assert!(!layout.pages[0].elements.iter().any(|e| e.id == "cond_container"));
+    assert!(!layout.pages[0].elements.iter().any(|e| e.id == "child_text"));
+
+    // show=true → container ve çocukları görünür
+    let layout = compute_layout(&tpl, &serde_json::json!({"show": true}), &fonts).unwrap();
+    assert!(layout.pages[0].elements.iter().any(|e| e.id == "cond_container"));
+    assert!(layout.pages[0].elements.iter().any(|e| e.id == "child_text"));
+}
+
+// =============================================================================
+// 7.5 Localization / FormatConfig from locale
+// =============================================================================
+
+#[test]
+fn test_7_5_locale_en_us_currency() {
+    let config = FormatConfig::from_locale("en-US");
+    assert_eq!(config.thousands_separator, ",");
+    assert_eq!(config.decimal_separator, ".");
+    assert_eq!(config.currency_symbol, "$");
+    assert_eq!(config.currency_position, "prefix");
+}
+
+#[test]
+fn test_7_5_locale_de_de_currency() {
+    let config = FormatConfig::from_locale("de-DE");
+    assert_eq!(config.thousands_separator, ".");
+    assert_eq!(config.decimal_separator, ",");
+    assert_eq!(config.currency_symbol, "€");
+    assert_eq!(config.currency_position, "suffix");
+}
+
+#[test]
+fn test_7_5_locale_fr_fr_currency() {
+    let config = FormatConfig::from_locale("fr-FR");
+    assert_eq!(config.thousands_separator, " ");
+    assert_eq!(config.decimal_separator, ",");
+    assert_eq!(config.currency_symbol, "€");
+}
+
+#[test]
+fn test_7_5_locale_tr_default() {
+    let config = FormatConfig::from_locale("tr-TR");
+    assert_eq!(config, FormatConfig::default());
+}
+
+#[test]
+fn test_7_5_unknown_locale_falls_back_to_default() {
+    let config = FormatConfig::from_locale("xx-XX");
+    assert_eq!(config, FormatConfig::default());
+}
+
+#[test]
+fn test_7_5_effective_format_config_priority() {
+    // format_config set → onu kullan
+    let tpl = Template {
+        id: "t1".to_string(),
+        name: "Test".to_string(),
+        page: PageSettings { width: 210.0, height: 297.0 },
+        fonts: vec![],
+        header: None,
+        footer: None,
+        root: ContainerElement {
+            id: "root".to_string(),
+            condition: None,
+            position: PositionMode::Flow,
+            size: SizeConstraint::default(),
+            direction: "column".to_string(),
+            gap: 0.0,
+            padding: Padding::default(),
+            align: "stretch".to_string(),
+            justify: "start".to_string(),
+            style: ContainerStyle::default(),
+            break_inside: "auto".to_string(),
+            children: vec![],
+        },
+        format_config: Some(FormatConfig {
+            thousands_separator: ",".to_string(),
+            decimal_separator: ".".to_string(),
+            currency_symbol: "$".to_string(),
+            currency_position: "prefix".to_string(),
+        }),
+        locale: Some("de-DE".to_string()),
+    };
+    let fc = tpl.effective_format_config();
+    assert_eq!(fc.currency_symbol, "$"); // format_config kullanılır, de-DE değil
+}
+
+#[test]
+fn test_7_5_effective_format_config_locale_fallback() {
+    let tpl = Template {
+        id: "t1".to_string(),
+        name: "Test".to_string(),
+        page: PageSettings { width: 210.0, height: 297.0 },
+        fonts: vec![],
+        header: None,
+        footer: None,
+        root: ContainerElement {
+            id: "root".to_string(),
+            condition: None,
+            position: PositionMode::Flow,
+            size: SizeConstraint::default(),
+            direction: "column".to_string(),
+            gap: 0.0,
+            padding: Padding::default(),
+            align: "stretch".to_string(),
+            justify: "start".to_string(),
+            style: ContainerStyle::default(),
+            break_inside: "auto".to_string(),
+            children: vec![],
+        },
+        format_config: None,
+        locale: Some("en-US".to_string()),
+    };
+    let fc = tpl.effective_format_config();
+    assert_eq!(fc.currency_symbol, "$");
+    assert_eq!(fc.currency_position, "prefix");
+}
+
+#[test]
+fn test_7_5_locale_affects_table_currency_format() {
+    let mut tpl = base_template();
+    tpl.locale = Some("en-US".to_string());
+    tpl.root.children.push(TemplateElement::RepeatingTable(RepeatingTableElement {
+        id: "tbl_locale".to_string(),
+        condition: None,
+        position: PositionMode::Flow,
+        size: SizeConstraint {
+            width: SizeValue::Fr { value: 1.0 },
+            height: SizeValue::Auto,
+            ..Default::default()
+        },
+        data_source: ArrayBinding { path: "items".to_string() },
+        columns: vec![
+            TableColumn {
+                id: "col_price".to_string(),
+                field: "price".to_string(),
+                title: "Price".to_string(),
+                width: SizeValue::Fr { value: 1.0 },
+                align: "right".to_string(),
+                format: Some("currency".to_string()),
+            },
+        ],
+        style: TableStyle::default(),
+        repeat_header: Some(true),
+    }));
+
+    let data = serde_json::json!({
+        "items": [
+            { "price": 1500 }
+        ]
+    });
+
+    // data_resolve seviyesinde kontrol: locale en-US → $ prefix, comma thousands
+    let resolved = dreport_layout::data_resolve::resolve_template(&tpl, &data);
+    let table = resolved.tables.get("tbl_locale").expect("tbl_locale should be resolved");
+    assert_eq!(table.rows.len(), 1);
+    assert_eq!(table.rows[0][0], "$1,500.00");
+}
+
+// =============================================================================
+// 8.1 Chart Legend — tek seri durumunda da render edilmeli
+// =============================================================================
+
+#[test]
+fn test_8_1_legend_renders_for_single_series() {
+    use dreport_layout::chart_render::render_svg;
+    use dreport_layout::data_resolve::{ChartSeries, ResolvedChartData};
+
+    let data = ResolvedChartData {
+        chart_type: ChartType::Bar,
+        categories: vec!["A".to_string(), "B".to_string()],
+        series: vec![ChartSeries {
+            name: "Revenue".to_string(),
+            values: vec![100.0, 200.0],
+        }],
+        title: None,
+        legend: Some(ChartLegend { show: true, position: None, font_size: None }),
+        labels: None,
+        axis: None,
+        style: ChartStyle::default(),
+        group_mode: None,
+    };
+
+    let svg = render_svg(&data, 100.0, 60.0);
+    let has_swatch = svg.contains(r#"width="2.5" height="2.5""#);
+    assert!(has_swatch, "tek serili chart'ta legend.show=true olunca legend render edilmeli");
+    assert!(svg.contains("Revenue"), "legend seri adını göstermeli");
+}
+
+#[test]
+fn test_8_1_legend_hidden_when_show_false() {
+    use dreport_layout::chart_render::render_svg;
+    use dreport_layout::data_resolve::{ChartSeries, ResolvedChartData};
+
+    let data = ResolvedChartData {
+        chart_type: ChartType::Bar,
+        categories: vec!["A".to_string()],
+        series: vec![ChartSeries {
+            name: "Sales".to_string(),
+            values: vec![50.0],
+        }],
+        title: None,
+        legend: Some(ChartLegend { show: false, position: None, font_size: None }),
+        labels: None,
+        axis: None,
+        style: ChartStyle::default(),
+        group_mode: None,
+    };
+
+    let svg = render_svg(&data, 100.0, 60.0);
+    let has_swatch = svg.contains(r#"width="2.5" height="2.5""#);
+    assert!(!has_swatch, "legend.show=false olunca legend render edilmemeli");
+}
+
+// =============================================================================
+// 8.2 Pie Chart Label Kontrolü
+// =============================================================================
+
+#[test]
+fn test_8_2_pie_labels_hidden_when_show_false() {
+    use dreport_layout::chart_render::render_svg;
+    use dreport_layout::data_resolve::{ChartSeries, ResolvedChartData};
+
+    let data = ResolvedChartData {
+        chart_type: ChartType::Pie,
+        categories: vec!["Gida".to_string(), "Ulasim".to_string(), "Kira".to_string()],
+        series: vec![ChartSeries {
+            name: "data".to_string(),
+            values: vec![50.0, 30.0, 20.0],
+        }],
+        title: None,
+        legend: None,
+        labels: Some(ChartLabels { show: false, font_size: None, color: None }),
+        axis: None,
+        style: ChartStyle::default(),
+        group_mode: None,
+    };
+
+    let svg = render_svg(&data, 80.0, 80.0);
+    assert!(!svg.contains("Gida"), "labels.show=false iken kategori adı görünmemeli");
+    assert!(!svg.contains("Ulasim"), "labels.show=false iken kategori adı görünmemeli");
+    assert!(!svg.contains("50%"), "labels.show=false iken yüzde etiketi görünmemeli");
+}
+
+#[test]
+fn test_8_2_pie_labels_shown_when_show_true() {
+    use dreport_layout::chart_render::render_svg;
+    use dreport_layout::data_resolve::{ChartSeries, ResolvedChartData};
+
+    let data = ResolvedChartData {
+        chart_type: ChartType::Pie,
+        categories: vec!["Gida".to_string(), "Ulasim".to_string()],
+        series: vec![ChartSeries {
+            name: "data".to_string(),
+            values: vec![75.0, 25.0],
+        }],
+        title: None,
+        legend: None,
+        labels: Some(ChartLabels { show: true, font_size: None, color: None }),
+        axis: None,
+        style: ChartStyle::default(),
+        group_mode: None,
+    };
+
+    let svg = render_svg(&data, 80.0, 80.0);
+    assert!(svg.contains("Gida"), "labels.show=true iken kategori adı görünmeli");
+    assert!(svg.contains("75%"), "labels.show=true iken yüzde etiketi görünmeli");
 }
