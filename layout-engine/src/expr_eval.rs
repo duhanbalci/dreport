@@ -59,7 +59,10 @@ fn dexpr_value_to_string(val: &DexprValue) -> String {
             format!("[{}]", items.join(", "))
         }
         DexprValue::Object(map) => {
-            let items: Vec<String> = map.iter().map(|(k, v)| format!("{}: {}", k, dexpr_value_to_string(v))).collect();
+            let items: Vec<String> = map
+                .iter()
+                .map(|(k, v)| format!("{}: {}", k, dexpr_value_to_string(v)))
+                .collect();
             format!("{{{}}}", items.join(", "))
         }
     }
@@ -67,11 +70,19 @@ fn dexpr_value_to_string(val: &DexprValue) -> String {
 
 /// Format result with given format type (varsayılan Türk formatı)
 pub fn apply_format(value: &str, format: Option<&str>) -> String {
-    apply_format_with_config(value, format, &dreport_core::models::FormatConfig::default())
+    apply_format_with_config(
+        value,
+        format,
+        &dreport_core::models::FormatConfig::default(),
+    )
 }
 
 /// Format result with given format type and config
-pub fn apply_format_with_config(value: &str, format: Option<&str>, config: &dreport_core::models::FormatConfig) -> String {
+pub fn apply_format_with_config(
+    value: &str,
+    format: Option<&str>,
+    config: &dreport_core::models::FormatConfig,
+) -> String {
     match format {
         Some("currency") => format_currency(value, config),
         Some("percentage") => format_percentage(value),
@@ -89,19 +100,31 @@ fn format_currency(value: &str, config: &dreport_core::models::FormatConfig) -> 
 
     // Round to 2 decimal places using Decimal — no float precision loss
     // MidpointAwayFromZero: 1.005 → 1.01 (currency convention)
-    let rounded = d.abs().round_dp_with_strategy(2, rust_decimal::RoundingStrategy::MidpointAwayFromZero);
+    let rounded = d
+        .abs()
+        .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::MidpointAwayFromZero);
     // Extract integer and fractional parts from the rounded Decimal
     let truncated = rounded.trunc();
     let frac_part = rounded - truncated;
     let integer = truncated.to_string().parse::<i64>().unwrap_or(0);
-    let frac = (frac_part * Decimal::from(100)).trunc().to_string().parse::<i64>().unwrap_or(0);
+    let frac = (frac_part * Decimal::from(100))
+        .trunc()
+        .to_string()
+        .parse::<i64>()
+        .unwrap_or(0);
 
     let int_str = format_with_thousands(integer, &config.thousands_separator);
     let sign = if d.is_sign_negative() { "-" } else { "" };
     if config.currency_position == "prefix" {
-        format!("{}{}{}{}{:02}", config.currency_symbol, sign, int_str, config.decimal_separator, frac)
+        format!(
+            "{}{}{}{}{:02}",
+            config.currency_symbol, sign, int_str, config.decimal_separator, frac
+        )
     } else {
-        format!("{}{}{}{:02} {}", sign, int_str, config.decimal_separator, frac, config.currency_symbol)
+        format!(
+            "{}{}{}{:02} {}",
+            sign, int_str, config.decimal_separator, frac, config.currency_symbol
+        )
     }
 }
 
@@ -135,7 +158,7 @@ fn format_with_thousands(n: i64, separator: &str) -> String {
     }
     let mut result = String::new();
     for (i, ch) in s.chars().enumerate() {
-        if i > 0 && (len - i) % 3 == 0 {
+        if i > 0 && (len - i).is_multiple_of(3) {
             result.push_str(separator);
         }
         result.push(ch);
@@ -157,26 +180,38 @@ mod tests {
     #[test]
     fn test_arithmetic() {
         let data = json!({"toplamlar": {"araToplam": 16000, "kdv": 2880}});
-        assert_eq!(evaluate_expression("toplamlar.araToplam + toplamlar.kdv", &data), "18880");
+        assert_eq!(
+            evaluate_expression("toplamlar.araToplam + toplamlar.kdv", &data),
+            "18880"
+        );
     }
 
     #[test]
     fn test_multiplication() {
         let data = json!({"toplamlar": {"araToplam": 16000}});
-        assert_eq!(evaluate_expression("toplamlar.araToplam * 0.20", &data), "3200");
+        assert_eq!(
+            evaluate_expression("toplamlar.araToplam * 0.20", &data),
+            "3200"
+        );
     }
 
     #[test]
     fn test_string_concat() {
         let data = json!({"fatura": {"no": "FTR-001"}});
-        assert_eq!(evaluate_expression("\"Fatura No: \" + fatura.no", &data), "Fatura No: FTR-001");
+        assert_eq!(
+            evaluate_expression("\"Fatura No: \" + fatura.no", &data),
+            "Fatura No: FTR-001"
+        );
     }
 
     #[test]
     fn test_ternary() {
         let data = json!({"fatura": {"tutar": 5000}});
         assert_eq!(
-            evaluate_expression("if fatura.tutar > 0 then \"Borclu\" else \"Alacakli\" end", &data),
+            evaluate_expression(
+                "if fatura.tutar > 0 then \"Borclu\" else \"Alacakli\" end",
+                &data
+            ),
             "Borclu"
         );
     }
@@ -185,7 +220,10 @@ mod tests {
     fn test_ternary_false() {
         let data = json!({"fatura": {"tutar": 0}});
         assert_eq!(
-            evaluate_expression("if fatura.tutar > 0 then \"Borclu\" else \"Alacakli\" end", &data),
+            evaluate_expression(
+                "if fatura.tutar > 0 then \"Borclu\" else \"Alacakli\" end",
+                &data
+            ),
             "Alacakli"
         );
     }
@@ -214,7 +252,10 @@ mod tests {
     fn test_numeric_comparison() {
         let data = json!({"fatura": {"tutar": 5000}});
         assert_eq!(
-            evaluate_expression("if fatura.tutar > 1000 then \"Yuksek\" else \"Dusuk\" end", &data),
+            evaluate_expression(
+                "if fatura.tutar > 1000 then \"Yuksek\" else \"Dusuk\" end",
+                &data
+            ),
             "Yuksek"
         );
     }

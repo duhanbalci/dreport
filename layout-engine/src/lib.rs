@@ -1,10 +1,10 @@
-pub mod sizing;
-pub mod text_measure;
 pub mod data_resolve;
-pub mod table_layout;
-pub mod tree;
-pub mod page_break;
 pub mod expr_eval;
+pub mod page_break;
+pub mod sizing;
+pub mod table_layout;
+pub mod text_measure;
+pub mod tree;
 
 #[cfg(target_arch = "wasm32")]
 pub mod wasm_api;
@@ -104,7 +104,7 @@ pub enum ResolvedContent {
         svg: String,
         /// PDF render icin chart verisi (frontend bunu kullanmaz)
         #[serde(flatten)]
-        chart_data: ChartRenderData,
+        chart_data: Box<ChartRenderData>,
     },
 }
 
@@ -274,7 +274,12 @@ impl FontData {
 
     /// Create FontData with explicit metadata (when metadata is already known).
     pub fn new(family: String, weight: u16, italic: bool, data: Vec<u8>) -> Self {
-        Self { family, weight, italic, data }
+        Self {
+            family,
+            weight,
+            italic,
+            data,
+        }
     }
 
     pub fn is_bold(&self) -> bool {

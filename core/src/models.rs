@@ -296,7 +296,7 @@ pub enum TemplateElement {
     #[serde(rename = "rich_text")]
     RichText(RichTextElement),
     #[serde(rename = "chart")]
-    Chart(ChartElement),
+    Chart(Box<ChartElement>),
 }
 
 impl TemplateElement {
@@ -406,11 +406,19 @@ pub struct ContainerElement {
     pub break_inside: String,
 }
 
-fn default_auto() -> String { "auto".to_string() }
+fn default_auto() -> String {
+    "auto".to_string()
+}
 
-fn default_column() -> String { "column".to_string() }
-fn default_stretch() -> String { "stretch".to_string() }
-fn default_start() -> String { "start".to_string() }
+fn default_column() -> String {
+    "column".to_string()
+}
+fn default_stretch() -> String {
+    "stretch".to_string()
+}
+fn default_start() -> String {
+    "start".to_string()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -488,7 +496,9 @@ pub struct RepeatingTableElement {
     pub repeat_header: Option<bool>,
 }
 
-fn default_true() -> Option<bool> { Some(true) }
+fn default_true() -> Option<bool> {
+    Some(true)
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -519,7 +529,7 @@ pub struct ShapeElement {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct CheckboxStyle {
-    pub size: Option<f64>,          // mm — kare boyutu
+    pub size: Option<f64>,            // mm — kare boyutu
     pub check_color: Option<String>,  // checkmark rengi
     pub border_color: Option<String>, // kare kenar rengi
     pub border_width: Option<f64>,    // kenar kalınlığı
@@ -531,8 +541,8 @@ pub struct CheckboxElement {
     pub id: String,
     pub position: PositionMode,
     pub size: SizeConstraint,
-    pub checked: Option<bool>,           // statik değer
-    pub binding: Option<ScalarBinding>,  // dinamik boolean binding
+    pub checked: Option<bool>,          // statik değer
+    pub binding: Option<ScalarBinding>, // dinamik boolean binding
     pub style: CheckboxStyle,
 }
 
@@ -583,10 +593,18 @@ pub struct FormatConfig {
 }
 
 impl FormatConfig {
-    fn default_thousands_sep() -> String { ".".to_string() }
-    fn default_decimal_sep() -> String { ",".to_string() }
-    fn default_currency_symbol() -> String { "₺".to_string() }
-    fn default_currency_position() -> String { "suffix".to_string() }
+    fn default_thousands_sep() -> String {
+        ".".to_string()
+    }
+    fn default_decimal_sep() -> String {
+        ",".to_string()
+    }
+    fn default_currency_symbol() -> String {
+        "₺".to_string()
+    }
+    fn default_currency_position() -> String {
+        "suffix".to_string()
+    }
 }
 
 impl Default for FormatConfig {

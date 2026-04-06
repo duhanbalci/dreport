@@ -1,7 +1,7 @@
 //! Integration tests for the layout engine's compute_layout() public API.
 
 use dreport_core::models::*;
-use dreport_layout::{compute_layout, LayoutResult};
+use dreport_layout::{LayoutResult, compute_layout};
 
 mod common;
 use common::load_test_fonts;
@@ -205,11 +205,7 @@ fn test_compute_layout_with_data_binding() {
     let result = compute_layout(&template, &data, &fonts).unwrap();
     let page = &result.pages[0];
 
-    let bound = page
-        .elements
-        .iter()
-        .find(|e| e.id == "bound_text")
-        .unwrap();
+    let bound = page.elements.iter().find(|e| e.id == "bound_text").unwrap();
     match &bound.content {
         Some(dreport_layout::ResolvedContent::Text { value }) => {
             assert_eq!(value, "Acme Corp");

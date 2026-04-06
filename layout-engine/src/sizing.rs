@@ -65,13 +65,13 @@ pub fn apply_size_to_style(
     // Fr → flex_grow (main axis'e göre)
     let main_fr = match parent_direction {
         Some("row") => fr_value(&size.width),
-        Some("column") | _ => fr_value(&size.height),
+        _ => fr_value(&size.height),
     };
 
     // Cross axis fr: row'da height fr, column'da width fr
     let cross_fr = match parent_direction {
         Some("row") => fr_value(&size.height),
-        Some("column") | _ => fr_value(&size.width),
+        _ => fr_value(&size.width),
     };
 
     // Eğer main axis fr ise, flex_grow ayarla ve flex_basis 0 yap
@@ -210,14 +210,22 @@ mod tests {
     fn test_mm_to_pt_one_inch() {
         // 1 inch = 25.4mm = 72pt
         let pt = mm_to_pt(25.4);
-        assert!((pt - 72.0).abs() < 0.01, "25.4mm should be ~72pt, got {}", pt);
+        assert!(
+            (pt - 72.0).abs() < 0.01,
+            "25.4mm should be ~72pt, got {}",
+            pt
+        );
     }
 
     #[test]
     fn test_pt_to_mm_conversion() {
         // 72pt = 25.4mm (1 inch)
         let mm = pt_to_mm(72.0);
-        assert!((mm - 25.4).abs() < 0.01, "72pt should be ~25.4mm, got {}", mm);
+        assert!(
+            (mm - 25.4).abs() < 0.01,
+            "72pt should be ~25.4mm, got {}",
+            mm
+        );
     }
 
     #[test]
@@ -248,7 +256,10 @@ mod tests {
     #[test]
     fn test_fixed_size() {
         let sv = SizeValue::Fixed { value: 50.0 };
-        assert_eq!(size_value_to_dimension(&sv), Dimension::length(mm_to_pt(50.0)));
+        assert_eq!(
+            size_value_to_dimension(&sv),
+            Dimension::length(mm_to_pt(50.0))
+        );
     }
 
     #[test]
@@ -321,7 +332,12 @@ mod tests {
             size: SizeConstraint::default(),
             direction: "row".to_string(),
             gap: 5.0,
-            padding: Padding { top: 10.0, right: 10.0, bottom: 10.0, left: 10.0 },
+            padding: Padding {
+                top: 10.0,
+                right: 10.0,
+                bottom: 10.0,
+                left: 10.0,
+            },
             align: "center".to_string(),
             justify: "space-between".to_string(),
             style: ContainerStyle::default(),

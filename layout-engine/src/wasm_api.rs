@@ -1,5 +1,5 @@
-use std::sync::Mutex;
 use std::collections::HashMap;
+use std::sync::Mutex;
 
 use wasm_bindgen::prelude::*;
 
@@ -92,10 +92,12 @@ pub fn get_loaded_fonts() -> String {
 
     let result: Vec<serde_json::Value> = families
         .into_iter()
-        .map(|(family, variants)| serde_json::json!({
-            "family": family,
-            "variants": variants,
-        }))
+        .map(|(family, variants)| {
+            serde_json::json!({
+                "family": family,
+                "variants": variants,
+            })
+        })
         .collect();
 
     serde_json::to_string(&result).unwrap_or_else(|_| "[]".to_string())
@@ -115,7 +117,9 @@ pub fn compute_layout_wasm(template_json: &str, data_json: &str) -> Result<Strin
 
     let fonts = FONTS.lock().unwrap();
     if fonts.is_empty() {
-        return Err(JsValue::from_str("Fonts not loaded. Call loadFonts() first."));
+        return Err(JsValue::from_str(
+            "Fonts not loaded. Call loadFonts() first.",
+        ));
     }
 
     // Text cache'i al (veya ilk kullanımda oluştur)
@@ -134,7 +138,13 @@ pub fn compute_layout_wasm(template_json: &str, data_json: &str) -> Result<Strin
 /// Barcode üret → ham RGBA pixel verisi (header: 8 byte width+height LE, sonra RGBA).
 /// Sonuç cache'lenir — aynı parametrelerle tekrar çağrılırsa cache'ten döner.
 #[wasm_bindgen(js_name = "generateBarcode")]
-pub fn generate_barcode_wasm(format: &str, value: &str, width: u32, height: u32, include_text: bool) -> Result<js_sys::Uint8ClampedArray, JsValue> {
+pub fn generate_barcode_wasm(
+    format: &str,
+    value: &str,
+    width: u32,
+    height: u32,
+    include_text: bool,
+) -> Result<js_sys::Uint8ClampedArray, JsValue> {
     let cache_key = BarcodeCacheKey {
         format: format.to_string(),
         value: value.to_string(),
@@ -155,8 +165,15 @@ pub fn generate_barcode_wasm(format: &str, value: &str, width: u32, height: u32,
 
     let fonts = FONTS.lock().unwrap();
     let fonts_slice: Option<&[FontData]> = if fonts.is_empty() { None } else { Some(&fonts) };
-    let result = crate::barcode_gen::generate_barcode_pixels(format, value, width, height, include_text, fonts_slice)
-        .map_err(|e| JsValue::from_str(&e))?;
+    let result = crate::barcode_gen::generate_barcode_pixels(
+        format,
+        value,
+        width,
+        height,
+        include_text,
+        fonts_slice,
+    )
+    .map_err(|e| JsValue::from_str(&e))?;
 
     // Grayscale → RGBA (canvas ImageData formatı)
     let mut rgba = Vec::with_capacity((result.width * result.height * 4) as usize);
@@ -164,7 +181,7 @@ pub fn generate_barcode_wasm(format: &str, value: &str, width: u32, height: u32,
         rgba.push(gray); // R
         rgba.push(gray); // G
         rgba.push(gray); // B
-        rgba.push(255);  // A
+        rgba.push(255); // A
     }
 
     // Header (8 byte: width LE + height LE) + RGBA pixel verisi

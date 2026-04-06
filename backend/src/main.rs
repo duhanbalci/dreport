@@ -14,7 +14,8 @@ async fn main() -> anyhow::Result<()> {
     println!("Font registry başlatılıyor...");
     let registry = Arc::new(FontRegistry::new());
 
-    let family_count = dreport_layout::font_provider::FontProvider::list_families(registry.as_ref()).len();
+    let family_count =
+        dreport_layout::font_provider::FontProvider::list_families(registry.as_ref()).len();
     println!("Font registry hazır ({} font ailesi)", family_count);
 
     let cors = CorsLayer::new()

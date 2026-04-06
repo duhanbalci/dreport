@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use dreport_layout::FontData;
 use dreport_layout::font_meta::{self, FontFamilyInfo, FontVariantKey};
 use dreport_layout::font_provider::FontProvider;
+use std::collections::HashMap;
 
 /// Font registry — manages all available fonts from embedded defaults + external directory.
 pub struct FontRegistry {
@@ -31,11 +31,26 @@ impl FontRegistry {
 
     fn load_embedded_defaults(&mut self) {
         let embedded: &[(&str, &[u8])] = &[
-            ("NotoSans-Regular", include_bytes!("../fonts/NotoSans-Regular.ttf")),
-            ("NotoSans-Bold", include_bytes!("../fonts/NotoSans-Bold.ttf")),
-            ("NotoSans-Italic", include_bytes!("../fonts/NotoSans-Italic.ttf")),
-            ("NotoSans-BoldItalic", include_bytes!("../fonts/NotoSans-BoldItalic.ttf")),
-            ("NotoSansMono-Regular", include_bytes!("../fonts/NotoSansMono-Regular.ttf")),
+            (
+                "NotoSans-Regular",
+                include_bytes!("../fonts/NotoSans-Regular.ttf"),
+            ),
+            (
+                "NotoSans-Bold",
+                include_bytes!("../fonts/NotoSans-Bold.ttf"),
+            ),
+            (
+                "NotoSans-Italic",
+                include_bytes!("../fonts/NotoSans-Italic.ttf"),
+            ),
+            (
+                "NotoSans-BoldItalic",
+                include_bytes!("../fonts/NotoSans-BoldItalic.ttf"),
+            ),
+            (
+                "NotoSansMono-Regular",
+                include_bytes!("../fonts/NotoSansMono-Regular.ttf"),
+            ),
         ];
 
         for (_name, data) in embedded {
@@ -60,13 +75,13 @@ impl FontRegistry {
 
         for entry in entries.flatten() {
             let p = entry.path();
-            if p.extension().is_some_and(|e| e == "ttf" || e == "otf") {
-                if let Ok(data) = std::fs::read(&p) {
-                    if self.register_font(data) {
-                        println!("  Font yüklendi: {}", p.display());
-                    } else {
-                        eprintln!("  Font parse edilemedi: {}", p.display());
-                    }
+            if p.extension().is_some_and(|e| e == "ttf" || e == "otf")
+                && let Ok(data) = std::fs::read(&p)
+            {
+                if self.register_font(data) {
+                    println!("  Font yüklendi: {}", p.display());
+                } else {
+                    eprintln!("  Font parse edilemedi: {}", p.display());
                 }
             }
         }
@@ -141,7 +156,8 @@ impl FontProvider for FontRegistry {
         self.families
             .iter()
             .map(|(family_lower, variants)| {
-                let family = self.family_names
+                let family = self
+                    .family_names
                     .get(family_lower)
                     .cloned()
                     .unwrap_or_else(|| family_lower.clone());

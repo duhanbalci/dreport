@@ -1,5 +1,5 @@
-use crate::font_meta::FontFamilyInfo;
 use crate::FontData;
+use crate::font_meta::FontFamilyInfo;
 
 /// Font resolution trait — host apps implement this to provide fonts.
 /// Backend implements it with a file-based registry, WASM side with API fetching.
@@ -36,7 +36,10 @@ pub trait FontProvider: Send + Sync {
             }
 
             let infos = self.list_families();
-            if let Some(info) = infos.iter().find(|i| i.family.to_lowercase() == family_lower) {
+            if let Some(info) = infos
+                .iter()
+                .find(|i| i.family.to_lowercase() == family_lower)
+            {
                 for variant in &info.variants {
                     if let Some(fd) = self.load_font(&info.family, variant.weight, variant.italic) {
                         result.push(fd);

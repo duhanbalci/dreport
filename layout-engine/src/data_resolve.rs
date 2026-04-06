@@ -148,11 +148,23 @@ pub fn resolve_template(template: &Template, data: &Value) -> ResolvedData {
         charts: HashMap::new(),
     };
     if let Some(ref header) = template.header {
-        resolve_element(&TemplateElement::Container(header.clone()), data, &mut resolved);
+        resolve_element(
+            &TemplateElement::Container(header.clone()),
+            data,
+            &mut resolved,
+        );
     }
-    resolve_element(&TemplateElement::Container(template.root.clone()), data, &mut resolved);
+    resolve_element(
+        &TemplateElement::Container(template.root.clone()),
+        data,
+        &mut resolved,
+    );
     if let Some(ref footer) = template.footer {
-        resolve_element(&TemplateElement::Container(footer.clone()), data, &mut resolved);
+        resolve_element(
+            &TemplateElement::Container(footer.clone()),
+            data,
+            &mut resolved,
+        );
     }
     resolved
 }
@@ -172,10 +184,19 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
         }
         TemplateElement::PageNumber(e) => {
             // Format string'i sakla — sayfa bölme sonrası gerçek değerlerle çözülecek
-            let fmt = e.format.as_deref().unwrap_or("{current} / {total}").to_string();
-            resolved.page_number_formats.insert(e.id.clone(), fmt.clone());
+            let fmt = e
+                .format
+                .as_deref()
+                .unwrap_or("{current} / {total}")
+                .to_string();
+            resolved
+                .page_number_formats
+                .insert(e.id.clone(), fmt.clone());
             // Placeholder koy (tek sayfalık fallback)
-            resolved.texts.insert(e.id.clone(), fmt.replace("{current}", "1").replace("{total}", "1"));
+            resolved.texts.insert(
+                e.id.clone(),
+                fmt.replace("{current}", "1").replace("{total}", "1"),
+            );
         }
         TemplateElement::Barcode(e) => {
             let value = if let Some(binding) = &e.binding {
@@ -249,7 +270,11 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
             let result = crate::expr_eval::evaluate_expression(&e.expression, data);
             let formatted = crate::expr_eval::apply_format(&result, e.format.as_deref());
             // Bos ifade veya hata durumunda placeholder goster — element 0 yukseklige dusmesin
-            let text = if formatted.is_empty() { " ".to_string() } else { formatted };
+            let text = if formatted.is_empty() {
+                " ".to_string()
+            } else {
+                formatted
+            };
             resolved.texts.insert(e.id.clone(), text);
         }
         TemplateElement::RichText(e) => {
@@ -269,8 +294,16 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
                     ResolvedRichSpan {
                         text,
                         font_size: span.style.font_size.or(e.style.font_size),
-                        font_weight: span.style.font_weight.clone().or(e.style.font_weight.clone()),
-                        font_family: span.style.font_family.clone().or(e.style.font_family.clone()),
+                        font_weight: span
+                            .style
+                            .font_weight
+                            .clone()
+                            .or(e.style.font_weight.clone()),
+                        font_family: span
+                            .style
+                            .font_family
+                            .clone()
+                            .or(e.style.font_family.clone()),
                         color: span.style.color.clone().or(e.style.color.clone()),
                     }
                 })
@@ -280,9 +313,7 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
         TemplateElement::Chart(e) => {
             let array = resolve_path(data, &e.data_source.path);
             let chart_data = match array {
-                Value::Array(items) if !items.is_empty() => {
-                    resolve_chart_data(e, items)
-                }
+                Value::Array(items) if !items.is_empty() => resolve_chart_data(e, items),
                 _ => ResolvedChartData {
                     chart_type: e.chart_type.clone(),
                     categories: vec![],
@@ -315,9 +346,7 @@ fn resolve_chart_data(e: &ChartElement, items: &[Value]) -> ResolvedChartData {
 
         for item in items {
             let cat = value_to_string(resolve_path(item, &e.category_field));
-            let val = resolve_path(item, &e.value_field)
-                .as_f64()
-                .unwrap_or(0.0);
+            let val = resolve_path(item, &e.value_field).as_f64().unwrap_or(0.0);
             let grp = value_to_string(resolve_path(item, group_field));
 
             if category_set.insert(cat.clone()) {
@@ -326,11 +355,7 @@ fn resolve_chart_data(e: &ChartElement, items: &[Value]) -> ResolvedChartData {
             if group_set.insert(grp.clone()) {
                 group_order.push(grp.clone());
             }
-            *group_data
-                .entry(grp)
-                .or_default()
-                .entry(cat)
-                .or_insert(0.0) += val;
+            *group_data.entry(grp).or_default().entry(cat).or_insert(0.0) += val;
         }
 
         let series = group_order
@@ -355,11 +380,7 @@ fn resolve_chart_data(e: &ChartElement, items: &[Value]) -> ResolvedChartData {
         let mut values = Vec::new();
         for item in items {
             categories.push(value_to_string(resolve_path(item, &e.category_field)));
-            values.push(
-                resolve_path(item, &e.value_field)
-                    .as_f64()
-                    .unwrap_or(0.0),
-            );
+            values.push(resolve_path(item, &e.value_field).as_f64().unwrap_or(0.0));
         }
         let series = vec![ChartSeries {
             name: e.value_field.clone(),
@@ -403,10 +424,7 @@ mod tests {
             value_to_string(resolve_path(&data, "firma.unvan")),
             "Acme A.Ş."
         );
-        assert_eq!(
-            value_to_string(resolve_path(&data, "firma.vergiNo")),
-            "123"
-        );
+        assert_eq!(value_to_string(resolve_path(&data, "firma.vergiNo")), "123");
     }
 
     #[test]
@@ -451,7 +469,10 @@ mod tests {
         let template = Template {
             id: "t1".to_string(),
             name: "Test".to_string(),
-            page: PageSettings { width: 210.0, height: 297.0 },
+            page: PageSettings {
+                width: 210.0,
+                height: 297.0,
+            },
             fonts: vec![],
             header: None,
             footer: None,
@@ -467,16 +488,16 @@ mod tests {
                 justify: "start".to_string(),
                 style: ContainerStyle::default(),
                 break_inside: "auto".to_string(),
-                children: vec![
-                    TemplateElement::Text(TextElement {
-                        id: "el_name".to_string(),
-                        position: PositionMode::Flow,
-                        size: SizeConstraint::default(),
-                        style: TextStyle::default(),
-                        content: None,
-                        binding: ScalarBinding { path: "firma.unvan".to_string() },
-                    }),
-                ],
+                children: vec![TemplateElement::Text(TextElement {
+                    id: "el_name".to_string(),
+                    position: PositionMode::Flow,
+                    size: SizeConstraint::default(),
+                    style: TextStyle::default(),
+                    content: None,
+                    binding: ScalarBinding {
+                        path: "firma.unvan".to_string(),
+                    },
+                })],
             },
         };
 
@@ -496,7 +517,10 @@ mod tests {
         let template = Template {
             id: "t1".to_string(),
             name: "Test".to_string(),
-            page: PageSettings { width: 210.0, height: 297.0 },
+            page: PageSettings {
+                width: 210.0,
+                height: 297.0,
+            },
             fonts: vec![],
             header: None,
             footer: None,
@@ -512,16 +536,16 @@ mod tests {
                 justify: "start".to_string(),
                 style: ContainerStyle::default(),
                 break_inside: "auto".to_string(),
-                children: vec![
-                    TemplateElement::Text(TextElement {
-                        id: "el_no".to_string(),
-                        position: PositionMode::Flow,
-                        size: SizeConstraint::default(),
-                        style: TextStyle::default(),
-                        content: Some("Fatura No: ".to_string()),
-                        binding: ScalarBinding { path: "fatura.no".to_string() },
-                    }),
-                ],
+                children: vec![TemplateElement::Text(TextElement {
+                    id: "el_no".to_string(),
+                    position: PositionMode::Flow,
+                    size: SizeConstraint::default(),
+                    style: TextStyle::default(),
+                    content: Some("Fatura No: ".to_string()),
+                    binding: ScalarBinding {
+                        path: "fatura.no".to_string(),
+                    },
+                })],
             },
         };
 
@@ -530,10 +554,7 @@ mod tests {
         });
 
         let resolved = resolve_template(&template, &data);
-        assert_eq!(
-            resolved.texts.get("el_no").unwrap(),
-            "Fatura No: FTR-001"
-        );
+        assert_eq!(resolved.texts.get("el_no").unwrap(), "Fatura No: FTR-001");
     }
 
     #[test]
@@ -541,7 +562,10 @@ mod tests {
         let template = Template {
             id: "t1".to_string(),
             name: "Test".to_string(),
-            page: PageSettings { width: 210.0, height: 297.0 },
+            page: PageSettings {
+                width: 210.0,
+                height: 297.0,
+            },
             fonts: vec![],
             header: None,
             footer: None,
@@ -557,15 +581,13 @@ mod tests {
                 justify: "start".to_string(),
                 style: ContainerStyle::default(),
                 break_inside: "auto".to_string(),
-                children: vec![
-                    TemplateElement::StaticText(StaticTextElement {
-                        id: "title".to_string(),
-                        position: PositionMode::Flow,
-                        size: SizeConstraint::default(),
-                        style: TextStyle::default(),
-                        content: "FATURA".to_string(),
-                    }),
-                ],
+                children: vec![TemplateElement::StaticText(StaticTextElement {
+                    id: "title".to_string(),
+                    position: PositionMode::Flow,
+                    size: SizeConstraint::default(),
+                    style: TextStyle::default(),
+                    content: "FATURA".to_string(),
+                })],
             },
         };
 
@@ -578,7 +600,10 @@ mod tests {
         let template = Template {
             id: "t1".to_string(),
             name: "Test".to_string(),
-            page: PageSettings { width: 210.0, height: 297.0 },
+            page: PageSettings {
+                width: 210.0,
+                height: 297.0,
+            },
             fonts: vec![],
             header: None,
             footer: None,
@@ -594,34 +619,34 @@ mod tests {
                 justify: "start".to_string(),
                 style: ContainerStyle::default(),
                 break_inside: "auto".to_string(),
-                children: vec![
-                    TemplateElement::RepeatingTable(RepeatingTableElement {
-                        id: "tbl".to_string(),
-                        position: PositionMode::Flow,
-                        size: SizeConstraint::default(),
-                        data_source: ArrayBinding { path: "kalemler".to_string() },
-                        columns: vec![
-                            TableColumn {
-                                id: "col_adi".to_string(),
-                                field: "adi".to_string(),
-                                title: "Urun Adi".to_string(),
-                                width: SizeValue::Fr { value: 1.0 },
-                                align: "left".to_string(),
-                                format: None,
-                            },
-                            TableColumn {
-                                id: "col_tutar".to_string(),
-                                field: "tutar".to_string(),
-                                title: "Tutar".to_string(),
-                                width: SizeValue::Fixed { value: 30.0 },
-                                align: "right".to_string(),
-                                format: None,
-                            },
-                        ],
-                        style: TableStyle::default(),
-                        repeat_header: Some(true),
-                    }),
-                ],
+                children: vec![TemplateElement::RepeatingTable(RepeatingTableElement {
+                    id: "tbl".to_string(),
+                    position: PositionMode::Flow,
+                    size: SizeConstraint::default(),
+                    data_source: ArrayBinding {
+                        path: "kalemler".to_string(),
+                    },
+                    columns: vec![
+                        TableColumn {
+                            id: "col_adi".to_string(),
+                            field: "adi".to_string(),
+                            title: "Urun Adi".to_string(),
+                            width: SizeValue::Fr { value: 1.0 },
+                            align: "left".to_string(),
+                            format: None,
+                        },
+                        TableColumn {
+                            id: "col_tutar".to_string(),
+                            field: "tutar".to_string(),
+                            title: "Tutar".to_string(),
+                            width: SizeValue::Fixed { value: 30.0 },
+                            align: "right".to_string(),
+                            format: None,
+                        },
+                    ],
+                    style: TableStyle::default(),
+                    repeat_header: Some(true),
+                })],
             },
         };
 
@@ -644,7 +669,10 @@ mod tests {
         let template = Template {
             id: "t1".to_string(),
             name: "Test".to_string(),
-            page: PageSettings { width: 210.0, height: 297.0 },
+            page: PageSettings {
+                width: 210.0,
+                height: 297.0,
+            },
             fonts: vec![],
             header: None,
             footer: None,
@@ -660,26 +688,24 @@ mod tests {
                 justify: "start".to_string(),
                 style: ContainerStyle::default(),
                 break_inside: "auto".to_string(),
-                children: vec![
-                    TemplateElement::RepeatingTable(RepeatingTableElement {
-                        id: "tbl".to_string(),
-                        position: PositionMode::Flow,
-                        size: SizeConstraint::default(),
-                        data_source: ArrayBinding { path: "items".to_string() },
-                        columns: vec![
-                            TableColumn {
-                                id: "c1".to_string(),
-                                field: "name".to_string(),
-                                title: "Name".to_string(),
-                                width: SizeValue::Fr { value: 1.0 },
-                                align: "left".to_string(),
-                                format: None,
-                            },
-                        ],
-                        style: TableStyle::default(),
-                        repeat_header: Some(true),
-                    }),
-                ],
+                children: vec![TemplateElement::RepeatingTable(RepeatingTableElement {
+                    id: "tbl".to_string(),
+                    position: PositionMode::Flow,
+                    size: SizeConstraint::default(),
+                    data_source: ArrayBinding {
+                        path: "items".to_string(),
+                    },
+                    columns: vec![TableColumn {
+                        id: "c1".to_string(),
+                        field: "name".to_string(),
+                        title: "Name".to_string(),
+                        width: SizeValue::Fr { value: 1.0 },
+                        align: "left".to_string(),
+                        format: None,
+                    }],
+                    style: TableStyle::default(),
+                    repeat_header: Some(true),
+                })],
             },
         };
 
@@ -694,7 +720,10 @@ mod tests {
         let template = Template {
             id: "t1".to_string(),
             name: "Test".to_string(),
-            page: PageSettings { width: 210.0, height: 297.0 },
+            page: PageSettings {
+                width: 210.0,
+                height: 297.0,
+            },
             fonts: vec![],
             header: None,
             footer: None,
@@ -710,16 +739,16 @@ mod tests {
                 justify: "start".to_string(),
                 style: ContainerStyle::default(),
                 break_inside: "auto".to_string(),
-                children: vec![
-                    TemplateElement::Text(TextElement {
-                        id: "el_missing".to_string(),
-                        position: PositionMode::Flow,
-                        size: SizeConstraint::default(),
-                        style: TextStyle::default(),
-                        content: None,
-                        binding: ScalarBinding { path: "does.not.exist".to_string() },
-                    }),
-                ],
+                children: vec![TemplateElement::Text(TextElement {
+                    id: "el_missing".to_string(),
+                    position: PositionMode::Flow,
+                    size: SizeConstraint::default(),
+                    style: TextStyle::default(),
+                    content: None,
+                    binding: ScalarBinding {
+                        path: "does.not.exist".to_string(),
+                    },
+                })],
             },
         };
 

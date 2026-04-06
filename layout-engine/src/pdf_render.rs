@@ -3,13 +3,13 @@
 
 use std::collections::HashMap;
 
+use krilla::Document;
 use krilla::color::rgb;
 use krilla::geom::{PathBuilder, Point, Size, Transform};
 use krilla::num::NormalizedF32;
 use krilla::page::PageSettings;
 use krilla::paint::{Fill, Stroke};
 use krilla::text::{Font as KrillaFont, TextDirection};
-use krilla::Document;
 
 use crate::text_measure::TextMeasurer;
 use crate::{ElementLayout, FontData, LayoutResult, PageLayout, ResolvedContent, ResolvedStyle};
@@ -126,10 +126,7 @@ impl FontCollection {
         let mut metrics = HashMap::new();
 
         for fd in font_data {
-            let Some(font) = KrillaFont::new(
-                krilla::Data::from(fd.data.clone()),
-                0,
-            ) else {
+            let Some(font) = KrillaFont::new(krilla::Data::from(fd.data.clone()), 0) else {
                 continue;
             };
 
@@ -146,10 +143,13 @@ impl FontCollection {
             if let Some(meta) = crate::font_meta::parse_font_meta(&fd.data) {
                 let units_per_em = meta.units_per_em;
                 if units_per_em > 0 {
-                    metrics.insert((family_lower.clone(), is_bold), FontMetrics {
-                        ascender: meta.ascender as f32 / units_per_em as f32,
-                        descender: meta.descender.unsigned_abs() as f32 / units_per_em as f32,
-                    });
+                    metrics.insert(
+                        (family_lower.clone(), is_bold),
+                        FontMetrics {
+                            ascender: meta.ascender as f32 / units_per_em as f32,
+                            descender: meta.descender.unsigned_abs() as f32 / units_per_em as f32,
+                        },
+                    );
                 }
             }
 
@@ -157,16 +157,25 @@ impl FontCollection {
         }
 
         // Hiç regular bulamadıysak ilk font'u default yap
-        if default.is_none() {
-            if let Some(fd) = font_data.first() {
-                default = KrillaFont::new(krilla::Data::from(fd.data.clone()), 0);
-            }
+        if default.is_none()
+            && let Some(fd) = font_data.first()
+        {
+            default = KrillaFont::new(krilla::Data::from(fd.data.clone()), 0);
         }
 
-        Self { fonts, default, metrics }
+        Self {
+            fonts,
+            default,
+            metrics,
+        }
     }
 
-    fn get(&self, family: Option<&str>, weight: Option<&str>, font_style: Option<&str>) -> Option<&KrillaFont> {
+    fn get(
+        &self,
+        family: Option<&str>,
+        weight: Option<&str>,
+        font_style: Option<&str>,
+    ) -> Option<&KrillaFont> {
         let is_bold = matches!(weight, Some("bold"));
         let is_italic = matches!(font_style, Some("italic"));
         let family_lower = family.unwrap_or("noto sans").to_lowercase();
@@ -188,7 +197,8 @@ impl FontCollection {
         let is_bold = matches!(weight, Some("bold"));
         let family_lower = family.unwrap_or("noto sans").to_lowercase();
 
-        let m = self.metrics
+        let m = self
+            .metrics
             .get(&(family_lower.clone(), is_bold))
             .or_else(|| self.metrics.get(&(family_lower, false)))
             .copied();
@@ -218,7 +228,8 @@ pub fn render_pdf(layout: &LayoutResult, font_data: &[FontData]) -> Result<Vec<u
         render_page(&mut doc, page, &fonts, font_data, &mut measurer)?;
     }
 
-    doc.finish().map_err(|e| format!("PDF oluşturma hatası: {e:?}"))
+    doc.finish()
+        .map_err(|e| format!("PDF oluşturma hatası: {e:?}"))
 }
 
 fn render_page(
@@ -332,9 +343,9 @@ fn render_shape(
 
     let rect_radius = |s: &ResolvedStyle| -> f32 {
         if shape_type == "rounded_rectangle" {
-            s.border_radius.map(|r| mm(r)).unwrap_or(mm(3.0))
+            s.border_radius.map(mm).unwrap_or(mm(3.0))
         } else {
-            s.border_radius.map(|r| mm(r)).unwrap_or(0.0)
+            s.border_radius.map(mm).unwrap_or(0.0)
         }
     };
 
@@ -357,15 +368,16 @@ fn render_shape(
         }));
 
         let path = match shape_type {
-            "ellipse" => build_ellipse_path(
-                x + inset, y + inset,
-                w - border_width, h - border_width,
-            ),
+            "ellipse" => {
+                build_ellipse_path(x + inset, y + inset, w - border_width, h - border_width)
+            }
             _ => {
                 let radius = rect_radius(style);
                 build_rect_path(
-                    x + inset, y + inset,
-                    w - border_width, h - border_width,
+                    x + inset,
+                    y + inset,
+                    w - border_width,
+                    h - border_width,
                     (radius - inset).max(0.0),
                 )
             }
@@ -416,8 +428,10 @@ fn render_checkbox(
     }));
 
     if let Some(p) = build_rect_path(
-        x + inset, y + inset,
-        w - border_width, h - border_width,
+        x + inset,
+        y + inset,
+        w - border_width,
+        h - border_width,
         0.0,
     ) {
         surface.draw_path(&p);
@@ -469,7 +483,7 @@ fn render_container_bg(
         return;
     }
 
-    let radius = style.border_radius.map(|r| mm(r)).unwrap_or(0.0);
+    let radius = style.border_radius.map(mm).unwrap_or(0.0);
 
     if has_border {
         let border_width = mm(style.border_width.unwrap_or(0.5));
@@ -490,8 +504,10 @@ fn render_container_bg(
             ..Default::default()
         }));
         if let Some(path) = build_rect_path(
-            x + inset, y + inset,
-            w - border_width, h - border_width,
+            x + inset,
+            y + inset,
+            w - border_width,
+            h - border_width,
             (radius - inset).max(0.0),
         ) {
             surface.draw_path(&path);
@@ -511,6 +527,7 @@ fn render_container_bg(
     surface.set_stroke(None);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_text(
     surface: &mut krilla::surface::Surface<'_>,
     x: f32,
@@ -589,6 +606,7 @@ fn render_text(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_rich_text(
     surface: &mut krilla::surface::Surface<'_>,
     x: f32,
@@ -614,7 +632,10 @@ fn render_rich_text(
     let total_width = {
         let mut tw = 0.0f32;
         for span in spans {
-            let fs = span.font_size.map(|f| f as f32).unwrap_or(default_font_size);
+            let fs = span
+                .font_size
+                .map(|f| f as f32)
+                .unwrap_or(default_font_size);
             let fw = span.font_weight.as_deref().or(default_weight);
             let ff = span.font_family.as_deref().or(default_family);
             let (sw, _) = measurer.measure(&span.text, ff, fs, fw, None);
@@ -643,7 +664,10 @@ fn render_rich_text(
             continue;
         }
 
-        let font_size = span.font_size.map(|f| f as f32).unwrap_or(default_font_size);
+        let font_size = span
+            .font_size
+            .map(|f| f as f32)
+            .unwrap_or(default_font_size);
         let color_str = span.color.as_deref().unwrap_or(default_color);
         let weight = span.font_weight.as_deref().or(default_weight);
         let family = span.font_family.as_deref().or(default_family);
@@ -748,7 +772,10 @@ fn render_image(
 
     // data:image/png;base64,... veya data:image/jpeg;base64,...
     let Some(base64_part) = src.split(',').nth(1) else {
-        eprintln!("[dreport] Image src data URI değil, atlanıyor: {}...", &src[..src.len().min(60)]);
+        eprintln!(
+            "[dreport] Image src data URI değil, atlanıyor: {}...",
+            &src[..src.len().min(60)]
+        );
         return;
     };
 
@@ -764,15 +791,13 @@ fn render_image(
         ImageFormat::Jpeg => krilla::image::Image::from_jpeg(decoded.into(), true),
         ImageFormat::Gif => krilla::image::Image::from_gif(decoded.into(), true),
         ImageFormat::WebP => krilla::image::Image::from_webp(decoded.into(), true),
-        ImageFormat::Unknown => {
-            match decode_to_png(&decoded) {
-                Some(png_data) => krilla::image::Image::from_png(png_data.into(), true),
-                None => {
-                    eprintln!("[dreport] Image decode/re-encode hatası");
-                    return;
-                }
+        ImageFormat::Unknown => match decode_to_png(&decoded) {
+            Some(png_data) => krilla::image::Image::from_png(png_data.into(), true),
+            None => {
+                eprintln!("[dreport] Image decode/re-encode hatası");
+                return;
             }
-        }
+        },
     };
 
     let Ok(img) = img_result else {
@@ -789,6 +814,7 @@ fn render_image(
     surface.pop();
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_barcode(
     surface: &mut krilla::surface::Surface<'_>,
     x: f32,
@@ -809,7 +835,14 @@ fn render_barcode(
     let h_px = ((h * 4.0) as u32).max(1);
     let include_text = style.barcode_include_text.unwrap_or(false);
 
-    let png_result = crate::barcode_gen::generate_barcode_png(format, value, w_px, h_px, include_text, Some(font_data));
+    let png_result = crate::barcode_gen::generate_barcode_png(
+        format,
+        value,
+        w_px,
+        h_px,
+        include_text,
+        Some(font_data),
+    );
 
     match png_result {
         Ok(png_bytes) => {
@@ -862,6 +895,7 @@ fn embed_png(
     surface.pop();
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_chart(
     surface: &mut krilla::surface::Surface<'_>,
     x: f32,
@@ -873,8 +907,8 @@ fn render_chart(
     measurer: &mut TextMeasurer,
 ) {
     use crate::chart_layout::{
-        color_at, compute_bar_layout, compute_chart_layout, compute_legend,
-        compute_line_layout, compute_pie_layout, format_value,
+        color_at, compute_bar_layout, compute_chart_layout, compute_legend, compute_line_layout,
+        compute_pie_layout, format_value,
     };
 
     let base_x_mm: f64 = (x / MM_TO_PT) as f64;
@@ -883,8 +917,14 @@ fn render_chart(
     let h_mm: f64 = (h / MM_TO_PT) as f64;
 
     // Background
-    chart_rect(surface, base_x_mm, base_y_mm, w_mm, h_mm,
-        parse_color(data.background_color.as_deref().unwrap_or("#FFFFFF")));
+    chart_rect(
+        surface,
+        base_x_mm,
+        base_y_mm,
+        w_mm,
+        h_mm,
+        parse_color(data.background_color.as_deref().unwrap_or("#FFFFFF")),
+    );
 
     let cl = compute_chart_layout(data, w_mm, h_mm, base_x_mm, base_y_mm);
 
@@ -905,7 +945,11 @@ fn render_chart(
             let ty = pt(title.y);
             surface.draw_text(
                 Point::from_xy(tx, ty),
-                f.clone(), fs_pt, &title.text, false, TextDirection::Auto,
+                f.clone(),
+                fs_pt,
+                &title.text,
+                false,
+                TextDirection::Auto,
             );
         }
     }
@@ -922,17 +966,43 @@ fn render_chart(
                     if bl.stacked {
                         if bar.value > 0.0 {
                             let label = format_value(bar.value);
-                            chart_text_centered(surface, bar.label_x, bar.label_y, &label, bl.label_font, &bl.label_color, fonts, measurer);
+                            chart_text_centered(
+                                surface,
+                                bar.label_x,
+                                bar.label_y,
+                                &label,
+                                bl.label_font,
+                                &bl.label_color,
+                                fonts,
+                                measurer,
+                            );
                         }
                     } else {
                         let label = format_value(bar.value);
-                        chart_text_centered(surface, bar.label_x, bar.label_y, &label, bl.label_font, &bl.label_color, fonts, measurer);
+                        chart_text_centered(
+                            surface,
+                            bar.label_x,
+                            bar.label_y,
+                            &label,
+                            bl.label_font,
+                            &bl.label_color,
+                            fonts,
+                            measurer,
+                        );
                     }
                 }
             }
             render_chart_x_labels(surface, &bl.x_labels, fonts, measurer);
             let ac = parse_color("#9CA3AF");
-            chart_line_seg(surface, bl.x_axis_x1, bl.x_axis_y, bl.x_axis_x2, bl.x_axis_y, ac, 0.8);
+            chart_line_seg(
+                surface,
+                bl.x_axis_x1,
+                bl.x_axis_y,
+                bl.x_axis_x2,
+                bl.x_axis_y,
+                ac,
+                0.8,
+            );
         }
         ChartType::Line => {
             let ll = compute_line_layout(data, &cl);
@@ -940,7 +1010,8 @@ fn render_chart(
             for series_layout in &ll.series {
                 let color = parse_color(color_at(&cl.palette, series_layout.color_idx));
                 // Polyline
-                let points: Vec<(f64, f64)> = series_layout.points.iter().map(|p| (p.x, p.y)).collect();
+                let points: Vec<(f64, f64)> =
+                    series_layout.points.iter().map(|p| (p.x, p.y)).collect();
                 surface.set_fill(None);
                 surface.set_stroke(Some(Stroke {
                     paint: color.into(),
@@ -951,12 +1022,17 @@ fn render_chart(
                 let path = {
                     let mut pb = PathBuilder::new();
                     for (i, (lx, ly)) in points.iter().enumerate() {
-                        if i == 0 { pb.move_to(pt(*lx), pt(*ly)); }
-                        else { pb.line_to(pt(*lx), pt(*ly)); }
+                        if i == 0 {
+                            pb.move_to(pt(*lx), pt(*ly));
+                        } else {
+                            pb.line_to(pt(*lx), pt(*ly));
+                        }
                     }
                     pb.finish()
                 };
-                if let Some(p) = path { surface.draw_path(&p); }
+                if let Some(p) = path {
+                    surface.draw_path(&p);
+                }
 
                 // Points
                 if ll.show_points {
@@ -977,7 +1053,9 @@ fn render_chart(
                             pb.close();
                             pb.finish()
                         };
-                        if let Some(p) = circle { surface.draw_path(&p); }
+                        if let Some(p) = circle {
+                            surface.draw_path(&p);
+                        }
                     }
                 }
 
@@ -985,13 +1063,30 @@ fn render_chart(
                 if ll.show_labels {
                     for lp in &series_layout.points {
                         let label = format_value(lp.value);
-                        chart_text_centered(surface, lp.x, lp.y - 1.5, &label, ll.label_font, &ll.label_color, fonts, measurer);
+                        chart_text_centered(
+                            surface,
+                            lp.x,
+                            lp.y - 1.5,
+                            &label,
+                            ll.label_font,
+                            &ll.label_color,
+                            fonts,
+                            measurer,
+                        );
                     }
                 }
             }
             render_chart_x_labels(surface, &ll.x_labels, fonts, measurer);
             let ac = parse_color("#9CA3AF");
-            chart_line_seg(surface, ll.x_axis_x1, ll.x_axis_y, ll.x_axis_x2, ll.x_axis_y, ac, 0.8);
+            chart_line_seg(
+                surface,
+                ll.x_axis_x1,
+                ll.x_axis_y,
+                ll.x_axis_x2,
+                ll.x_axis_y,
+                ac,
+                0.8,
+            );
         }
         ChartType::Pie => {
             let pl = compute_pie_layout(data, &cl);
@@ -1004,21 +1099,65 @@ fn render_chart(
                     opacity: NormalizedF32::ONE,
                     ..Default::default()
                 }));
-                let path = build_arc_path(pl.cx, pl.cy, pl.radius, pl.inner_radius, slice.start_angle, slice.end_angle);
-                if let Some(p) = path { surface.draw_path(&p); }
+                let path = build_arc_path(
+                    pl.cx,
+                    pl.cy,
+                    pl.radius,
+                    pl.inner_radius,
+                    slice.start_angle,
+                    slice.end_angle,
+                );
+                if let Some(p) = path {
+                    surface.draw_path(&p);
+                }
 
                 if pl.show_labels {
                     let pct = (slice.fraction * 100.0).round();
                     let label = format!("{}%", pct);
-                    chart_text_centered(surface, slice.label_x, slice.label_y, &label, pl.label_font, &pl.label_color, fonts, measurer);
+                    chart_text_centered(
+                        surface,
+                        slice.label_x,
+                        slice.label_y,
+                        &label,
+                        pl.label_font,
+                        &pl.label_color,
+                        fonts,
+                        measurer,
+                    );
                 }
 
                 if !slice.cat_label_text.is_empty() {
-                    chart_line_seg(surface, slice.leader_start_x, slice.leader_start_y, slice.leader_end_x, slice.leader_end_y, parse_color("#999999"), 0.5);
+                    chart_line_seg(
+                        surface,
+                        slice.leader_start_x,
+                        slice.leader_start_y,
+                        slice.leader_end_x,
+                        slice.leader_end_y,
+                        parse_color("#999999"),
+                        0.5,
+                    );
                     if slice.cat_label_anchor_end {
-                        chart_text_end(surface, slice.cat_label_x, slice.cat_label_y, &slice.cat_label_text, 2.5, "#555555", fonts, measurer);
+                        chart_text_end(
+                            surface,
+                            slice.cat_label_x,
+                            slice.cat_label_y,
+                            &slice.cat_label_text,
+                            2.5,
+                            "#555555",
+                            fonts,
+                            measurer,
+                        );
                     } else {
-                        chart_text_start(surface, slice.cat_label_x, slice.cat_label_y, &slice.cat_label_text, 2.5, "#555555", fonts, measurer);
+                        chart_text_start(
+                            surface,
+                            slice.cat_label_x,
+                            slice.cat_label_y,
+                            &slice.cat_label_text,
+                            2.5,
+                            "#555555",
+                            fonts,
+                            measurer,
+                        );
                     }
                 }
             }
@@ -1030,8 +1169,24 @@ fn render_chart(
         let legend = compute_legend(data, &cl, base_x_mm, base_y_mm, w_mm, h_mm);
         for item in &legend.items {
             let color = parse_color(color_at(&cl.palette, item.color_idx));
-            chart_rect(surface, item.swatch_x, item.swatch_y, legend.swatch_size, legend.swatch_size, color);
-            chart_text_start(surface, item.text_x, item.text_y, &item.name, legend.font_size, "#666666", fonts, measurer);
+            chart_rect(
+                surface,
+                item.swatch_x,
+                item.swatch_y,
+                legend.swatch_size,
+                legend.swatch_size,
+                color,
+            );
+            chart_text_start(
+                surface,
+                item.text_x,
+                item.text_y,
+                &item.name,
+                legend.font_size,
+                "#666666",
+                fonts,
+                measurer,
+            );
         }
     }
 
@@ -1056,7 +1211,14 @@ fn render_chart(
 }
 
 /// mm degerlerini pt'ye cevirip rect ciz
-fn chart_rect(surface: &mut krilla::surface::Surface<'_>, rx: f64, ry: f64, rw: f64, rh: f64, color: rgb::Color) {
+fn chart_rect(
+    surface: &mut krilla::surface::Surface<'_>,
+    rx: f64,
+    ry: f64,
+    rw: f64,
+    rh: f64,
+    color: rgb::Color,
+) {
     let (rx, ry, rw, rh) = (pt(rx), pt(ry), pt(rw), pt(rh));
     surface.set_fill(Some(fill_from_color(color)));
     surface.set_stroke(None);
@@ -1072,7 +1234,15 @@ fn chart_rect(surface: &mut krilla::surface::Surface<'_>, rx: f64, ry: f64, rw: 
     }
 }
 
-fn chart_line_seg(surface: &mut krilla::surface::Surface<'_>, x1: f64, y1: f64, x2: f64, y2: f64, color: rgb::Color, width: f32) {
+fn chart_line_seg(
+    surface: &mut krilla::surface::Surface<'_>,
+    x1: f64,
+    y1: f64,
+    x2: f64,
+    y2: f64,
+    color: rgb::Color,
+    width: f32,
+) {
     let (x1, y1, x2, y2) = (pt(x1), pt(y1), pt(x2), pt(y2));
     surface.set_fill(None);
     surface.set_stroke(Some(Stroke {
@@ -1094,14 +1264,21 @@ fn chart_line_seg(surface: &mut krilla::surface::Surface<'_>, x1: f64, y1: f64, 
 
 /// Chart icin metin ciz — tek satirlik, centered
 /// font_size_mm: SVG viewBox'taki mm cinsinden boyut, pt'ye cevrilir
+#[allow(clippy::too_many_arguments)]
 fn chart_text_centered(
     surface: &mut krilla::surface::Surface<'_>,
-    cx_mm: f64, cy_mm: f64,
-    text: &str, font_size_mm: f64, color_hex: &str,
-    fonts: &FontCollection, measurer: &mut TextMeasurer,
+    cx_mm: f64,
+    cy_mm: f64,
+    text: &str,
+    font_size_mm: f64,
+    color_hex: &str,
+    fonts: &FontCollection,
+    measurer: &mut TextMeasurer,
 ) {
     let font = fonts.get(None, None, None);
-    let Some(f) = font else { return; };
+    let Some(f) = font else {
+        return;
+    };
     let color = parse_color(color_hex);
     let fs_pt = pt(font_size_mm);
     let (tw, _) = measurer.measure(text, None, fs_pt, None, None);
@@ -1109,19 +1286,30 @@ fn chart_text_centered(
     surface.set_stroke(None);
     surface.draw_text(
         Point::from_xy(pt(cx_mm) - tw / 2.0, pt(cy_mm)),
-        f.clone(), fs_pt, text, false, TextDirection::Auto,
+        f.clone(),
+        fs_pt,
+        text,
+        false,
+        TextDirection::Auto,
     );
 }
 
 /// Chart icin metin ciz — end-aligned (sag hizali)
+#[allow(clippy::too_many_arguments)]
 fn chart_text_end(
     surface: &mut krilla::surface::Surface<'_>,
-    right_x_mm: f64, cy_mm: f64,
-    text: &str, font_size_mm: f64, color_hex: &str,
-    fonts: &FontCollection, measurer: &mut TextMeasurer,
+    right_x_mm: f64,
+    cy_mm: f64,
+    text: &str,
+    font_size_mm: f64,
+    color_hex: &str,
+    fonts: &FontCollection,
+    measurer: &mut TextMeasurer,
 ) {
     let font = fonts.get(None, None, None);
-    let Some(f) = font else { return; };
+    let Some(f) = font else {
+        return;
+    };
     let color = parse_color(color_hex);
     let fs_pt = pt(font_size_mm);
     let (tw, _) = measurer.measure(text, None, fs_pt, None, None);
@@ -1129,26 +1317,41 @@ fn chart_text_end(
     surface.set_stroke(None);
     surface.draw_text(
         Point::from_xy(pt(right_x_mm) - tw, pt(cy_mm)),
-        f.clone(), fs_pt, text, false, TextDirection::Auto,
+        f.clone(),
+        fs_pt,
+        text,
+        false,
+        TextDirection::Auto,
     );
 }
 
 /// Chart icin metin ciz — start-aligned (sol hizali)
+#[allow(clippy::too_many_arguments)]
 fn chart_text_start(
     surface: &mut krilla::surface::Surface<'_>,
-    x_mm: f64, cy_mm: f64,
-    text: &str, font_size_mm: f64, color_hex: &str,
-    fonts: &FontCollection, _measurer: &mut TextMeasurer,
+    x_mm: f64,
+    cy_mm: f64,
+    text: &str,
+    font_size_mm: f64,
+    color_hex: &str,
+    fonts: &FontCollection,
+    _measurer: &mut TextMeasurer,
 ) {
     let font = fonts.get(None, None, None);
-    let Some(f) = font else { return; };
+    let Some(f) = font else {
+        return;
+    };
     let color = parse_color(color_hex);
     let fs_pt = pt(font_size_mm);
     surface.set_fill(Some(fill_from_color(color)));
     surface.set_stroke(None);
     surface.draw_text(
         Point::from_xy(pt(x_mm), pt(cy_mm)),
-        f.clone(), fs_pt, text, false, TextDirection::Auto,
+        f.clone(),
+        fs_pt,
+        text,
+        false,
+        TextDirection::Auto,
     );
 }
 
@@ -1156,25 +1359,52 @@ fn chart_text_start(
 fn render_chart_y_axis(
     surface: &mut krilla::surface::Surface<'_>,
     y_axis: &crate::chart_layout::YAxisLayout,
-    fonts: &FontCollection, measurer: &mut TextMeasurer,
+    fonts: &FontCollection,
+    measurer: &mut TextMeasurer,
 ) {
     for tick in &y_axis.ticks {
-        chart_text_end(surface, y_axis.axis_x - 1.5, tick.y + 0.8, &tick.label, 2.3, "#666666", fonts, measurer);
+        chart_text_end(
+            surface,
+            y_axis.axis_x - 1.5,
+            tick.y + 0.8,
+            &tick.label,
+            2.3,
+            "#666666",
+            fonts,
+            measurer,
+        );
         if y_axis.show_grid {
             let gc = parse_color(&y_axis.grid_color);
-            chart_line_seg(surface, y_axis.axis_x, tick.y, y_axis.grid_end_x, tick.y, gc, 0.4);
+            chart_line_seg(
+                surface,
+                y_axis.axis_x,
+                tick.y,
+                y_axis.grid_end_x,
+                tick.y,
+                gc,
+                0.4,
+            );
         }
     }
     // Y axis line
     let ac = parse_color("#9CA3AF");
-    chart_line_seg(surface, y_axis.axis_x, y_axis.axis_y_start, y_axis.axis_x, y_axis.axis_y_end, ac, 0.8);
+    chart_line_seg(
+        surface,
+        y_axis.axis_x,
+        y_axis.axis_y_start,
+        y_axis.axis_x,
+        y_axis.axis_y_end,
+        ac,
+        0.8,
+    );
 }
 
 /// X-axis category labels — consumes shared XLabelLayout
 fn render_chart_x_labels(
     surface: &mut krilla::surface::Surface<'_>,
     x_labels: &crate::chart_layout::XLabelLayout,
-    fonts: &FontCollection, measurer: &mut TextMeasurer,
+    fonts: &FontCollection,
+    measurer: &mut TextMeasurer,
 ) {
     for label in &x_labels.labels {
         if x_labels.needs_rotate {
@@ -1182,20 +1412,41 @@ fn render_chart_x_labels(
             let c = std::f32::consts::FRAC_PI_4.cos();
             let s = std::f32::consts::FRAC_PI_4.sin();
             surface.push_transform(&Transform::from_row(c, -s, s, c, 0.0, 0.0));
-            chart_text_end(surface, 0.0, 0.0, &label.text, 2.2, "#666666", fonts, measurer);
+            chart_text_end(
+                surface,
+                0.0,
+                0.0,
+                &label.text,
+                2.2,
+                "#666666",
+                fonts,
+                measurer,
+            );
             surface.pop();
             surface.pop();
         } else {
-            chart_text_centered(surface, label.x, label.y, &label.text, 2.5, "#666666", fonts, measurer);
+            chart_text_centered(
+                surface,
+                label.x,
+                label.y,
+                &label.text,
+                2.5,
+                "#666666",
+                fonts,
+                measurer,
+            );
         }
     }
 }
 
 /// Arc path olustur — pie/donut dilimi (mm cinsinden, pt'ye cevrilir)
 fn build_arc_path(
-    cx: f64, cy: f64,
-    radius: f64, inner_r: f64,
-    start: f64, end: f64,
+    cx: f64,
+    cy: f64,
+    radius: f64,
+    inner_r: f64,
+    start: f64,
+    end: f64,
 ) -> Option<krilla::geom::Path> {
     let mut pb = PathBuilder::new();
 
@@ -1221,12 +1472,7 @@ fn build_arc_path(
 }
 
 /// Arc'i cubic bezier segmentleriyle yaklasik ciz (her segment ≤ 90°)
-fn approximate_arc(
-    pb: &mut PathBuilder,
-    cx: f64, cy: f64,
-    r: f64,
-    start: f64, end: f64,
-) {
+fn approximate_arc(pb: &mut PathBuilder, cx: f64, cy: f64, r: f64, start: f64, end: f64) {
     let sweep = end - start;
     let n_segs = ((sweep.abs() / std::f64::consts::FRAC_PI_2).ceil() as usize).max(1);
     let seg_sweep = sweep / n_segs as f64;
@@ -1345,7 +1591,10 @@ mod tests {
         let template = Template {
             id: "test".to_string(),
             name: "Test".to_string(),
-            page: PageSettings { width: 210.0, height: 297.0 },
+            page: PageSettings {
+                width: 210.0,
+                height: 297.0,
+            },
             fonts: vec!["Noto Sans".to_string()],
             header: None,
             footer: None,
@@ -1356,11 +1605,19 @@ mod tests {
                 size: SizeConstraint {
                     width: SizeValue::Auto,
                     height: SizeValue::Auto,
-                    min_width: None, min_height: None, max_width: None, max_height: None,
+                    min_width: None,
+                    min_height: None,
+                    max_width: None,
+                    max_height: None,
                 },
                 direction: "column".to_string(),
                 gap: 5.0,
-                padding: Padding { top: 15.0, right: 15.0, bottom: 15.0, left: 15.0 },
+                padding: Padding {
+                    top: 15.0,
+                    right: 15.0,
+                    bottom: 15.0,
+                    left: 15.0,
+                },
                 align: "stretch".to_string(),
                 justify: "start".to_string(),
                 style: ContainerStyle::default(),
@@ -1372,7 +1629,10 @@ mod tests {
                         size: SizeConstraint {
                             width: SizeValue::Fr { value: 1.0 },
                             height: SizeValue::Auto,
-                            min_width: None, min_height: None, max_width: None, max_height: None,
+                            min_width: None,
+                            min_height: None,
+                            max_width: None,
+                            max_height: None,
                         },
                         style: TextStyle {
                             font_size: Some(18.0),
@@ -1387,7 +1647,10 @@ mod tests {
                         size: SizeConstraint {
                             width: SizeValue::Fr { value: 1.0 },
                             height: SizeValue::Auto,
-                            min_width: None, min_height: None, max_width: None, max_height: None,
+                            min_width: None,
+                            min_height: None,
+                            max_width: None,
+                            max_height: None,
                         },
                         style: LineStyle {
                             stroke_color: Some("#000000".to_string()),
@@ -1400,7 +1663,10 @@ mod tests {
                         size: SizeConstraint {
                             width: SizeValue::Fr { value: 1.0 },
                             height: SizeValue::Auto,
-                            min_width: None, min_height: None, max_width: None, max_height: None,
+                            min_width: None,
+                            min_height: None,
+                            max_width: None,
+                            max_height: None,
                         },
                         style: TextStyle {
                             font_size: Some(11.0),
@@ -1463,7 +1729,10 @@ mod tests {
 
     #[test]
     fn test_detect_unknown() {
-        assert_eq!(detect_image_format(&[0x00, 0x01, 0x02]), ImageFormat::Unknown);
+        assert_eq!(
+            detect_image_format(&[0x00, 0x01, 0x02]),
+            ImageFormat::Unknown
+        );
         assert_eq!(detect_image_format(&[]), ImageFormat::Unknown);
     }
 }

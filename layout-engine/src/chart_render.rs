@@ -1,6 +1,6 @@
 use crate::chart_layout::{
-    self, color_at, compute_bar_layout, compute_chart_layout, compute_legend,
-    compute_line_layout, compute_pie_layout, format_value, ChartLayout,
+    self, ChartLayout, color_at, compute_bar_layout, compute_chart_layout, compute_legend,
+    compute_line_layout, compute_pie_layout, format_value,
 };
 use crate::data_resolve::ResolvedChartData;
 use std::fmt::Write;
@@ -9,11 +9,7 @@ use std::fmt::Write;
 pub fn render_svg(data: &ResolvedChartData, width_mm: f64, height_mm: f64) -> String {
     let mut svg = String::with_capacity(4096);
 
-    let bg = data
-        .style
-        .background_color
-        .as_deref()
-        .unwrap_or("#FFFFFF");
+    let bg = data.style.background_color.as_deref().unwrap_or("#FFFFFF");
 
     write!(
         svg,
@@ -58,28 +54,26 @@ pub fn render_svg(data: &ResolvedChartData, width_mm: f64, height_mm: f64) -> St
 
     // Axis labels
     let has_axis = !matches!(data.chart_type, dreport_core::models::ChartType::Pie);
-    if has_axis {
-        if let Some(ref axis) = data.axis {
-            if let Some(ref x_label) = axis.x_label {
-                let x = cl.plot_x + cl.plot_w / 2.0;
-                let y = height_mm - 2.0;
-                write!(
+    if has_axis && let Some(ref axis) = data.axis {
+        if let Some(ref x_label) = axis.x_label {
+            let x = cl.plot_x + cl.plot_w / 2.0;
+            let y = height_mm - 2.0;
+            write!(
                     svg,
                     r##"<text x="{:.2}" y="{:.2}" font-size="2.8" fill="#666" text-anchor="middle">{}</text>"##,
                     x, y, escape_xml(x_label)
                 )
                 .unwrap();
-            }
-            if let Some(ref y_label) = axis.y_label {
-                let x = 3.0;
-                let y = cl.plot_y + cl.plot_h / 2.0;
-                write!(
+        }
+        if let Some(ref y_label) = axis.y_label {
+            let x = 3.0;
+            let y = cl.plot_y + cl.plot_h / 2.0;
+            write!(
                     svg,
                     r##"<text x="{:.2}" y="{:.2}" font-size="2.8" fill="#666" text-anchor="middle" transform="rotate(-90,{:.2},{:.2})">{}</text>"##,
                     x, y, x, y, escape_xml(y_label)
                 )
                 .unwrap();
-            }
         }
     }
 
@@ -212,7 +206,11 @@ fn render_pie(svg: &mut String, data: &ResolvedChartData, cl: &ChartLayout) {
 
     for slice in &pl.slices {
         let color = color_at(&cl.palette, slice.color_idx);
-        let large_arc = if slice.sweep > std::f64::consts::PI { 1 } else { 0 };
+        let large_arc = if slice.sweep > std::f64::consts::PI {
+            1
+        } else {
+            0
+        };
 
         let x1 = cx + radius * slice.start_angle.cos();
         let y1 = cy + radius * slice.start_angle.sin();
@@ -262,7 +260,11 @@ fn render_pie(svg: &mut String, data: &ResolvedChartData, cl: &ChartLayout) {
             )
             .unwrap();
 
-            let anchor = if slice.cat_label_anchor_end { "end" } else { "start" };
+            let anchor = if slice.cat_label_anchor_end {
+                "end"
+            } else {
+                "start"
+            };
             write!(
                 svg,
                 r##"<text x="{:.2}" y="{:.2}" font-size="2.5" fill="#555" text-anchor="{}" dominant-baseline="central">{}</text>"##,
@@ -273,7 +275,13 @@ fn render_pie(svg: &mut String, data: &ResolvedChartData, cl: &ChartLayout) {
     }
 }
 
-fn render_legend(svg: &mut String, data: &ResolvedChartData, cl: &ChartLayout, total_w: f64, total_h: f64) {
+fn render_legend(
+    svg: &mut String,
+    data: &ResolvedChartData,
+    cl: &ChartLayout,
+    total_w: f64,
+    total_h: f64,
+) {
     let legend = compute_legend(data, cl, 0.0, 0.0, total_w, total_h);
 
     for item in &legend.items {
@@ -287,7 +295,10 @@ fn render_legend(svg: &mut String, data: &ResolvedChartData, cl: &ChartLayout, t
         write!(
             svg,
             r##"<text x="{:.2}" y="{:.2}" font-size="{:.1}" fill="#666">{}</text>"##,
-            item.text_x, item.text_y, legend.font_size, escape_xml(&item.name)
+            item.text_x,
+            item.text_y,
+            legend.font_size,
+            escape_xml(&item.name)
         )
         .unwrap();
     }

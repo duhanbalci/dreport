@@ -113,7 +113,7 @@ fn find_table(data: &[u8], tag: &[u8; 4]) -> Option<(usize, usize)> {
 
 /// Decode a UTF-16BE byte slice into a `String`.
 fn decode_utf16be(raw: &[u8]) -> Option<String> {
-    if raw.len() % 2 != 0 {
+    if !raw.len().is_multiple_of(2) {
         return None;
     }
     let code_units: Vec<u16> = raw

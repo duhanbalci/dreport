@@ -1,10 +1,9 @@
 use axum::{
-    Router,
+    Json, Router,
     extract::{Path, State},
     http::{StatusCode, header},
     response::IntoResponse,
     routing::get,
-    Json,
 };
 use dreport_layout::font_provider::FontProvider;
 use serde::Serialize;
@@ -25,15 +24,14 @@ struct FontVariantResponse {
 }
 
 /// GET /api/fonts — list all available font families
-async fn list_fonts(
-    State(registry): State<Arc<FontRegistry>>,
-) -> Json<Vec<FontFamilyResponse>> {
+async fn list_fonts(State(registry): State<Arc<FontRegistry>>) -> Json<Vec<FontFamilyResponse>> {
     let families = registry.list_families();
     let response: Vec<FontFamilyResponse> = families
         .into_iter()
         .map(|f| FontFamilyResponse {
             family: f.family,
-            variants: f.variants
+            variants: f
+                .variants
                 .into_iter()
                 .map(|v| FontVariantResponse {
                     weight: v.weight,

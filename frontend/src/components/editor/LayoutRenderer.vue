@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject, watch, nextTick } from 'vue'
+import { inject, watch, nextTick, type CSSProperties } from 'vue'
 import type { ElementLayout, PageLayout, LayoutResult } from '../../core/layout-types'
 
 const props = defineProps<{
@@ -231,11 +231,7 @@ watch(
           <img
             v-if="el.content?.type === 'image' && el.content.src"
             :src="el.content.src"
-            :style="{
-              width: '100%',
-              height: '100%',
-              objectFit: el.style.objectFit || 'fill',
-            }"
+            :style="{ width: '100%', height: '100%', objectFit: (el.style.objectFit || 'fill') as CSSProperties['objectFit'] }"
           />
           <div v-else class="layout-el__placeholder">Görsel</div>
         </div>

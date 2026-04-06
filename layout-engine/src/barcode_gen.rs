@@ -55,19 +55,21 @@ pub fn generate_barcode_pixels(
 
     // Metin alanı hesapla (QR hariç, include_text true ise)
     let text_area_h = if !is_qr && include_text {
-        (req_h / 5).max(16).min(48)
+        (req_h / 5).clamp(16, 48)
     } else {
         0
     };
     let bar_h = req_h - text_area_h;
 
-    let mut hints = EncodeHints::default();
-    hints.Margin = Some("1".to_string());
+    let mut hints = EncodeHints {
+        Margin: Some("1".to_string()),
+        ..Default::default()
+    };
     if is_qr {
         hints.ErrorCorrection = Some("M".to_string());
     }
 
-    let writer = rxing::MultiFormatWriter::default();
+    let writer = rxing::MultiFormatWriter;
     let matrix = writer
         .encode_with_hints(value, &bc_format, req_w as i32, bar_h as i32, &hints)
         .map_err(|e| format!("Barcode encode hatası ({format}): {e}"))?;
@@ -91,10 +93,22 @@ pub fn generate_barcode_pixels(
 
     // Metin rendering
     if text_area_h > 0 && !is_qr {
-        render_text_cosmic(&mut pixels, out_w, out_h, mat_h, text_area_h, value, font_data);
+        render_text_cosmic(
+            &mut pixels,
+            out_w,
+            out_h,
+            mat_h,
+            text_area_h,
+            value,
+            font_data,
+        );
     }
 
-    Ok(BarcodePixels { pixels, width: out_w, height: out_h })
+    Ok(BarcodePixels {
+        pixels,
+        width: out_w,
+        height: out_h,
+    })
 }
 
 /// cosmic-text ile metin render et — gerçek font rendering
@@ -161,7 +175,8 @@ fn render_text_cosmic(
         for glyph in run.glyphs.iter() {
             let physical = glyph.physical((offset_x as f32, line_y as f32), 1.0);
 
-            let Some(image) = swash_cache.get_image_uncached(&mut font_system, physical.cache_key) else {
+            let Some(image) = swash_cache.get_image_uncached(&mut font_system, physical.cache_key)
+            else {
                 continue;
             };
 
@@ -179,13 +194,19 @@ fn render_text_cosmic(
                     }
 
                     let src_idx = (row * gw + col) as usize;
-                    if src_idx >= image.data.len() { continue; }
+                    if src_idx >= image.data.len() {
+                        continue;
+                    }
 
                     let alpha = image.data[src_idx];
-                    if alpha == 0 { continue; }
+                    if alpha == 0 {
+                        continue;
+                    }
 
                     let dst_idx = (py as u32 * img_w + px as u32) as usize;
-                    if dst_idx >= pixels.len() { continue; }
+                    if dst_idx >= pixels.len() {
+                        continue;
+                    }
 
                     // Alpha blending: beyaz arka plan üzerine siyah metin
                     let bg = pixels[dst_idx] as f32;
@@ -207,7 +228,8 @@ pub fn generate_barcode_png(
     include_text: bool,
     font_data: Option<&[FontData]>,
 ) -> Result<Vec<u8>, String> {
-    let result = generate_barcode_pixels(format, value, width_px, height_px, include_text, font_data)?;
+    let result =
+        generate_barcode_pixels(format, value, width_px, height_px, include_text, font_data)?;
 
     let img = image::GrayImage::from_raw(result.width, result.height, result.pixels)
         .ok_or_else(|| "Pixel buffer boyutu uyumsuz".to_string())?;
@@ -231,20 +253,23 @@ mod tests {
 
     #[test]
     fn test_qr_is_square() {
-        let result = generate_barcode_pixels("qr", "https://example.com", 300, 200, false, None).unwrap();
+        let result =
+            generate_barcode_pixels("qr", "https://example.com", 300, 200, false, None).unwrap();
         assert_eq!(result.width, result.height);
     }
 
     #[test]
     fn test_ean13_with_text() {
-        let result = generate_barcode_pixels("ean13", "5901234123457", 300, 100, true, None).unwrap();
+        let result =
+            generate_barcode_pixels("ean13", "5901234123457", 300, 100, true, None).unwrap();
         assert!(result.width > 0);
         assert!(result.height > 0);
     }
 
     #[test]
     fn test_ean13_without_text() {
-        let result = generate_barcode_pixels("ean13", "5901234123457", 300, 100, false, None).unwrap();
+        let result =
+            generate_barcode_pixels("ean13", "5901234123457", 300, 100, false, None).unwrap();
         assert!(result.width > 0);
         assert!(result.height > 0);
     }
@@ -253,13 +278,18 @@ mod tests {
     #[test]
     fn test_ean13_with_font_rendering() {
         let fonts = crate::text_measure::load_test_fonts();
-        let result = generate_barcode_pixels("ean13", "5901234123457", 400, 150, true, Some(&fonts)).unwrap();
+        let result =
+            generate_barcode_pixels("ean13", "5901234123457", 400, 150, true, Some(&fonts))
+                .unwrap();
         assert!(result.width > 0);
         assert!(result.height > 0);
         // Metin alanında siyah pikseller olmalı (font rendering çalıştı)
         let text_start = (result.height - result.height / 5) * result.width;
         let text_pixels = &result.pixels[text_start as usize..];
-        assert!(text_pixels.iter().any(|&p| p < 128), "Font rendering metin üretmeli");
+        assert!(
+            text_pixels.iter().any(|&p| p < 128),
+            "Font rendering metin üretmeli"
+        );
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -273,7 +303,8 @@ mod tests {
     #[test]
     fn test_ean13_png_with_text() {
         let fonts = crate::text_measure::load_test_fonts();
-        let png = generate_barcode_png("ean13", "5901234123457", 400, 150, true, Some(&fonts)).unwrap();
+        let png =
+            generate_barcode_png("ean13", "5901234123457", 400, 150, true, Some(&fonts)).unwrap();
         assert!(png.starts_with(&[0x89, b'P', b'N', b'G']));
     }
 

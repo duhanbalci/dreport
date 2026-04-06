@@ -45,6 +45,7 @@ export type ResolvedContent =
   | { type: 'checkbox'; checked: boolean }
   | { type: 'rich_text'; spans: ResolvedRichSpan[] }
   | { type: 'table'; headers: TableHeaderCell[]; rows: TableCell[][]; column_widths_mm: number[] }
+  | { type: 'chart'; svg: string }
 
 export interface TableHeaderCell {
   text: string

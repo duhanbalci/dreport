@@ -102,7 +102,9 @@ impl TextMeasurer {
 
     /// Cache'i dışarı taşı (persist etmek için).
     pub fn take_cache(self) -> TextMeasureCache {
-        TextMeasureCache { entries: self.cache }
+        TextMeasureCache {
+            entries: self.cache,
+        }
     }
 
     /// Text'i ölç. Dönen değerler pt cinsinden (width, height).
@@ -120,13 +122,25 @@ impl TextMeasurer {
             return (0.0, font_size_pt * 1.2);
         }
 
-        let key = MeasureCacheKey::new(text, font_family, font_size_pt, font_weight, available_width_pt);
+        let key = MeasureCacheKey::new(
+            text,
+            font_family,
+            font_size_pt,
+            font_weight,
+            available_width_pt,
+        );
 
         if let Some(&cached) = self.cache.get(&key) {
             return cached;
         }
 
-        let result = self.measure_uncached(text, font_family, font_size_pt, font_weight, available_width_pt);
+        let result = self.measure_uncached(
+            text,
+            font_family,
+            font_size_pt,
+            font_weight,
+            available_width_pt,
+        );
         self.cache.insert(key, result);
         result
     }
@@ -253,10 +267,7 @@ impl TextMeasurer {
         }
 
         // En büyük font boyutunu bul — line height buna göre belirlenir
-        let max_font_size_pt = spans
-            .iter()
-            .map(|s| s.font_size_pt)
-            .fold(0.0f32, f32::max);
+        let max_font_size_pt = spans.iter().map(|s| s.font_size_pt).fold(0.0f32, f32::max);
 
         if max_font_size_pt <= 0.0 {
             return (0.0, 0.0);
@@ -393,11 +404,21 @@ mod tests {
     fn test_wrapping_reduces_width() {
         let mut m = make_measurer();
         // Sınırsız genişlikte ölç
-        let (w_unlimited, h_unlimited) =
-            m.measure("This is a longer text that should wrap", None, 12.0, None, None);
+        let (w_unlimited, h_unlimited) = m.measure(
+            "This is a longer text that should wrap",
+            None,
+            12.0,
+            None,
+            None,
+        );
         // Dar genişlikte ölç
-        let (w_narrow, h_narrow) =
-            m.measure("This is a longer text that should wrap", None, 12.0, None, Some(50.0));
+        let (w_narrow, h_narrow) = m.measure(
+            "This is a longer text that should wrap",
+            None,
+            12.0,
+            None,
+            Some(50.0),
+        );
 
         // Dar genişlikte yükseklik artmalı (wrapping oldu)
         assert!(

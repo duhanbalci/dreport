@@ -52,7 +52,11 @@ fn compute_auto_column_widths(
     let max_pad_h = cell_pad_h.max(header_pad_h);
 
     // Hangi sütunlar auto?
-    let is_auto: Vec<bool> = table.columns.iter().map(|c| matches!(c.width, SizeValue::Auto)).collect();
+    let is_auto: Vec<bool> = table
+        .columns
+        .iter()
+        .map(|c| matches!(c.width, SizeValue::Auto))
+        .collect();
 
     // Hiç auto yoksa olduğu gibi dön
     if !is_auto.iter().any(|&a| a) {
@@ -60,7 +64,10 @@ fn compute_auto_column_widths(
     }
 
     // Fr sütun var mı?
-    let has_fr = table.columns.iter().any(|c| matches!(c.width, SizeValue::Fr { .. }));
+    let has_fr = table
+        .columns
+        .iter()
+        .any(|c| matches!(c.width, SizeValue::Fr { .. }));
 
     // Her auto sütun için max içerik genişliğini ölç (mm cinsinden)
     let mut max_widths_mm = vec![0.0_f64; num_cols];
@@ -87,13 +94,7 @@ fn compute_auto_column_widths(
             if text.is_empty() {
                 continue;
             }
-            let (w_pt, _) = measurer.measure(
-                text,
-                None,
-                font_size as f32,
-                None,
-                None,
-            );
+            let (w_pt, _) = measurer.measure(text, None, font_size as f32, None, None);
             let w_mm = w_pt as f64 / (72.0 / 25.4);
             if w_mm > max_widths_mm[col_idx] {
                 max_widths_mm[col_idx] = w_mm;
@@ -107,10 +108,10 @@ fn compute_auto_column_widths(
     // Fixed sütunların kapladığı alanı hesapla
     let mut fixed_total_mm = 0.0_f64;
     for (col_idx, col) in table.columns.iter().enumerate() {
-        if !is_auto[col_idx] {
-            if let SizeValue::Fixed { value } = &col.width {
-                fixed_total_mm += value;
-            }
+        if !is_auto[col_idx]
+            && let SizeValue::Fixed { value } = &col.width
+        {
+            fixed_total_mm += value;
         }
     }
 
@@ -126,7 +127,9 @@ fn compute_auto_column_widths(
         // kalan alanı Fr sütunlarına bırak (taffy flex ile dağıtır).
 
         // Fr sütunları için minimum alan ayır (en az padding kadar)
-        let fr_count = table.columns.iter()
+        let fr_count = table
+            .columns
+            .iter()
             .filter(|c| matches!(c.width, SizeValue::Fr { .. }))
             .count();
         let fr_min_space = fr_count as f64 * max_pad_h * 2.0;
@@ -137,14 +140,18 @@ fn compute_auto_column_widths(
                 result.push(col.width.clone());
             } else if auto_natural_total <= auto_budget {
                 // Sığıyor — doğal genişliği kullan
-                result.push(SizeValue::Fixed { value: max_widths_mm[col_idx] });
+                result.push(SizeValue::Fixed {
+                    value: max_widths_mm[col_idx],
+                });
             } else if auto_budget > 0.0 && auto_natural_total > 0.0 {
                 // Sığmıyor — budget'a oransal küçült
                 let ratio = max_widths_mm[col_idx] / auto_natural_total;
                 let width_mm = auto_budget * ratio;
                 result.push(SizeValue::Fixed { value: width_mm });
             } else {
-                result.push(SizeValue::Fixed { value: max_widths_mm[col_idx] });
+                result.push(SizeValue::Fixed {
+                    value: max_widths_mm[col_idx],
+                });
             }
         }
     } else {
@@ -177,7 +184,9 @@ pub fn expand_table_cached(
     available_width_mm: f64,
     cache: &mut TableExpandCache,
 ) -> ContainerElement {
-    let rows = resolved.tables.get(&table.id)
+    let rows = resolved
+        .tables
+        .get(&table.id)
         .map(|t| t.rows.as_slice())
         .unwrap_or(&[]);
     let key = table_cache_key(table, rows, available_width_mm);
@@ -203,9 +212,7 @@ pub fn expand_table(
     available_width_mm: f64,
 ) -> ContainerElement {
     let resolved_table = resolved.tables.get(&table.id);
-    let rows = resolved_table
-        .map(|t| t.rows.as_slice())
-        .unwrap_or(&[]);
+    let rows = resolved_table.map(|t| t.rows.as_slice()).unwrap_or(&[]);
 
     // Auto sütunlar için içerik bazlı genişlik hesapla
     let effective_widths = compute_auto_column_widths(table, rows, measurer, available_width_mm);
@@ -329,10 +336,7 @@ pub fn expand_table(
             .iter()
             .enumerate()
             .map(|(col_idx, col)| {
-                let text_content = row_data
-                    .get(col_idx)
-                    .cloned()
-                    .unwrap_or_default();
+                let text_content = row_data.get(col_idx).cloned().unwrap_or_default();
 
                 let text = TemplateElement::StaticText(StaticTextElement {
                     id: format!("{}_r{}c{}", table.id, row_idx, col_idx),
@@ -448,9 +452,9 @@ pub fn expand_table(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::FontData;
     use crate::data_resolve::{ResolvedData, ResolvedTable};
     use crate::text_measure::TextMeasurer;
-    use crate::FontData;
     use std::collections::HashMap;
 
     fn make_table(num_columns: usize) -> RepeatingTableElement {
@@ -473,7 +477,9 @@ mod tests {
                 height: SizeValue::Auto,
                 ..Default::default()
             },
-            data_source: ArrayBinding { path: "items".to_string() },
+            data_source: ArrayBinding {
+                path: "items".to_string(),
+            },
             columns,
             style: TableStyle::default(),
             repeat_header: Some(true),
@@ -509,7 +515,11 @@ mod tests {
     fn unwrap_cell_text(cell: &TemplateElement) -> &StaticTextElement {
         match cell {
             TemplateElement::Container(c) => {
-                assert_eq!(c.children.len(), 1, "Cell wrapper should have exactly 1 child");
+                assert_eq!(
+                    c.children.len(),
+                    1,
+                    "Cell wrapper should have exactly 1 child"
+                );
                 match &c.children[0] {
                     TemplateElement::StaticText(t) => t,
                     _ => panic!("Expected StaticText inside cell wrapper"),
@@ -522,10 +532,13 @@ mod tests {
     #[test]
     fn test_expand_table_structure() {
         let table = make_table(2);
-        let resolved = make_resolved("tbl", vec![
-            vec!["A".to_string(), "1".to_string()],
-            vec!["B".to_string(), "2".to_string()],
-        ]);
+        let resolved = make_resolved(
+            "tbl",
+            vec![
+                vec!["A".to_string(), "1".to_string()],
+                vec!["B".to_string(), "2".to_string()],
+            ],
+        );
         let mut measurer = make_measurer();
 
         let container = expand_table(&table, &resolved, &mut measurer, 180.0);
@@ -586,9 +599,10 @@ mod tests {
     #[test]
     fn test_expand_table_column_count() {
         let table = make_table(4);
-        let resolved = make_resolved("tbl", vec![
-            vec!["a".into(), "b".into(), "c".into(), "d".into()],
-        ]);
+        let resolved = make_resolved(
+            "tbl",
+            vec![vec!["a".into(), "b".into(), "c".into(), "d".into()]],
+        );
         let mut measurer = make_measurer();
 
         let container = expand_table(&table, &resolved, &mut measurer, 180.0);
@@ -610,9 +624,7 @@ mod tests {
     #[test]
     fn test_expand_table_data_cell_content() {
         let table = make_table(2);
-        let resolved = make_resolved("tbl", vec![
-            vec!["Hello".to_string(), "42".to_string()],
-        ]);
+        let resolved = make_resolved("tbl", vec![vec!["Hello".to_string(), "42".to_string()]]);
         let mut measurer = make_measurer();
 
         let container = expand_table(&table, &resolved, &mut measurer, 180.0);
@@ -633,9 +645,7 @@ mod tests {
     fn test_expand_table_with_border_adds_separator() {
         let mut table = make_table(2);
         table.style.border_color = Some("#000000".to_string());
-        let resolved = make_resolved("tbl", vec![
-            vec!["A".to_string(), "1".to_string()],
-        ]);
+        let resolved = make_resolved("tbl", vec![vec!["A".to_string(), "1".to_string()]]);
         let mut measurer = make_measurer();
 
         let container = expand_table(&table, &resolved, &mut measurer, 180.0);
@@ -657,11 +667,14 @@ mod tests {
         let mut table = make_table(1);
         table.style.zebra_odd = Some("#f0f0f0".to_string());
         table.style.zebra_even = Some("#ffffff".to_string());
-        let resolved = make_resolved("tbl", vec![
-            vec!["row0".into()],
-            vec!["row1".into()],
-            vec!["row2".into()],
-        ]);
+        let resolved = make_resolved(
+            "tbl",
+            vec![
+                vec!["row0".into()],
+                vec!["row1".into()],
+                vec!["row2".into()],
+            ],
+        );
         let mut measurer = make_measurer();
 
         let container = expand_table(&table, &resolved, &mut measurer, 180.0);
@@ -722,16 +735,21 @@ mod tests {
                 height: SizeValue::Auto,
                 ..Default::default()
             },
-            data_source: ArrayBinding { path: "items".to_string() },
+            data_source: ArrayBinding {
+                path: "items".to_string(),
+            },
             columns,
             style: TableStyle::default(),
             repeat_header: Some(true),
         };
 
-        let resolved = make_resolved("tbl", vec![
-            vec!["1".into(), "Web Uygulama Gelistirme".into()],
-            vec!["2".into(), "SSL Sertifikasi".into()],
-        ]);
+        let resolved = make_resolved(
+            "tbl",
+            vec![
+                vec!["1".into(), "Web Uygulama Gelistirme".into()],
+                vec!["2".into(), "SSL Sertifikasi".into()],
+            ],
+        );
         let mut measurer = make_measurer();
 
         let container = expand_table(&table, &resolved, &mut measurer, 180.0);
@@ -753,10 +771,16 @@ mod tests {
                     },
                     _ => panic!("Expected Container wrapper"),
                 };
-                assert!(w1 > w0, "Long column ({w1}mm) should be wider than short column ({w0}mm)");
+                assert!(
+                    w1 > w0,
+                    "Long column ({w1}mm) should be wider than short column ({w0}mm)"
+                );
                 // Her iki sütun toplamı available_width'e eşit olmalı
                 let total = w0 + w1;
-                assert!((total - 180.0).abs() < 0.1, "Total width ({total}mm) should equal available width (180mm)");
+                assert!(
+                    (total - 180.0).abs() < 0.1,
+                    "Total width ({total}mm) should equal available width (180mm)"
+                );
             }
             _ => panic!("Expected Container"),
         }
@@ -765,9 +789,7 @@ mod tests {
     #[test]
     fn test_table_cache_hit() {
         let table = make_table(2);
-        let resolved = make_resolved("tbl", vec![
-            vec!["A".to_string(), "1".to_string()],
-        ]);
+        let resolved = make_resolved("tbl", vec![vec!["A".to_string(), "1".to_string()]]);
         let mut measurer = make_measurer();
         let mut cache = TableExpandCache::new();
 
@@ -785,12 +807,8 @@ mod tests {
     #[test]
     fn test_table_cache_miss_on_data_change() {
         let table = make_table(2);
-        let resolved1 = make_resolved("tbl", vec![
-            vec!["A".to_string(), "1".to_string()],
-        ]);
-        let resolved2 = make_resolved("tbl", vec![
-            vec!["B".to_string(), "2".to_string()],
-        ]);
+        let resolved1 = make_resolved("tbl", vec![vec!["A".to_string(), "1".to_string()]]);
+        let resolved2 = make_resolved("tbl", vec![vec!["B".to_string(), "2".to_string()]]);
         let mut measurer = make_measurer();
         let mut cache = TableExpandCache::new();
 
@@ -805,9 +823,7 @@ mod tests {
     #[test]
     fn test_table_cache_miss_on_width_change() {
         let table = make_table(2);
-        let resolved = make_resolved("tbl", vec![
-            vec!["A".to_string(), "1".to_string()],
-        ]);
+        let resolved = make_resolved("tbl", vec![vec!["A".to_string(), "1".to_string()]]);
         let mut measurer = make_measurer();
         let mut cache = TableExpandCache::new();
 

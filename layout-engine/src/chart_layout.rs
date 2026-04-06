@@ -226,34 +226,90 @@ pub trait ChartDataSource {
 // ---------------------------------------------------------------------------
 
 impl ChartDataSource for crate::data_resolve::ResolvedChartData {
-    fn chart_type(&self) -> ChartType { self.chart_type.clone() }
-    fn categories(&self) -> &[String] { &self.categories }
-    fn series_count(&self) -> usize { self.series.len() }
-    fn series_name(&self, idx: usize) -> &str { &self.series[idx].name }
-    fn series_values(&self, idx: usize) -> &[f64] { &self.series[idx].values }
-    fn title_text(&self) -> Option<&str> {
-        self.title.as_ref().map(|t| t.text.as_str()).filter(|t| !t.is_empty())
+    fn chart_type(&self) -> ChartType {
+        self.chart_type.clone()
     }
-    fn title_font_size(&self) -> Option<f64> { self.title.as_ref().and_then(|t| t.font_size) }
-    fn title_color(&self) -> Option<&str> { self.title.as_ref().and_then(|t| t.color.as_deref()) }
-    fn title_align(&self) -> Option<&str> { self.title.as_ref().and_then(|t| t.align.as_deref()) }
-    fn legend_show(&self) -> bool { self.legend.as_ref().is_some_and(|l| l.show) }
-    fn legend_position(&self) -> Option<&str> { self.legend.as_ref().and_then(|l| l.position.as_deref()) }
-    fn legend_font_size(&self) -> Option<f64> { self.legend.as_ref().and_then(|l| l.font_size) }
-    fn x_label(&self) -> Option<&str> { self.axis.as_ref().and_then(|a| a.x_label.as_deref()) }
-    fn y_label(&self) -> Option<&str> { self.axis.as_ref().and_then(|a| a.y_label.as_deref()) }
-    fn show_grid(&self) -> bool { self.axis.as_ref().and_then(|a| a.show_grid).unwrap_or(true) }
-    fn grid_color(&self) -> Option<&str> { self.axis.as_ref().and_then(|a| a.grid_color.as_deref()) }
-    fn bar_gap(&self) -> Option<f64> { self.style.bar_gap }
-    fn stacked(&self) -> bool { matches!(self.group_mode, Some(dreport_core::models::GroupMode::Stacked)) }
-    fn colors(&self) -> Option<&[String]> { self.style.colors.as_deref() }
-    fn background_color(&self) -> Option<&str> { self.style.background_color.as_deref() }
-    fn show_labels(&self) -> bool { self.labels.as_ref().is_some_and(|l| l.show) }
-    fn label_font_size(&self) -> Option<f64> { self.labels.as_ref().and_then(|l| l.font_size) }
-    fn label_color(&self) -> Option<&str> { self.labels.as_ref().and_then(|l| l.color.as_deref()) }
-    fn inner_radius(&self) -> Option<f64> { self.style.inner_radius }
-    fn show_points(&self) -> Option<bool> { self.style.show_points }
-    fn line_width(&self) -> Option<f64> { self.style.line_width }
+    fn categories(&self) -> &[String] {
+        &self.categories
+    }
+    fn series_count(&self) -> usize {
+        self.series.len()
+    }
+    fn series_name(&self, idx: usize) -> &str {
+        &self.series[idx].name
+    }
+    fn series_values(&self, idx: usize) -> &[f64] {
+        &self.series[idx].values
+    }
+    fn title_text(&self) -> Option<&str> {
+        self.title
+            .as_ref()
+            .map(|t| t.text.as_str())
+            .filter(|t| !t.is_empty())
+    }
+    fn title_font_size(&self) -> Option<f64> {
+        self.title.as_ref().and_then(|t| t.font_size)
+    }
+    fn title_color(&self) -> Option<&str> {
+        self.title.as_ref().and_then(|t| t.color.as_deref())
+    }
+    fn title_align(&self) -> Option<&str> {
+        self.title.as_ref().and_then(|t| t.align.as_deref())
+    }
+    fn legend_show(&self) -> bool {
+        self.legend.as_ref().is_some_and(|l| l.show)
+    }
+    fn legend_position(&self) -> Option<&str> {
+        self.legend.as_ref().and_then(|l| l.position.as_deref())
+    }
+    fn legend_font_size(&self) -> Option<f64> {
+        self.legend.as_ref().and_then(|l| l.font_size)
+    }
+    fn x_label(&self) -> Option<&str> {
+        self.axis.as_ref().and_then(|a| a.x_label.as_deref())
+    }
+    fn y_label(&self) -> Option<&str> {
+        self.axis.as_ref().and_then(|a| a.y_label.as_deref())
+    }
+    fn show_grid(&self) -> bool {
+        self.axis.as_ref().and_then(|a| a.show_grid).unwrap_or(true)
+    }
+    fn grid_color(&self) -> Option<&str> {
+        self.axis.as_ref().and_then(|a| a.grid_color.as_deref())
+    }
+    fn bar_gap(&self) -> Option<f64> {
+        self.style.bar_gap
+    }
+    fn stacked(&self) -> bool {
+        matches!(
+            self.group_mode,
+            Some(dreport_core::models::GroupMode::Stacked)
+        )
+    }
+    fn colors(&self) -> Option<&[String]> {
+        self.style.colors.as_deref()
+    }
+    fn background_color(&self) -> Option<&str> {
+        self.style.background_color.as_deref()
+    }
+    fn show_labels(&self) -> bool {
+        self.labels.as_ref().is_some_and(|l| l.show)
+    }
+    fn label_font_size(&self) -> Option<f64> {
+        self.labels.as_ref().and_then(|l| l.font_size)
+    }
+    fn label_color(&self) -> Option<&str> {
+        self.labels.as_ref().and_then(|l| l.color.as_deref())
+    }
+    fn inner_radius(&self) -> Option<f64> {
+        self.style.inner_radius
+    }
+    fn show_points(&self) -> Option<bool> {
+        self.style.show_points
+    }
+    fn line_width(&self) -> Option<f64> {
+        self.style.line_width
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -261,36 +317,88 @@ impl ChartDataSource for crate::data_resolve::ResolvedChartData {
 // ---------------------------------------------------------------------------
 
 impl ChartDataSource for crate::ChartRenderData {
-    fn chart_type(&self) -> ChartType { self.chart_type.clone() }
-    fn categories(&self) -> &[String] { &self.categories }
-    fn series_count(&self) -> usize { self.series.len() }
-    fn series_name(&self, idx: usize) -> &str { &self.series[idx].name }
-    fn series_values(&self, idx: usize) -> &[f64] { &self.series[idx].values }
+    fn chart_type(&self) -> ChartType {
+        self.chart_type.clone()
+    }
+    fn categories(&self) -> &[String] {
+        &self.categories
+    }
+    fn series_count(&self) -> usize {
+        self.series.len()
+    }
+    fn series_name(&self, idx: usize) -> &str {
+        &self.series[idx].name
+    }
+    fn series_values(&self, idx: usize) -> &[f64] {
+        &self.series[idx].values
+    }
     fn title_text(&self) -> Option<&str> {
         self.title_text.as_deref().filter(|t| !t.is_empty())
     }
-    fn title_font_size(&self) -> Option<f64> { self.title_font_size }
-    fn title_color(&self) -> Option<&str> { self.title_color.as_deref() }
-    fn title_align(&self) -> Option<&str> { self.title_align.as_deref() }
-    fn legend_show(&self) -> bool { self.legend_show }
-    fn legend_position(&self) -> Option<&str> { self.legend_position.as_deref() }
-    fn legend_font_size(&self) -> Option<f64> { self.legend_font_size }
-    fn x_label(&self) -> Option<&str> { self.x_label.as_deref() }
-    fn y_label(&self) -> Option<&str> { self.y_label.as_deref() }
-    fn show_grid(&self) -> bool { self.show_grid }
-    fn grid_color(&self) -> Option<&str> { self.grid_color.as_deref() }
-    fn bar_gap(&self) -> Option<f64> { self.bar_gap }
-    fn stacked(&self) -> bool { self.stacked }
-    fn colors(&self) -> Option<&[String]> {
-        if self.colors.is_empty() { None } else { Some(&self.colors) }
+    fn title_font_size(&self) -> Option<f64> {
+        self.title_font_size
     }
-    fn background_color(&self) -> Option<&str> { self.background_color.as_deref() }
-    fn show_labels(&self) -> bool { self.show_labels }
-    fn label_font_size(&self) -> Option<f64> { self.label_font_size }
-    fn label_color(&self) -> Option<&str> { self.label_color.as_deref() }
-    fn inner_radius(&self) -> Option<f64> { self.inner_radius }
-    fn show_points(&self) -> Option<bool> { self.show_points }
-    fn line_width(&self) -> Option<f64> { self.line_width }
+    fn title_color(&self) -> Option<&str> {
+        self.title_color.as_deref()
+    }
+    fn title_align(&self) -> Option<&str> {
+        self.title_align.as_deref()
+    }
+    fn legend_show(&self) -> bool {
+        self.legend_show
+    }
+    fn legend_position(&self) -> Option<&str> {
+        self.legend_position.as_deref()
+    }
+    fn legend_font_size(&self) -> Option<f64> {
+        self.legend_font_size
+    }
+    fn x_label(&self) -> Option<&str> {
+        self.x_label.as_deref()
+    }
+    fn y_label(&self) -> Option<&str> {
+        self.y_label.as_deref()
+    }
+    fn show_grid(&self) -> bool {
+        self.show_grid
+    }
+    fn grid_color(&self) -> Option<&str> {
+        self.grid_color.as_deref()
+    }
+    fn bar_gap(&self) -> Option<f64> {
+        self.bar_gap
+    }
+    fn stacked(&self) -> bool {
+        self.stacked
+    }
+    fn colors(&self) -> Option<&[String]> {
+        if self.colors.is_empty() {
+            None
+        } else {
+            Some(&self.colors)
+        }
+    }
+    fn background_color(&self) -> Option<&str> {
+        self.background_color.as_deref()
+    }
+    fn show_labels(&self) -> bool {
+        self.show_labels
+    }
+    fn label_font_size(&self) -> Option<f64> {
+        self.label_font_size
+    }
+    fn label_color(&self) -> Option<&str> {
+        self.label_color.as_deref()
+    }
+    fn inner_radius(&self) -> Option<f64> {
+        self.inner_radius
+    }
+    fn show_points(&self) -> Option<bool> {
+        self.show_points
+    }
+    fn line_width(&self) -> Option<f64> {
+        self.line_width
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -306,10 +414,10 @@ pub fn build_palette(data: &dyn ChartDataSource) -> Vec<String> {
     let user_colors = data.colors();
     (0..n_colors)
         .map(|i| {
-            if let Some(uc) = user_colors {
-                if i < uc.len() {
-                    return uc[i].clone();
-                }
+            if let Some(uc) = user_colors
+                && i < uc.len()
+            {
+                return uc[i].clone();
             }
             DEFAULT_COLORS[i % DEFAULT_COLORS.len()].to_string()
         })
@@ -392,7 +500,14 @@ pub fn compute_chart_layout(
             _ => origin_x + width_mm / 2.0,
         };
         let y = origin_y + margin_top - 1.0;
-        Some(TitleLayout { text: text.to_string(), font_size: fs, color, x, y, align })
+        Some(TitleLayout {
+            text: text.to_string(),
+            font_size: fs,
+            color,
+            x,
+            y,
+            align,
+        })
     } else {
         None
     };
@@ -423,14 +538,18 @@ pub fn compute_chart_layout(
         let max_label_len = data.categories().iter().map(|c| c.len()).max().unwrap_or(0);
         let n_cats = data.categories().len();
         let available_w = width_mm - margin_left - margin_right;
-        let cat_width = if n_cats > 0 { available_w / n_cats as f64 } else { available_w };
+        let cat_width = if n_cats > 0 {
+            available_w / n_cats as f64
+        } else {
+            available_w
+        };
         let max_chars_fit = (cat_width / 1.25).max(1.0) as usize;
         let will_rotate = max_label_len > max_chars_fit;
         if will_rotate {
             let char_w_mm = 1.1;
             let max_text_w = max_label_len as f64 * char_w_mm;
             let label_v = max_text_w * 0.707;
-            margin_bottom += label_v.min(25.0).max(6.0);
+            margin_bottom += label_v.clamp(6.0, 25.0);
             let label_h = max_text_w * 0.707;
             let extra_left = (label_h - cat_width / 2.0).max(0.0);
             margin_left += extra_left.min(10.0);
@@ -447,17 +566,33 @@ pub fn compute_chart_layout(
     let plot_h = (height_mm - margin_top - margin_bottom).max(1.0);
 
     ChartLayout {
-        plot_x, plot_y, plot_w, plot_h,
-        margin_top, margin_bottom, margin_left, margin_right,
-        palette, title, legend_show, legend_pos, legend_font,
+        plot_x,
+        plot_y,
+        plot_w,
+        plot_h,
+        margin_top,
+        margin_bottom,
+        margin_left,
+        margin_right,
+        palette,
+        title,
+        legend_show,
+        legend_pos,
+        legend_font,
     }
 }
 
 /// Compute Y axis ticks and grid lines.
+#[allow(clippy::too_many_arguments)]
 pub fn compute_y_axis(
-    min_val: f64, max_val: f64,
-    px: f64, py: f64, pw: f64, ph: f64,
-    show_grid: bool, grid_color: &str,
+    min_val: f64,
+    max_val: f64,
+    px: f64,
+    py: f64,
+    pw: f64,
+    ph: f64,
+    show_grid: bool,
+    grid_color: &str,
 ) -> YAxisLayout {
     let range = safe_range(min_val, max_val);
     let tick_count = 5;
@@ -466,7 +601,11 @@ pub fn compute_y_axis(
             let frac = i as f64 / tick_count as f64;
             let val = min_val + frac * range;
             let y = py + ph - frac * ph;
-            YTick { value: val, label: format_value(val), y }
+            YTick {
+                value: val,
+                label: format_value(val),
+                y,
+            }
         })
         .collect();
 
@@ -482,38 +621,78 @@ pub fn compute_y_axis(
 }
 
 /// Compute X label positions for bar chart (slot-based spacing).
-pub fn compute_x_labels_bar(categories: &[String], px: f64, baseline_y: f64, pw: f64) -> XLabelLayout {
+pub fn compute_x_labels_bar(
+    categories: &[String],
+    px: f64,
+    baseline_y: f64,
+    pw: f64,
+) -> XLabelLayout {
     let n_cats = categories.len();
     if n_cats == 0 {
-        return XLabelLayout { labels: vec![], needs_rotate: false };
+        return XLabelLayout {
+            labels: vec![],
+            needs_rotate: false,
+        };
     }
     let cat_width = pw / n_cats as f64;
     let max_chars = (cat_width / 1.25).max(1.0) as usize;
     let needs_rotate = categories.iter().any(|c| c.len() > max_chars);
-    let labels = categories.iter().enumerate().map(|(ci, cat)| {
-        XLabel {
+    let labels = categories
+        .iter()
+        .enumerate()
+        .map(|(ci, cat)| XLabel {
             text: cat.clone(),
             x: px + ci as f64 * cat_width + cat_width / 2.0,
             y: baseline_y + 2.5,
-        }
-    }).collect();
-    XLabelLayout { labels, needs_rotate }
+        })
+        .collect();
+    XLabelLayout {
+        labels,
+        needs_rotate,
+    }
 }
 
 /// Compute X label positions for line chart (point-based spacing).
-pub fn compute_x_labels_line(categories: &[String], px: f64, baseline_y: f64, pw: f64) -> XLabelLayout {
+pub fn compute_x_labels_line(
+    categories: &[String],
+    px: f64,
+    baseline_y: f64,
+    pw: f64,
+) -> XLabelLayout {
     let n_cats = categories.len();
     if n_cats == 0 {
-        return XLabelLayout { labels: vec![], needs_rotate: false };
+        return XLabelLayout {
+            labels: vec![],
+            needs_rotate: false,
+        };
     }
-    let spacing = if n_cats == 1 { pw } else { pw / (n_cats - 1) as f64 };
+    let spacing = if n_cats == 1 {
+        pw
+    } else {
+        pw / (n_cats - 1) as f64
+    };
     let max_chars = (spacing / 1.25).max(1.0) as usize;
     let needs_rotate = categories.iter().any(|c| c.len() > max_chars);
-    let labels = categories.iter().enumerate().map(|(ci, cat)| {
-        let x = if n_cats == 1 { px + pw / 2.0 } else { px + ci as f64 * pw / (n_cats - 1) as f64 };
-        XLabel { text: cat.clone(), x, y: baseline_y + 2.5 }
-    }).collect();
-    XLabelLayout { labels, needs_rotate }
+    let labels = categories
+        .iter()
+        .enumerate()
+        .map(|(ci, cat)| {
+            let x = if n_cats == 1 {
+                px + pw / 2.0
+            } else {
+                px + ci as f64 * pw / (n_cats - 1) as f64
+            };
+            XLabel {
+                text: cat.clone(),
+                x,
+                y: baseline_y + 2.5,
+            }
+        })
+        .collect();
+    XLabelLayout {
+        labels,
+        needs_rotate,
+    }
 }
 
 /// Compute bar chart layout (all bar geometries + axes).
@@ -565,7 +744,11 @@ pub fn compute_bar_layout(data: &dyn ChartDataSource, cl: &ChartLayout) -> BarCh
                 y_offset += bar_h;
             }
         } else {
-            let bar_w = if n_series > 0 { group_width / n_series as f64 } else { group_width };
+            let bar_w = if n_series > 0 {
+                group_width / n_series as f64
+            } else {
+                group_width
+            };
             for si in 0..n_series {
                 let val = data.series_values(si).get(ci).copied().unwrap_or(0.0);
                 let bar_h = ((val - min_val) / range) * ph;
@@ -588,9 +771,15 @@ pub fn compute_bar_layout(data: &dyn ChartDataSource, cl: &ChartLayout) -> BarCh
     let x_labels = compute_x_labels_bar(data.categories(), px, py + ph, pw);
 
     BarChartLayout {
-        min_val, max_val,
-        y_axis, x_labels, bars,
-        show_labels, label_font, label_color, stacked,
+        min_val,
+        max_val,
+        y_axis,
+        x_labels,
+        bars,
+        show_labels,
+        label_font,
+        label_color,
+        stacked,
         x_axis_y: py + ph,
         x_axis_x1: px,
         x_axis_x2: px + pw,
@@ -618,23 +807,42 @@ pub fn compute_line_layout(data: &dyn ChartDataSource, cl: &ChartLayout) -> Line
     let label_font = data.label_font_size().unwrap_or(2.2);
     let label_color = data.label_color().unwrap_or("#333").to_string();
 
-    let series = (0..data.series_count()).map(|si| {
-        let values = data.series_values(si);
-        let points = values.iter().enumerate().map(|(ci, val)| {
-            let x = if n_cats == 1 { px + pw / 2.0 } else { px + ci as f64 * pw / (n_cats - 1) as f64 };
-            let y = py + ph - ((val - min_val) / range) * ph;
-            LinePoint { x, y, value: *val }
-        }).collect();
-        LineSeriesLayout { color_idx: si, points }
-    }).collect();
+    let series = (0..data.series_count())
+        .map(|si| {
+            let values = data.series_values(si);
+            let points = values
+                .iter()
+                .enumerate()
+                .map(|(ci, val)| {
+                    let x = if n_cats == 1 {
+                        px + pw / 2.0
+                    } else {
+                        px + ci as f64 * pw / (n_cats - 1) as f64
+                    };
+                    let y = py + ph - ((val - min_val) / range) * ph;
+                    LinePoint { x, y, value: *val }
+                })
+                .collect();
+            LineSeriesLayout {
+                color_idx: si,
+                points,
+            }
+        })
+        .collect();
 
     let x_labels = compute_x_labels_line(data.categories(), px, py + ph, pw);
 
     LineChartLayout {
-        min_val, max_val,
-        y_axis, x_labels, series,
-        line_width: line_width,
-        show_points, show_labels, label_font, label_color,
+        min_val,
+        max_val,
+        y_axis,
+        x_labels,
+        series,
+        line_width,
+        show_points,
+        show_labels,
+        label_font,
+        label_color,
         x_axis_y: py + ph,
         x_axis_x1: px,
         x_axis_x2: px + pw,
@@ -651,11 +859,15 @@ pub fn compute_pie_layout(data: &dyn ChartDataSource, cl: &ChartLayout) -> PieCh
     let values: Vec<f64> = if data.series_count() == 1 {
         data.series_values(0).to_vec()
     } else {
-        data.categories().iter().enumerate().map(|(ci, _)| {
-            (0..data.series_count())
-                .map(|si| data.series_values(si).get(ci).copied().unwrap_or(0.0))
-                .sum()
-        }).collect()
+        data.categories()
+            .iter()
+            .enumerate()
+            .map(|(ci, _)| {
+                (0..data.series_count())
+                    .map(|si| data.series_values(si).get(ci).copied().unwrap_or(0.0))
+                    .sum()
+            })
+            .collect()
     };
 
     let total: f64 = values.iter().sum();
@@ -685,7 +897,11 @@ pub fn compute_pie_layout(data: &dyn ChartDataSource, cl: &ChartLayout) -> PieCh
             let mid_angle = start_angle + sweep / 2.0;
 
             // Label inside slice
-            let label_r = if inner_r > 0.0 { (radius + inner_r) / 2.0 } else { radius * 0.65 };
+            let label_r = if inner_r > 0.0 {
+                (radius + inner_r) / 2.0
+            } else {
+                radius * 0.65
+            };
             let lx = cx + label_r * mid_angle.cos();
             let ly = cy + label_r * mid_angle.sin();
             let pct = (val / total * 100.0).round();
@@ -701,19 +917,29 @@ pub fn compute_pie_layout(data: &dyn ChartDataSource, cl: &ChartLayout) -> PieCh
             let leader_ey = cy + line_end_r * mid_angle.sin();
             let cat_lx = cx + text_r * mid_angle.cos();
             let cat_ly = cy + text_r * mid_angle.sin();
-            let cat_text = if i < categories.len() { categories[i].clone() } else { String::new() };
+            let cat_text = if i < categories.len() {
+                categories[i].clone()
+            } else {
+                String::new()
+            };
             let anchor_end = mid_angle.cos() < 0.0;
 
             slices.push(PieSlice {
-                start_angle, end_angle, sweep,
+                start_angle,
+                end_angle,
+                sweep,
                 color_idx: i,
                 value: *val,
                 fraction: val / total,
-                label_x: lx, label_y: ly,
+                label_x: lx,
+                label_y: ly,
                 label_text: format!("{}%", pct),
-                leader_start_x: leader_sx, leader_start_y: leader_sy,
-                leader_end_x: leader_ex, leader_end_y: leader_ey,
-                cat_label_x: cat_lx, cat_label_y: cat_ly,
+                leader_start_x: leader_sx,
+                leader_start_y: leader_sy,
+                leader_end_x: leader_ex,
+                leader_end_y: leader_ey,
+                cat_label_x: cat_lx,
+                cat_label_y: cat_ly,
                 cat_label_text: cat_text,
                 cat_label_anchor_end: anchor_end,
             });
@@ -723,8 +949,14 @@ pub fn compute_pie_layout(data: &dyn ChartDataSource, cl: &ChartLayout) -> PieCh
     }
 
     PieChartLayout {
-        cx, cy, radius, inner_radius: inner_r,
-        slices, show_labels, label_font, label_color,
+        cx,
+        cy,
+        radius,
+        inner_radius: inner_r,
+        slices,
+        show_labels,
+        label_font,
+        label_color,
     }
 }
 
@@ -747,7 +979,9 @@ pub fn compute_legend(
     let names: Vec<String> = if is_pie {
         data.categories().to_vec()
     } else {
-        (0..data.series_count()).map(|i| data.series_name(i).to_string()).collect()
+        (0..data.series_count())
+            .map(|i| data.series_name(i).to_string())
+            .collect()
     };
 
     let mut items = Vec::new();
@@ -758,9 +992,12 @@ pub fn compute_legend(
             let mut x = origin_x + cl.margin_left;
             for (i, name) in names.iter().enumerate() {
                 items.push(LegendItemLayout {
-                    name: name.clone(), color_idx: i,
-                    swatch_x: x, swatch_y: y - font_size * 0.3,
-                    text_x: x + item_gap, text_y: y + font_size * 0.3,
+                    name: name.clone(),
+                    color_idx: i,
+                    swatch_x: x,
+                    swatch_y: y - font_size * 0.3,
+                    text_x: x + item_gap,
+                    text_y: y + font_size * 0.3,
                 });
                 x += item_gap + name.len() as f64 * font_size * 0.5 + spacing;
             }
@@ -770,9 +1007,12 @@ pub fn compute_legend(
             let mut y = origin_y + cl.margin_top + 2.0;
             for (i, name) in names.iter().enumerate() {
                 items.push(LegendItemLayout {
-                    name: name.clone(), color_idx: i,
-                    swatch_x: x, swatch_y: y,
-                    text_x: x + item_gap, text_y: y + font_size * 0.7,
+                    name: name.clone(),
+                    color_idx: i,
+                    swatch_x: x,
+                    swatch_y: y,
+                    text_x: x + item_gap,
+                    text_y: y + font_size * 0.7,
                 });
                 y += font_size + 2.0;
             }
@@ -780,20 +1020,30 @@ pub fn compute_legend(
         _ => {
             // bottom (default)
             let y = origin_y + total_h - 3.0;
-            let total_legend_w: f64 = names.iter()
+            let total_legend_w: f64 = names
+                .iter()
                 .map(|n| item_gap + n.len() as f64 * font_size * 0.5 + spacing)
-                .sum::<f64>() - spacing;
+                .sum::<f64>()
+                - spacing;
             let mut x = origin_x + (total_w - total_legend_w) / 2.0;
             for (i, name) in names.iter().enumerate() {
                 items.push(LegendItemLayout {
-                    name: name.clone(), color_idx: i,
-                    swatch_x: x, swatch_y: y - font_size * 0.3,
-                    text_x: x + item_gap, text_y: y + font_size * 0.3,
+                    name: name.clone(),
+                    color_idx: i,
+                    swatch_x: x,
+                    swatch_y: y - font_size * 0.3,
+                    text_x: x + item_gap,
+                    text_y: y + font_size * 0.3,
                 });
                 x += item_gap + name.len() as f64 * font_size * 0.5 + spacing;
             }
         }
     }
 
-    LegendLayout { items, font_size, position, swatch_size }
+    LegendLayout {
+        items,
+        font_size,
+        position,
+        swatch_size,
+    }
 }

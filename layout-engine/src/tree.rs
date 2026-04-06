@@ -81,17 +81,16 @@ pub fn compute(
     };
     let page_node = taffy.new_with_children(page_style, &[root_node])?;
 
-    taffy
-        .compute_layout_with_measure(
-            page_node,
-            Size {
-                width: AvailableSpace::Definite(page_w_pt),
-                height: AvailableSpace::MaxContent,
-            },
-            |known_dimensions, available_space, _node_id, context, _style| {
-                measure_leaf(known_dimensions, available_space, context, measurer)
-            },
-        )?;
+    taffy.compute_layout_with_measure(
+        page_node,
+        Size {
+            width: AvailableSpace::Definite(page_w_pt),
+            height: AvailableSpace::MaxContent,
+        },
+        |known_dimensions, available_space, _node_id, context, _style| {
+            measure_leaf(known_dimensions, available_space, context, measurer)
+        },
+    )?;
 
     let body_elements = collect_layout(&taffy, root_node, &node_map, resolved, 0.0, 0.0)?;
 
@@ -135,7 +134,16 @@ fn compute_section(
     let mut node_map: HashMap<NodeId, NodeInfo> = HashMap::new();
     let mut table_cache = TableExpandCache::new();
 
-    let section_node = build_container(container, &mut taffy, &mut node_map, resolved, None, measurer, page_width_mm, &mut table_cache)?;
+    let section_node = build_container(
+        container,
+        &mut taffy,
+        &mut node_map,
+        resolved,
+        None,
+        measurer,
+        page_width_mm,
+        &mut table_cache,
+    )?;
 
     let wrapper_style = Style {
         display: Display::Flex,
@@ -148,17 +156,16 @@ fn compute_section(
     };
     let wrapper_node = taffy.new_with_children(wrapper_style, &[section_node])?;
 
-    taffy
-        .compute_layout_with_measure(
-            wrapper_node,
-            Size {
-                width: AvailableSpace::Definite(page_w_pt),
-                height: AvailableSpace::MaxContent,
-            },
-            |known_dimensions, available_space, _node_id, context, _style| {
-                measure_leaf(known_dimensions, available_space, context, measurer)
-            },
-        )?;
+    taffy.compute_layout_with_measure(
+        wrapper_node,
+        Size {
+            width: AvailableSpace::Definite(page_w_pt),
+            height: AvailableSpace::MaxContent,
+        },
+        |known_dimensions, available_space, _node_id, context, _style| {
+            measure_leaf(known_dimensions, available_space, context, measurer)
+        },
+    )?;
 
     let elements = collect_layout(&taffy, section_node, &node_map, resolved, 0.0, 0.0)?;
 
@@ -209,6 +216,7 @@ fn collect_no_repeat_recursive(el: &TemplateElement, set: &mut std::collections:
 }
 
 /// Container element'ini taffy node ağacına ekle (recursive)
+#[allow(clippy::too_many_arguments)]
 fn build_container(
     el: &ContainerElement,
     taffy: &mut TaffyTree<MeasureContext>,
@@ -229,14 +237,24 @@ fn build_container(
         SizeValue::Fixed { value } => *value,
         _ => page_width_mm, // Fr veya Auto ise parent'ın genişliğini kullan
     };
-    let content_width_mm = container_own_width - el.padding.left - el.padding.right - border_w * 2.0;
+    let content_width_mm =
+        container_own_width - el.padding.left - el.padding.right - border_w * 2.0;
     let content_width_mm = content_width_mm.max(0.0);
 
     let mut child_nodes = Vec::new();
     let mut children_ids = Vec::new();
 
     for child in &el.children {
-        let child_node = build_element(child, taffy, node_map, resolved, Some(direction), measurer, content_width_mm, table_cache)?;
+        let child_node = build_element(
+            child,
+            taffy,
+            node_map,
+            resolved,
+            Some(direction),
+            measurer,
+            content_width_mm,
+            table_cache,
+        )?;
         child_nodes.push(child_node);
         children_ids.push(child.id().to_string());
     }
@@ -265,6 +283,7 @@ fn build_container(
 }
 
 /// Herhangi bir element tipini taffy node'a çevir
+#[allow(clippy::too_many_arguments)]
 fn build_element(
     el: &TemplateElement,
     taffy: &mut TaffyTree<MeasureContext>,
@@ -276,9 +295,16 @@ fn build_element(
     table_cache: &mut TableExpandCache,
 ) -> Result<NodeId, LayoutError> {
     match el {
-        TemplateElement::Container(e) => {
-            build_container(e, taffy, node_map, resolved, parent_direction, measurer, page_width_mm, table_cache)
-        }
+        TemplateElement::Container(e) => build_container(
+            e,
+            taffy,
+            node_map,
+            resolved,
+            parent_direction,
+            measurer,
+            page_width_mm,
+            table_cache,
+        ),
         TemplateElement::StaticText(e) => build_text_leaf(
             taffy,
             node_map,
@@ -327,11 +353,7 @@ fn build_element(
             )
         }
         TemplateElement::CurrentDate(e) => {
-            let text = resolved
-                .texts
-                .get(&e.id)
-                .map(|s| s.as_str())
-                .unwrap_or("");
+            let text = resolved.texts.get(&e.id).map(|s| s.as_str()).unwrap_or("");
             build_text_leaf(
                 taffy,
                 node_map,
@@ -345,11 +367,7 @@ fn build_element(
             )
         }
         TemplateElement::CalculatedText(e) => {
-            let text = resolved
-                .texts
-                .get(&e.id)
-                .map(|s| s.as_str())
-                .unwrap_or("");
+            let text = resolved.texts.get(&e.id).map(|s| s.as_str()).unwrap_or("");
             build_text_leaf(
                 taffy,
                 node_map,
@@ -446,7 +464,13 @@ fn build_element(
         }
         TemplateElement::RepeatingTable(e) => {
             // Tabloyu container ağacına expand et (cache ile)
-            let expanded = table_layout::expand_table_cached(e, resolved, measurer, page_width_mm, table_cache);
+            let expanded = table_layout::expand_table_cached(
+                e,
+                resolved,
+                measurer,
+                page_width_mm,
+                table_cache,
+            );
 
             // Expand edilmiş tablo cell'lerinin text'lerini resolved'a ekle
             // (expand_table StaticText'ler üretir, bunların text'leri zaten content'te)
@@ -492,7 +516,11 @@ fn build_element(
             Ok(node)
         }
         TemplateElement::Checkbox(e) => {
-            let checked_str = resolved.texts.get(&e.id).map(|s| s.as_str()).unwrap_or("false");
+            let checked_str = resolved
+                .texts
+                .get(&e.id)
+                .map(|s| s.as_str())
+                .unwrap_or("false");
             let checked = checked_str == "true";
             let box_size_mm = e.style.size.unwrap_or(4.0);
             let style = sizing::leaf_style(&e.size, &e.position, parent_direction);
@@ -570,7 +598,9 @@ fn build_element(
                 NodeInfo {
                     element_id: e.id.clone(),
                     element_type: "rich_text".to_string(),
-                    content: Some(ResolvedContent::RichText { spans: resolved_spans }),
+                    content: Some(ResolvedContent::RichText {
+                        spans: resolved_spans,
+                    }),
                     style: ResolvedStyle {
                         font_size: e.style.font_size,
                         font_weight: e.style.font_weight.clone(),
@@ -647,6 +677,7 @@ fn register_expanded_texts(el: &TemplateElement, resolved: &mut ResolvedData) {
 }
 
 /// Text leaf node oluştur (static_text, text, page_number için ortak)
+#[allow(clippy::too_many_arguments)]
 fn build_text_leaf(
     taffy: &mut TaffyTree<MeasureContext>,
     node_map: &mut HashMap<NodeId, NodeInfo>,
@@ -767,14 +798,16 @@ fn collect_layout(
     // Chart elementleri icin SVG uret (boyutlar artik belli)
     let content = if info.element_type == "chart" {
         resolved.charts.get(&info.element_id).map(|cd| {
-            use crate::{ChartRenderData, ChartSeriesData};
             use crate::chart_layout::DEFAULT_COLORS;
+            use crate::{ChartRenderData, ChartSeriesData};
 
             // Renk paleti olustur
             let n_colors = cd.categories.len().max(cd.series.len()).max(1);
             let colors: Vec<String> = (0..n_colors)
                 .map(|i| {
-                    cd.style.colors.as_ref()
+                    cd.style
+                        .colors
+                        .as_ref()
                         .and_then(|c| c.get(i).cloned())
                         .unwrap_or_else(|| DEFAULT_COLORS[i % DEFAULT_COLORS.len()].to_string())
                 })
@@ -782,13 +815,17 @@ fn collect_layout(
 
             ResolvedContent::Chart {
                 svg: crate::chart_render::render_svg(cd, w_mm, h_mm),
-                chart_data: ChartRenderData {
+                chart_data: Box::new(ChartRenderData {
                     chart_type: cd.chart_type.clone(),
                     categories: cd.categories.clone(),
-                    series: cd.series.iter().map(|s| ChartSeriesData {
-                        name: s.name.clone(),
-                        values: s.values.clone(),
-                    }).collect(),
+                    series: cd
+                        .series
+                        .iter()
+                        .map(|s| ChartSeriesData {
+                            name: s.name.clone(),
+                            values: s.values.clone(),
+                        })
+                        .collect(),
                     title_text: cd.title.as_ref().map(|t| t.text.clone()),
                     title_font_size: cd.title.as_ref().and_then(|t| t.font_size),
                     title_color: cd.title.as_ref().and_then(|t| t.color.clone()),
@@ -798,7 +835,10 @@ fn collect_layout(
                     show_grid: cd.axis.as_ref().and_then(|a| a.show_grid).unwrap_or(true),
                     grid_color: cd.axis.as_ref().and_then(|a| a.grid_color.clone()),
                     bar_gap: cd.style.bar_gap,
-                    stacked: matches!(cd.group_mode, Some(dreport_core::models::GroupMode::Stacked)),
+                    stacked: matches!(
+                        cd.group_mode,
+                        Some(dreport_core::models::GroupMode::Stacked)
+                    ),
                     inner_radius: cd.style.inner_radius,
                     show_points: cd.style.show_points,
                     line_width: cd.style.line_width,
@@ -810,7 +850,7 @@ fn collect_layout(
                     x_label: cd.axis.as_ref().and_then(|a| a.x_label.clone()),
                     y_label: cd.axis.as_ref().and_then(|a| a.y_label.clone()),
                     title_align: cd.title.as_ref().and_then(|t| t.align.clone()),
-                },
+                }),
             }
         })
     } else {

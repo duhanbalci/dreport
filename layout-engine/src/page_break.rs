@@ -109,7 +109,12 @@ pub fn split_into_pages(input: PageSplitInput) -> Vec<PageLayout> {
     // Page number çözümleme
     let total = pages.len();
     for (page_idx, page) in pages.iter_mut().enumerate() {
-        resolve_page_numbers(&mut page.elements, page_idx + 1, total, &input.page_number_formats);
+        resolve_page_numbers(
+            &mut page.elements,
+            page_idx + 1,
+            total,
+            &input.page_number_formats,
+        );
     }
 
     pages
@@ -197,11 +202,7 @@ fn build_avoid_groups(
     groups
 }
 
-fn collect_descendants(
-    parent_id: &str,
-    elements: &[ElementLayout],
-    result: &mut HashSet<String>,
-) {
+fn collect_descendants(parent_id: &str, elements: &[ElementLayout], result: &mut HashSet<String>) {
     // children alanından recursive olarak topla
     for el in elements {
         if el.id == parent_id {
@@ -380,12 +381,15 @@ fn split_elements(
 
             // Tablo satırı mı? Header tekrarı gerekebilir
             let mut table_header_to_add: Option<(String, Vec<ElementLayout>, f64)> = None;
-            if let Some((table_id, _row_idx)) = detect_table_row(&el.id) {
-                if let Some(info) = table_info.get(&table_id) {
-                    // Yeni sayfada bu tablonun header'ını tekrarla
-                    table_header_to_add =
-                        Some((table_id.clone(), info.header_elements.clone(), info.header_height_mm));
-                }
+            if let Some((table_id, _row_idx)) = detect_table_row(&el.id)
+                && let Some(info) = table_info.get(&table_id)
+            {
+                // Yeni sayfada bu tablonun header'ını tekrarla
+                table_header_to_add = Some((
+                    table_id.clone(),
+                    info.header_elements.clone(),
+                    info.header_height_mm,
+                ));
             }
 
             page_top = el_top;
@@ -435,6 +439,7 @@ fn split_elements(
     pages
 }
 
+#[allow(clippy::too_many_arguments)]
 fn assemble_page(
     page_index: usize,
     body_elements: &[ElementLayout],
@@ -461,7 +466,11 @@ fn assemble_page(
 
     // Body elemanları (y offset'li — strip y'den sayfa-relative y'ye)
     // Sayfa 2+ için root padding tekrar eklenir (root container sadece sayfa 1'de var)
-    let extra_top = if page_index > 0 { root_padding_top_mm } else { 0.0 };
+    let extra_top = if page_index > 0 {
+        root_padding_top_mm
+    } else {
+        0.0
+    };
     for el in body_elements {
         let mut adjusted = el.clone();
         adjusted.y_mm = el.y_mm - body_y_offset + header_height_mm + extra_top;
@@ -703,11 +712,7 @@ mod tests {
         }
 
         // Sayfa 2: pn_p1 → "2 / 2"
-        let pn2 = pages[1]
-            .elements
-            .iter()
-            .find(|e| e.id == "pn_p1")
-            .unwrap();
+        let pn2 = pages[1].elements.iter().find(|e| e.id == "pn_p1").unwrap();
         if let Some(ResolvedContent::Text { value }) = &pn2.content {
             assert_eq!(value, "2 / 2");
         } else {
@@ -933,7 +938,7 @@ mod tests {
             .collect();
 
         let mut body_elements = vec![
-            make_element("el1", 0.0, 50.0, "text"), // 50mm metin
+            make_element("el1", 0.0, 50.0, "text"),  // 50mm metin
             make_element("el2", 50.0, 50.0, "text"), // 50mm metin (toplam 100mm)
             tbl_wrapper,
             tbl_header,

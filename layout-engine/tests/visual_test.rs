@@ -15,8 +15,8 @@ mod visual {
     use std::process::Command;
 
     use dreport_core::models::Template;
-    use dreport_layout::{compute_layout, ResolvedContent};
     use dreport_layout::pdf_render::render_pdf;
+    use dreport_layout::{ResolvedContent, compute_layout};
 
     use crate::common::load_test_fonts;
 
@@ -101,11 +101,10 @@ mod visual {
 
         for (a, r) in actual_rgba.pixels().zip(reference_rgba.pixels()) {
             // Allow per-channel tolerance of 2 for font rendering differences
-            let channel_diff = a
-                .0
-                .iter()
-                .zip(r.0.iter())
-                .any(|(ac, rc)| (*ac as i32 - *rc as i32).unsigned_abs() > 2);
+            let channel_diff =
+                a.0.iter()
+                    .zip(r.0.iter())
+                    .any(|(ac, rc)| (*ac as i32 - *rc as i32).unsigned_abs() > 2);
             if channel_diff {
                 diff_pixels += 1;
             }
@@ -181,7 +180,9 @@ mod visual {
 
         let layout = compute_layout(&template, &data, &fonts).unwrap();
 
-        let mut html = String::from("<!DOCTYPE html><html><head><style>body{margin:20px;font-family:sans-serif;background:#f5f5f5}.chart-box{margin:10px 0;background:white;box-shadow:0 1px 3px rgba(0,0,0,.1)}</style></head><body><h2>Chart SVG Preview (HTML render)</h2>");
+        let mut html = String::from(
+            "<!DOCTYPE html><html><head><style>body{margin:20px;font-family:sans-serif;background:#f5f5f5}.chart-box{margin:10px 0;background:white;box-shadow:0 1px 3px rgba(0,0,0,.1)}</style></head><body><h2>Chart SVG Preview (HTML render)</h2>",
+        );
 
         for page in &layout.pages {
             for el in &page.elements {
@@ -212,9 +213,21 @@ mod visual {
     #[ignore]
     fn generate_cross_renderer_refs() {
         let fixtures = [
-            ("visual_test_template.json", "visual_test_data.json", "visual_test"),
-            ("chart_test_template.json", "chart_test_data.json", "chart_test"),
-            ("comprehensive_test_template.json", "comprehensive_test_data.json", "comprehensive_test"),
+            (
+                "visual_test_template.json",
+                "visual_test_data.json",
+                "visual_test",
+            ),
+            (
+                "chart_test_template.json",
+                "chart_test_data.json",
+                "chart_test",
+            ),
+            (
+                "comprehensive_test_template.json",
+                "comprehensive_test_data.json",
+                "comprehensive_test",
+            ),
         ];
 
         let out_dir = cross_renderer_dir();
@@ -222,7 +235,11 @@ mod visual {
 
         for (template_file, data_file, name) in &fixtures {
             let pdf_bytes = generate_test_pdf(template_file, data_file);
-            assert!(!pdf_bytes.is_empty(), "PDF should not be empty for {}", name);
+            assert!(
+                !pdf_bytes.is_empty(),
+                "PDF should not be empty for {}",
+                name
+            );
 
             let png_path = out_dir.join(format!("{}.png", name));
             if !pdf_to_png(&pdf_bytes, &png_path) {
@@ -234,7 +251,11 @@ mod visual {
 
     #[test]
     fn test_visual_snapshot_basic() {
-        run_visual_test("visual_test_template.json", "visual_test_data.json", "visual_test");
+        run_visual_test(
+            "visual_test_template.json",
+            "visual_test_data.json",
+            "visual_test",
+        );
     }
 
     #[test]
@@ -252,10 +273,18 @@ mod visual {
 
         // SVG HTML ciktisini kaydet (karsilastirma icin)
         let html_path = snap_dir.join("chart_test_svg.html");
-        generate_chart_svg_html("chart_test_template.json", "chart_test_data.json", &html_path);
+        generate_chart_svg_html(
+            "chart_test_template.json",
+            "chart_test_data.json",
+            &html_path,
+        );
         println!("Chart SVG HTML saved to {:?}", html_path);
 
         // Visual regression test
-        run_visual_test("chart_test_template.json", "chart_test_data.json", "chart_test");
+        run_visual_test(
+            "chart_test_template.json",
+            "chart_test_data.json",
+            "chart_test",
+        );
     }
 }
