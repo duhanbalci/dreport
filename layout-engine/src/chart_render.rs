@@ -442,12 +442,12 @@ fn render_pie(
 
     let cx = px + pw / 2.0;
     let cy = py + ph / 2.0;
-    let radius = pw.min(ph) / 2.0 * 0.9;
+    let radius = pw.min(ph) / 2.0 * 0.65;
     let inner_frac = data.style.inner_radius.unwrap_or(0.0).clamp(0.0, 0.9);
     let inner_r = radius * inner_frac;
 
     let show_labels = data.labels.as_ref().is_some_and(|l| l.show);
-    let label_font = data.labels.as_ref().and_then(|l| l.font_size).unwrap_or(2.5);
+    let label_font = data.labels.as_ref().and_then(|l| l.font_size).unwrap_or(3.0);
     let label_color = data
         .labels
         .as_ref()
@@ -499,7 +499,7 @@ fn render_pie(
             .unwrap();
         }
 
-        // Label
+        // Percentage label inside slice
         if show_labels {
             let mid_angle = start_angle + sweep / 2.0;
             let label_r = if inner_r > 0.0 {
@@ -514,6 +514,37 @@ fn render_pie(
                 svg,
                 r##"<text x="{:.2}" y="{:.2}" font-size="{:.1}" fill="{}" text-anchor="middle" dominant-baseline="central">{}%</text>"##,
                 lx, ly, label_font, label_color, pct
+            )
+            .unwrap();
+        }
+
+        // Category name label outside slice with leader line
+        if i < data.categories.len() {
+            let mid_angle = start_angle + sweep / 2.0;
+            let line_start_r = radius; // starts at pie edge
+            let line_end_r = radius + 3.0;
+            let text_r = radius + 4.0;
+
+            // Leader line from pie edge to label
+            let lx1 = cx + line_start_r * mid_angle.cos();
+            let ly1 = cy + line_start_r * mid_angle.sin();
+            let lx2 = cx + line_end_r * mid_angle.cos();
+            let ly2 = cy + line_end_r * mid_angle.sin();
+            write!(
+                svg,
+                r##"<line x1="{:.2}" y1="{:.2}" x2="{:.2}" y2="{:.2}" stroke="#999" stroke-width="0.2"/>"##,
+                lx1, ly1, lx2, ly2
+            )
+            .unwrap();
+
+            // Category text
+            let tx = cx + text_r * mid_angle.cos();
+            let ty = cy + text_r * mid_angle.sin();
+            let anchor = if mid_angle.cos() >= 0.0 { "start" } else { "end" };
+            write!(
+                svg,
+                r##"<text x="{:.2}" y="{:.2}" font-size="2.5" fill="#555" text-anchor="{}" dominant-baseline="central">{}</text>"##,
+                tx, ty, anchor, escape_xml(&data.categories[i])
             )
             .unwrap();
         }

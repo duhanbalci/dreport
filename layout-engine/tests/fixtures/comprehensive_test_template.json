@@ -1,0 +1,466 @@
+{
+  "id": "comprehensive_test",
+  "name": "Comprehensive Element Test",
+  "page": { "width": 210, "height": 297 },
+  "fonts": ["Noto Sans", "Noto Sans Mono"],
+  "root": {
+    "id": "root",
+    "type": "container",
+    "position": { "type": "flow" },
+    "size": { "width": { "type": "auto" }, "height": { "type": "auto" } },
+    "direction": "column",
+    "gap": 4,
+    "padding": { "top": 12, "right": 12, "bottom": 12, "left": 12 },
+    "align": "stretch",
+    "justify": "start",
+    "style": {},
+    "children": [
+
+      {
+        "id": "title",
+        "type": "static_text",
+        "position": { "type": "flow" },
+        "size": { "width": { "type": "auto" }, "height": { "type": "auto" } },
+        "style": { "fontSize": 16, "fontWeight": "bold", "color": "#1a1a1a", "align": "center" },
+        "content": "COMPREHENSIVE ELEMENT TEST"
+      },
+
+      {
+        "id": "subtitle",
+        "type": "static_text",
+        "position": { "type": "flow" },
+        "size": { "width": { "type": "auto" }, "height": { "type": "auto" } },
+        "style": { "fontSize": 9, "color": "#888888", "align": "center" },
+        "content": "All element types in a single document"
+      },
+
+      {
+        "id": "line_top",
+        "type": "line",
+        "position": { "type": "flow" },
+        "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+        "style": { "strokeColor": "#1e293b", "strokeWidth": 1 }
+      },
+
+      {
+        "id": "section_text",
+        "type": "container",
+        "position": { "type": "flow" },
+        "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+        "direction": "column",
+        "gap": 2,
+        "padding": { "top": 2, "right": 4, "bottom": 2, "left": 4 },
+        "align": "stretch",
+        "justify": "start",
+        "style": { "backgroundColor": "#f0f4ff", "borderColor": "#c7d2fe", "borderWidth": 0.5, "borderRadius": 2 },
+        "children": [
+          {
+            "id": "sec1_label",
+            "type": "static_text",
+            "position": { "type": "flow" },
+            "size": { "width": { "type": "auto" }, "height": { "type": "auto" } },
+            "style": { "fontSize": 8, "fontWeight": "bold", "color": "#4338ca" },
+            "content": "TEXT ELEMENTS"
+          },
+          {
+            "id": "row_texts",
+            "type": "container",
+            "position": { "type": "flow" },
+            "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+            "direction": "row",
+            "gap": 4,
+            "padding": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
+            "align": "start",
+            "justify": "start",
+            "style": {},
+            "children": [
+              {
+                "id": "bound_text",
+                "type": "text",
+                "position": { "type": "flow" },
+                "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+                "style": { "fontSize": 10, "color": "#333333" },
+                "content": "Company: ",
+                "binding": { "path": "company.name" }
+              },
+              {
+                "id": "bound_text2",
+                "type": "text",
+                "position": { "type": "flow" },
+                "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+                "style": { "fontSize": 10, "color": "#333333" },
+                "content": "City: ",
+                "binding": { "path": "company.city" }
+              }
+            ]
+          },
+          {
+            "id": "rich_text_el",
+            "type": "rich_text",
+            "position": { "type": "flow" },
+            "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+            "style": { "fontSize": 9, "color": "#333333" },
+            "content": [
+              { "text": "Rich text: ", "style": { "fontSize": 9, "fontWeight": "bold", "color": "#1e293b" } },
+              { "text": "normal ", "style": { "fontSize": 9, "color": "#555555" } },
+              { "text": "bold ", "style": { "fontSize": 9, "fontWeight": "bold", "color": "#dc2626" } },
+              { "text": "large ", "style": { "fontSize": 12, "color": "#059669" } },
+              { "text": "mono", "style": { "fontSize": 9, "fontFamily": "Noto Sans Mono", "color": "#7c3aed" } }
+            ]
+          },
+          {
+            "id": "calc_text",
+            "type": "calculated_text",
+            "position": { "type": "flow" },
+            "size": { "width": { "type": "auto" }, "height": { "type": "auto" } },
+            "style": { "fontSize": 9, "color": "#333333" },
+            "expression": "company.revenue * 0.20",
+            "format": "currency"
+          },
+          {
+            "id": "row_date_page",
+            "type": "container",
+            "position": { "type": "flow" },
+            "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+            "direction": "row",
+            "gap": 8,
+            "padding": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
+            "align": "center",
+            "justify": "start",
+            "style": {},
+            "children": [
+              {
+                "id": "date_el",
+                "type": "current_date",
+                "position": { "type": "flow" },
+                "size": { "width": { "type": "auto" }, "height": { "type": "auto" } },
+                "style": { "fontSize": 9, "color": "#666666" },
+                "format": "DD.MM.YYYY"
+              },
+              {
+                "id": "page_num",
+                "type": "page_number",
+                "position": { "type": "flow" },
+                "size": { "width": { "type": "auto" }, "height": { "type": "auto" } },
+                "style": { "fontSize": 9, "color": "#666666" },
+                "format": "Page {current}/{total}"
+              }
+            ]
+          }
+        ]
+      },
+
+      {
+        "id": "line_thin",
+        "type": "line",
+        "position": { "type": "flow" },
+        "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+        "style": { "strokeColor": "#e2e8f0", "strokeWidth": 0.3 }
+      },
+
+      {
+        "id": "section_shapes",
+        "type": "container",
+        "position": { "type": "flow" },
+        "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+        "direction": "column",
+        "gap": 2,
+        "padding": { "top": 2, "right": 4, "bottom": 2, "left": 4 },
+        "align": "stretch",
+        "justify": "start",
+        "style": { "backgroundColor": "#fef3c7", "borderColor": "#fbbf24", "borderWidth": 0.5, "borderRadius": 2 },
+        "children": [
+          {
+            "id": "sec2_label",
+            "type": "static_text",
+            "position": { "type": "flow" },
+            "size": { "width": { "type": "auto" }, "height": { "type": "auto" } },
+            "style": { "fontSize": 8, "fontWeight": "bold", "color": "#92400e" },
+            "content": "SHAPES, CHECKBOXES & BARCODES"
+          },
+          {
+            "id": "row_shapes",
+            "type": "container",
+            "position": { "type": "flow" },
+            "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+            "direction": "row",
+            "gap": 4,
+            "padding": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
+            "align": "center",
+            "justify": "start",
+            "style": {},
+            "children": [
+              {
+                "id": "shape_rect",
+                "type": "shape",
+                "position": { "type": "flow" },
+                "size": { "width": { "type": "fixed", "value": 15 }, "height": { "type": "fixed", "value": 10 } },
+                "shapeType": "rectangle",
+                "style": { "backgroundColor": "#3b82f6", "borderColor": "#1d4ed8", "borderWidth": 0.5 }
+              },
+              {
+                "id": "shape_ellipse",
+                "type": "shape",
+                "position": { "type": "flow" },
+                "size": { "width": { "type": "fixed", "value": 15 }, "height": { "type": "fixed", "value": 10 } },
+                "shapeType": "ellipse",
+                "style": { "backgroundColor": "#ef4444", "borderColor": "#b91c1c", "borderWidth": 0.5 }
+              },
+              {
+                "id": "shape_rounded",
+                "type": "shape",
+                "position": { "type": "flow" },
+                "size": { "width": { "type": "fixed", "value": 15 }, "height": { "type": "fixed", "value": 10 } },
+                "shapeType": "rounded_rectangle",
+                "style": { "backgroundColor": "#10b981", "borderColor": "#047857", "borderWidth": 0.5, "borderRadius": 3 }
+              },
+              {
+                "id": "cb_checked",
+                "type": "checkbox",
+                "position": { "type": "flow" },
+                "size": { "width": { "type": "fixed", "value": 5 }, "height": { "type": "fixed", "value": 5 } },
+                "checked": true,
+                "style": { "size": 5, "checkColor": "#059669", "borderColor": "#333333", "borderWidth": 0.3 }
+              },
+              {
+                "id": "cb_label1",
+                "type": "static_text",
+                "position": { "type": "flow" },
+                "size": { "width": { "type": "auto" }, "height": { "type": "auto" } },
+                "style": { "fontSize": 8, "color": "#333333" },
+                "content": "Checked"
+              },
+              {
+                "id": "cb_unchecked",
+                "type": "checkbox",
+                "position": { "type": "flow" },
+                "size": { "width": { "type": "fixed", "value": 5 }, "height": { "type": "fixed", "value": 5 } },
+                "checked": false,
+                "style": { "size": 5, "checkColor": "#000000", "borderColor": "#333333", "borderWidth": 0.3 }
+              },
+              {
+                "id": "cb_label2",
+                "type": "static_text",
+                "position": { "type": "flow" },
+                "size": { "width": { "type": "auto" }, "height": { "type": "auto" } },
+                "style": { "fontSize": 8, "color": "#333333" },
+                "content": "Unchecked"
+              }
+            ]
+          },
+          {
+            "id": "row_barcodes",
+            "type": "container",
+            "position": { "type": "flow" },
+            "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+            "direction": "row",
+            "gap": 6,
+            "padding": { "top": 2, "right": 0, "bottom": 0, "left": 0 },
+            "align": "start",
+            "justify": "start",
+            "style": {},
+            "children": [
+              {
+                "id": "barcode_qr",
+                "type": "barcode",
+                "position": { "type": "flow" },
+                "size": { "width": { "type": "fixed", "value": 20 }, "height": { "type": "fixed", "value": 20 } },
+                "format": "qr",
+                "value": "https://dreport.dev",
+                "style": {}
+              },
+              {
+                "id": "barcode_128",
+                "type": "barcode",
+                "position": { "type": "flow" },
+                "size": { "width": { "type": "fixed", "value": 40 }, "height": { "type": "fixed", "value": 15 } },
+                "format": "code128",
+                "binding": { "path": "order.code" },
+                "style": { "includeText": true }
+              },
+              {
+                "id": "barcode_ean",
+                "type": "barcode",
+                "position": { "type": "flow" },
+                "size": { "width": { "type": "fixed", "value": 35 }, "height": { "type": "fixed", "value": 15 } },
+                "format": "ean13",
+                "value": "5901234123457",
+                "style": { "includeText": true }
+              }
+            ]
+          }
+        ]
+      },
+
+      {
+        "id": "section_table",
+        "type": "container",
+        "position": { "type": "flow" },
+        "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+        "direction": "column",
+        "gap": 2,
+        "padding": { "top": 2, "right": 0, "bottom": 0, "left": 0 },
+        "align": "stretch",
+        "justify": "start",
+        "style": {},
+        "children": [
+          {
+            "id": "sec3_label",
+            "type": "static_text",
+            "position": { "type": "flow" },
+            "size": { "width": { "type": "auto" }, "height": { "type": "auto" } },
+            "style": { "fontSize": 8, "fontWeight": "bold", "color": "#0f766e" },
+            "content": "REPEATING TABLE"
+          },
+          {
+            "id": "products_table",
+            "type": "repeating_table",
+            "position": { "type": "flow" },
+            "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+            "dataSource": { "path": "products" },
+            "columns": [
+              { "id": "col_no", "field": "no", "title": "#", "width": { "type": "fixed", "value": 8 }, "align": "center" },
+              { "id": "col_name", "field": "name", "title": "Product", "width": { "type": "fr", "value": 1 }, "align": "left" },
+              { "id": "col_qty", "field": "qty", "title": "Qty", "width": { "type": "fixed", "value": 15 }, "align": "right" },
+              { "id": "col_price", "field": "price", "title": "Price", "width": { "type": "fixed", "value": 25 }, "align": "right", "format": "currency" },
+              { "id": "col_total", "field": "total", "title": "Total", "width": { "type": "fixed", "value": 25 }, "align": "right", "format": "currency" }
+            ],
+            "style": {
+              "fontSize": 8,
+              "headerFontSize": 8,
+              "headerBg": "#0f766e",
+              "headerColor": "#ffffff",
+              "zebraOdd": "#ffffff",
+              "zebraEven": "#f0fdfa",
+              "borderColor": "#99f6e4",
+              "borderWidth": 0.3
+            }
+          }
+        ]
+      },
+
+      {
+        "id": "section_charts",
+        "type": "container",
+        "position": { "type": "flow" },
+        "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+        "direction": "column",
+        "gap": 2,
+        "padding": { "top": 2, "right": 0, "bottom": 0, "left": 0 },
+        "align": "stretch",
+        "justify": "start",
+        "style": {},
+        "children": [
+          {
+            "id": "sec4_label",
+            "type": "static_text",
+            "position": { "type": "flow" },
+            "size": { "width": { "type": "auto" }, "height": { "type": "auto" } },
+            "style": { "fontSize": 8, "fontWeight": "bold", "color": "#9333ea" },
+            "content": "CHARTS"
+          },
+          {
+            "id": "charts_row",
+            "type": "container",
+            "position": { "type": "flow" },
+            "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+            "direction": "row",
+            "gap": 4,
+            "padding": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
+            "align": "start",
+            "justify": "start",
+            "style": {},
+            "children": [
+              {
+                "id": "chart_bar",
+                "type": "chart",
+                "position": { "type": "flow" },
+                "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "fixed", "value": 45 } },
+                "chartType": "bar",
+                "dataSource": { "path": "products" },
+                "categoryField": "name",
+                "valueField": "total",
+                "title": { "text": "Revenue by Product", "fontSize": 3, "color": "#1e293b" },
+                "legend": { "show": false },
+                "labels": { "show": true, "fontSize": 2, "color": "#333" },
+                "axis": { "showGrid": true },
+                "style": { "colors": ["#6366f1", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6"] }
+              },
+              {
+                "id": "chart_pie",
+                "type": "chart",
+                "position": { "type": "flow" },
+                "size": { "width": { "type": "fixed", "value": 55 }, "height": { "type": "fixed", "value": 45 } },
+                "chartType": "pie",
+                "dataSource": { "path": "distribution" },
+                "categoryField": "category",
+                "valueField": "value",
+                "title": { "text": "Distribution", "fontSize": 3, "color": "#1e293b" },
+                "legend": { "show": true, "position": "bottom", "fontSize": 2 },
+                "labels": { "show": true, "fontSize": 2, "color": "#333" },
+                "style": { "colors": ["#3b82f6", "#ef4444", "#10b981", "#f59e0b"], "innerRadius": 0.4 }
+              }
+            ]
+          },
+          {
+            "id": "chart_line",
+            "type": "chart",
+            "position": { "type": "flow" },
+            "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "fixed", "value": 40 } },
+            "chartType": "line",
+            "dataSource": { "path": "trend" },
+            "categoryField": "month",
+            "valueField": "value",
+            "groupField": "series",
+            "title": { "text": "Monthly Trend", "fontSize": 3, "color": "#1e293b" },
+            "legend": { "show": true, "position": "top", "fontSize": 2 },
+            "labels": { "show": false },
+            "axis": { "showGrid": true },
+            "style": { "colors": ["#6366f1", "#ef4444"], "lineWidth": 1.5, "showPoints": true }
+          }
+        ]
+      },
+
+      {
+        "id": "line_bottom",
+        "type": "line",
+        "position": { "type": "flow" },
+        "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+        "style": { "strokeColor": "#1e293b", "strokeWidth": 0.5 }
+      },
+
+      {
+        "id": "footer_row",
+        "type": "container",
+        "position": { "type": "flow" },
+        "size": { "width": { "type": "fr", "value": 1 }, "height": { "type": "auto" } },
+        "direction": "row",
+        "gap": 0,
+        "padding": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
+        "align": "center",
+        "justify": "space-between",
+        "style": {},
+        "children": [
+          {
+            "id": "footer_left",
+            "type": "static_text",
+            "position": { "type": "flow" },
+            "size": { "width": { "type": "auto" }, "height": { "type": "auto" } },
+            "style": { "fontSize": 7, "color": "#94a3b8" },
+            "content": "Generated by dreport visual test suite"
+          },
+          {
+            "id": "footer_right",
+            "type": "text",
+            "position": { "type": "flow" },
+            "size": { "width": { "type": "auto" }, "height": { "type": "auto" } },
+            "style": { "fontSize": 7, "color": "#94a3b8", "align": "right" },
+            "content": "Version: ",
+            "binding": { "path": "meta.version" }
+          }
+        ]
+      }
+
+    ]
+  }
+}

@@ -1,1 +1,10 @@
-target/
+**/target/
+node_modules/
+dist/
+*.wasm
+.DS_Store
+
+# Visual test artifacts (regenerated on demand)
+frontend/tests/visual/cross-renderer-refs/
+frontend/tests/visual/cross-renderer-diffs/
+frontend/tests/visual/test-results/

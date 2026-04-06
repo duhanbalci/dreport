@@ -771,6 +771,13 @@ fn collect_layout(
                     show_points: cd.style.show_points,
                     line_width: cd.style.line_width,
                     background_color: cd.style.background_color.clone(),
+                    label_color: cd.labels.as_ref().and_then(|l| l.color.clone()),
+                    legend_show: cd.legend.as_ref().is_some_and(|l| l.show),
+                    legend_position: cd.legend.as_ref().and_then(|l| l.position.clone()),
+                    legend_font_size: cd.legend.as_ref().and_then(|l| l.font_size),
+                    x_label: cd.axis.as_ref().and_then(|a| a.x_label.clone()),
+                    y_label: cd.axis.as_ref().and_then(|a| a.y_label.clone()),
+                    title_align: cd.title.as_ref().and_then(|t| t.align.clone()),
                 },
             }
         })

@@ -13,7 +13,7 @@ mod visual {
     use std::process::Command;
 
     use dreport_core::models::Template;
-    use dreport_layout::{compute_layout, FontData};
+    use dreport_layout::{compute_layout, FontData, ResolvedContent};
     use dreport_layout::pdf_render::render_pdf;
 
     fn fixtures_dir() -> std::path::PathBuf {
@@ -156,17 +156,15 @@ mod visual {
         }
     }
 
-    #[test]
-    fn test_visual_snapshot_basic() {
-        let pdf_bytes =
-            generate_test_pdf("visual_test_template.json", "visual_test_data.json");
+    fn run_visual_test(template_file: &str, data_file: &str, test_name: &str) {
+        let pdf_bytes = generate_test_pdf(template_file, data_file);
         assert!(!pdf_bytes.is_empty(), "PDF should not be empty");
 
         let snap_dir = snapshots_dir();
         fs::create_dir_all(&snap_dir).unwrap();
 
-        let actual_png = snap_dir.join("visual_test_actual.png");
-        let reference_png = snap_dir.join("visual_test_reference.png");
+        let actual_png = snap_dir.join(format!("{}_actual.png", test_name));
+        let reference_png = snap_dir.join(format!("{}_reference.png", test_name));
 
         if !pdf_to_png(&pdf_bytes, &actual_png) {
             eprintln!("Skipping visual comparison - pdftoppm not available");
@@ -188,7 +186,8 @@ mod visual {
         match compare_images(&actual_png, &reference_png, 0.01) {
             Ok(diff) => {
                 println!(
-                    "Visual test passed: {:.4}% pixels differ",
+                    "Visual test [{}] passed: {:.4}% pixels differ",
+                    test_name,
                     diff * 100.0
                 );
                 let _ = fs::remove_file(&actual_png);
@@ -196,10 +195,99 @@ mod visual {
             Err(err) => {
                 // Keep actual for debugging
                 panic!(
-                    "Visual regression detected: {}. Actual saved at {:?}",
-                    err, actual_png
+                    "Visual regression [{}]: {}. Actual saved at {:?}",
+                    test_name, err, actual_png
                 );
             }
         }
+    }
+
+    /// SVG'yi standalone HTML'e sar — chart'ın HTML render'ını görmek icin
+    fn generate_chart_svg_html(template_file: &str, data_file: &str, output_path: &Path) {
+        let template_json = fs::read_to_string(fixtures_dir().join(template_file)).unwrap();
+        let data_json = fs::read_to_string(fixtures_dir().join(data_file)).unwrap();
+
+        let template: Template = serde_json::from_str(&template_json).unwrap();
+        let data: serde_json::Value = serde_json::from_str(&data_json).unwrap();
+        let fonts = load_test_fonts();
+
+        let layout = compute_layout(&template, &data, &fonts);
+
+        let mut html = String::from("<!DOCTYPE html><html><head><style>body{margin:20px;font-family:sans-serif;background:#f5f5f5}.chart-box{margin:10px 0;background:white;box-shadow:0 1px 3px rgba(0,0,0,.1)}</style></head><body><h2>Chart SVG Preview (HTML render)</h2>");
+
+        for page in &layout.pages {
+            for el in &page.elements {
+                if let Some(ResolvedContent::Chart { svg, .. }) = &el.content {
+                    html.push_str(&format!(
+                        "<div class='chart-box' style='width:{}mm;height:{}mm'>{}</div>",
+                        el.width_mm, el.height_mm, svg
+                    ));
+                }
+            }
+        }
+
+        html.push_str("</body></html>");
+        fs::write(output_path, html).unwrap();
+    }
+
+    /// Cross-renderer reference PNG output directory
+    fn cross_renderer_dir() -> std::path::PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("frontend/tests/visual/cross-renderer-refs")
+    }
+
+    /// Generates PDF→PNG references for cross-renderer comparison with HTML render.
+    /// Run explicitly: cargo test -p dreport-layout --test visual_test -- generate_cross_renderer --ignored
+    #[test]
+    #[ignore]
+    fn generate_cross_renderer_refs() {
+        let fixtures = [
+            ("visual_test_template.json", "visual_test_data.json", "visual_test"),
+            ("chart_test_template.json", "chart_test_data.json", "chart_test"),
+            ("comprehensive_test_template.json", "comprehensive_test_data.json", "comprehensive_test"),
+        ];
+
+        let out_dir = cross_renderer_dir();
+        fs::create_dir_all(&out_dir).unwrap();
+
+        for (template_file, data_file, name) in &fixtures {
+            let pdf_bytes = generate_test_pdf(template_file, data_file);
+            assert!(!pdf_bytes.is_empty(), "PDF should not be empty for {}", name);
+
+            let png_path = out_dir.join(format!("{}.png", name));
+            if !pdf_to_png(&pdf_bytes, &png_path) {
+                panic!("pdftoppm failed for {} — install poppler-utils", name);
+            }
+            println!("Cross-renderer reference: {:?}", png_path);
+        }
+    }
+
+    #[test]
+    fn test_visual_snapshot_basic() {
+        run_visual_test("visual_test_template.json", "visual_test_data.json", "visual_test");
+    }
+
+    #[test]
+    fn test_visual_snapshot_charts() {
+        let pdf_bytes = generate_test_pdf("chart_test_template.json", "chart_test_data.json");
+        assert!(!pdf_bytes.is_empty(), "Chart PDF should not be empty");
+
+        let snap_dir = snapshots_dir();
+        fs::create_dir_all(&snap_dir).unwrap();
+
+        // PDF ciktisini kaydet (inceleme icin)
+        let pdf_path = snap_dir.join("chart_test.pdf");
+        fs::write(&pdf_path, &pdf_bytes).unwrap();
+        println!("Chart PDF saved to {:?}", pdf_path);
+
+        // SVG HTML ciktisini kaydet (karsilastirma icin)
+        let html_path = snap_dir.join("chart_test_svg.html");
+        generate_chart_svg_html("chart_test_template.json", "chart_test_data.json", &html_path);
+        println!("Chart SVG HTML saved to {:?}", html_path);
+
+        // Visual regression test
+        run_visual_test("chart_test_template.json", "chart_test_data.json", "chart_test");
     }
 }

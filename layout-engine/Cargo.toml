@@ -2,13 +2,16 @@
 name = "dreport-layout"
 version = "0.1.0"
 edition = "2024"
+description = "Layout engine for dreport (taffy + cosmic-text)"
+license = "MIT"
+publish = ["gitea"]
 
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-dreport-core = { path = "../core" }
+dreport-core = { version = "0.1.0", path = "../core", registry = "gitea" }
 dexpr = { version = "0.1.0", registry = "gitea" }
 taffy = "0.9"
 cosmic-text = { version = "0.18", default-features = false, features = ["std", "swash"] }

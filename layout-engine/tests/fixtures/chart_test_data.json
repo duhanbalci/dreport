@@ -1,0 +1,33 @@
+{
+  "satis": [
+    { "ay": "Ocak", "gelir": 15000, "kanal": "Online" },
+    { "ay": "Ocak", "gelir": 8000, "kanal": "Magaza" },
+    { "ay": "Ocak", "gelir": 3000, "kanal": "Toptan" },
+    { "ay": "Subat", "gelir": 18000, "kanal": "Online" },
+    { "ay": "Subat", "gelir": 9500, "kanal": "Magaza" },
+    { "ay": "Subat", "gelir": 4200, "kanal": "Toptan" },
+    { "ay": "Mart", "gelir": 22000, "kanal": "Online" },
+    { "ay": "Mart", "gelir": 11000, "kanal": "Magaza" },
+    { "ay": "Mart", "gelir": 5100, "kanal": "Toptan" },
+    { "ay": "Nisan", "gelir": 19500, "kanal": "Online" },
+    { "ay": "Nisan", "gelir": 10200, "kanal": "Magaza" },
+    { "ay": "Nisan", "gelir": 4800, "kanal": "Toptan" }
+  ],
+  "trend": [
+    { "hafta": "H1", "ziyaretci": 1200, "kaynak": "Organik" },
+    { "hafta": "H1", "ziyaretci": 800, "kaynak": "Reklam" },
+    { "hafta": "H2", "ziyaretci": 1500, "kaynak": "Organik" },
+    { "hafta": "H2", "ziyaretci": 950, "kaynak": "Reklam" },
+    { "hafta": "H3", "ziyaretci": 1350, "kaynak": "Organik" },
+    { "hafta": "H3", "ziyaretci": 1100, "kaynak": "Reklam" },
+    { "hafta": "H4", "ziyaretci": 1800, "kaynak": "Organik" },
+    { "hafta": "H4", "ziyaretci": 1250, "kaynak": "Reklam" }
+  ],
+  "dagilim": [
+    { "kategori": "Elektronik", "oran": 35 },
+    { "kategori": "Giyim", "oran": 25 },
+    { "kategori": "Gida", "oran": 20 },
+    { "kategori": "Kozmetik", "oran": 12 },
+    { "kategori": "Diger", "oran": 8 }
+  ]
+}

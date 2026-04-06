@@ -713,6 +713,7 @@ const isAnyDragActive = computed(() =>
       v-if="!isDragging && !isResizing"
       :scale="scale"
       :layout-map="layoutMap"
+      :page-height-px="pageHeightPx"
     />
   </div>
 </template>

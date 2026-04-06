@@ -604,11 +604,7 @@ async function downloadPdf() {
     const blob = await editorRef.value?.exportPdf()
     if (!blob) return
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${template.value.name || 'belge'}.pdf`
-    a.click()
-    URL.revokeObjectURL(url)
+    window.open(url, '_blank')
   } catch (err) {
     alert(err instanceof Error ? err.message : 'PDF olusturulamadi')
   } finally {
@@ -668,7 +664,7 @@ function resetTemplate() {
       <!-- Output -->
       <button class="header-btn" :disabled="pdfLoading" @click="downloadPdf">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="1" width="10" height="14" rx="1.5" /><path d="M6 5h4M6 8h4M6 11h2" /></svg>
-        {{ pdfLoading ? 'Hazirlaniyor...' : 'PDF Indir' }}
+        {{ pdfLoading ? 'Hazirlaniyor...' : 'PDF Onizle' }}
       </button>
     </header>
     <DreportEditor

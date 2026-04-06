@@ -118,6 +118,24 @@ pub struct ChartRenderData {
     pub line_width: Option<f64>,
     #[serde(default)]
     pub background_color: Option<String>,
+    // Label color
+    #[serde(default)]
+    pub label_color: Option<String>,
+    // Legend
+    #[serde(default)]
+    pub legend_show: bool,
+    #[serde(default)]
+    pub legend_position: Option<String>,
+    #[serde(default)]
+    pub legend_font_size: Option<f64>,
+    // Axis labels
+    #[serde(default)]
+    pub x_label: Option<String>,
+    #[serde(default)]
+    pub y_label: Option<String>,
+    // Title align
+    #[serde(default)]
+    pub title_align: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

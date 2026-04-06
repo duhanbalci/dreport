@@ -2,6 +2,9 @@
 name = "dreport-core"
 version = "0.1.0"
 edition = "2024"
+description = "Core models and types for dreport document design tool"
+license = "MIT"
+publish = ["gitea"]
 
 [lib]
 crate-type = ["rlib"]

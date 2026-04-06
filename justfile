@@ -24,3 +24,28 @@ wasm:
 # Layout engine WASM watch (rebuild on change)
 wasm-watch:
     watchexec -w layout-engine/src -w core/src -e rs -- just wasm
+
+# Generate PDF reference PNGs for cross-renderer visual tests
+visual-refs:
+    cargo test -p dreport-layout --test visual_test -- generate_cross_renderer --ignored
+
+# Run cross-renderer visual tests (Playwright vs PDF)
+visual-test: visual-refs
+    cd frontend && bun run test:visual -- --project=cross-renderer
+
+# Run all visual tests (editor + cross-renderer)
+visual-test-all: visual-refs
+    cd frontend && bun run test:visual
+
+# Publish dreport-core to Gitea
+publish-core:
+    cargo publish -p dreport-core --registry gitea --allow-dirty
+
+# Publish dreport-layout to Gitea (depends on core)
+publish-layout:
+    cargo publish -p dreport-layout --registry gitea --allow-dirty
+
+# Publish all crates to Gitea (in order)
+publish-all:
+    just publish-core
+    just publish-layout

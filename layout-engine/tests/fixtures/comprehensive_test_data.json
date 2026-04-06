@@ -1,0 +1,42 @@
+{
+  "company": {
+    "name": "Teknova Yazilim A.S.",
+    "city": "Istanbul",
+    "revenue": 148200
+  },
+  "order": {
+    "code": "ORD-2026-0042"
+  },
+  "meta": {
+    "version": "1.0.0"
+  },
+  "products": [
+    { "no": 1, "name": "Web Application Development", "qty": 1, "price": 45000, "total": 45000 },
+    { "no": 2, "name": "Mobile App Development", "qty": 1, "price": 35000, "total": 35000 },
+    { "no": 3, "name": "UI/UX Design Service", "qty": 40, "price": 750, "total": 30000 },
+    { "no": 4, "name": "Server Maintenance (Annual)", "qty": 1, "price": 12000, "total": 12000 },
+    { "no": 5, "name": "SSL Certificate", "qty": 3, "price": 500, "total": 1500 },
+    { "no": 6, "name": "Cloud Hosting Setup", "qty": 1, "price": 8500, "total": 8500 },
+    { "no": 7, "name": "Database Optimization", "qty": 2, "price": 6000, "total": 12000 }
+  ],
+  "distribution": [
+    { "category": "Development", "value": 80000 },
+    { "category": "Design", "value": 30000 },
+    { "category": "Infrastructure", "value": 22000 },
+    { "category": "Support", "value": 12000 }
+  ],
+  "trend": [
+    { "month": "Jan", "series": "Revenue", "value": 18000 },
+    { "month": "Feb", "series": "Revenue", "value": 22000 },
+    { "month": "Mar", "series": "Revenue", "value": 19500 },
+    { "month": "Apr", "series": "Revenue", "value": 28000 },
+    { "month": "May", "series": "Revenue", "value": 32000 },
+    { "month": "Jun", "series": "Revenue", "value": 35000 },
+    { "month": "Jan", "series": "Costs", "value": 12000 },
+    { "month": "Feb", "series": "Costs", "value": 14000 },
+    { "month": "Mar", "series": "Costs", "value": 11000 },
+    { "month": "Apr", "series": "Costs", "value": 16000 },
+    { "month": "May", "series": "Costs", "value": 18000 },
+    { "month": "Jun", "series": "Costs", "value": 20000 }
+  ]
+}

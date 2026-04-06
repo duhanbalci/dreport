@@ -3,12 +3,15 @@ import { computed } from 'vue'
 import { useTemplateStore } from '../../stores/template'
 import { useEditorStore } from '../../stores/editor'
 import { isContainer } from '../../core/types'
-import type { ContainerElement, TextStyle, RepeatingTableElement, TableStyle } from '../../core/types'
-import type { ElementLayout } from '../../core/layout-types'
+import type { ContainerElement, TextStyle, RepeatingTableElement, TableStyle, ChartElement, ChartType } from '../../core/types'
+import type { LayoutMapEntry } from '../../core/layout-types'
+
+const PAGE_GAP_PX = 24
 
 const props = defineProps<{
   scale: number
-  layoutMap: Record<string, ElementLayout>
+  layoutMap: Record<string, LayoutMapEntry>
+  pageHeightPx?: number
 }>()
 
 const templateStore = useTemplateStore()
@@ -36,6 +39,15 @@ const isTable = computed(() => selected.value?.type === 'repeating_table')
 const tableEl = computed(() => isTable.value ? selected.value as RepeatingTableElement : null)
 const tableStyle = computed(() => tableEl.value?.style as TableStyle | undefined)
 
+const isChart = computed(() => selected.value?.type === 'chart')
+const chartEl = computed(() => isChart.value ? selected.value as ChartElement : null)
+
+function pageYOffset(pageIndex: number): number {
+  if (pageIndex <= 0) return 0
+  const pageH = props.pageHeightPx ?? (templateStore.template.page.height * props.scale)
+  return pageIndex * (pageH + PAGE_GAP_PX)
+}
+
 const toolbarStyle = computed(() => {
   const el = selected.value
   if (!el) return { display: 'none' }
@@ -43,10 +55,11 @@ const toolbarStyle = computed(() => {
   if (!l) return { display: 'none' }
 
   const s = props.scale
+  const pYOff = pageYOffset(l.pageIndex)
   return {
     position: 'absolute' as const,
     left: `${l.x_mm * s}px`,
-    top: `${l.y_mm * s - 30}px`,
+    top: `${l.y_mm * s - 30 + pYOff}px`,
     zIndex: 1100,
   }
 })
@@ -73,6 +86,13 @@ function setTextAlign(a: string) { updateStyle('align', a) }
 
 // Table
 function updateTableStyle(key: string, value: unknown) {
+  if (!selected.value) return
+  update({ style: { ...selected.value.style, [key]: value } })
+}
+
+// Chart
+function setChartType(t: ChartType) { update({ chartType: t }) }
+function updateChartStyle(key: string, value: unknown) {
   if (!selected.value) return
   update({ style: { ...selected.value.style, [key]: value } })
 }
@@ -297,6 +317,73 @@ function updateTableStyle(key: string, value: unknown) {
           <rect x="1" y="1" width="10" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
         </svg>
         <input type="number" class="et__num" step="0.1" min="0" :value="tableStyle.borderWidth ?? 0.5" @input="(e) => updateTableStyle('borderWidth', parseFloat((e.target as HTMLInputElement).value) || 0)" />
+      </div>
+    </template>
+
+    <!-- ===== Chart ===== -->
+    <template v-if="isChart && chartEl">
+      <!-- Chart type -->
+      <div class="et__group">
+        <button class="et__btn" :class="{ 'et__btn--active': chartEl.chartType === 'bar' }" data-tip="Cubuk" @click="setChartType('bar')">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="2" y="6" width="3" height="6" rx="0.5" fill="currentColor"/>
+            <rect x="5.5" y="3" width="3" height="9" rx="0.5" fill="currentColor"/>
+            <rect x="9" y="5" width="3" height="7" rx="0.5" fill="currentColor"/>
+          </svg>
+        </button>
+        <button class="et__btn" :class="{ 'et__btn--active': chartEl.chartType === 'line' }" data-tip="Cizgi" @click="setChartType('line')">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <polyline points="2,10 5,5 8,7 12,3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <circle cx="2" cy="10" r="1.2" fill="currentColor"/><circle cx="5" cy="5" r="1.2" fill="currentColor"/><circle cx="8" cy="7" r="1.2" fill="currentColor"/><circle cx="12" cy="3" r="1.2" fill="currentColor"/>
+          </svg>
+        </button>
+        <button class="et__btn" :class="{ 'et__btn--active': chartEl.chartType === 'pie' }" data-tip="Pasta" @click="setChartType('pie')">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M7 2a5 5 0 1 1-3.54 1.46" stroke="currentColor" stroke-width="1.3" fill="none"/>
+            <path d="M7 7V2A5 5 0 0 0 3.46 3.46Z" fill="currentColor"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="et__sep" />
+
+      <!-- Show labels -->
+      <div class="et__group">
+        <button class="et__btn" :class="{ 'et__btn--active': chartEl.labels?.show !== false }" data-tip="Etiketler" @click="update({ labels: { ...chartEl.labels, show: chartEl.labels?.show === false ? true : false } })">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="2" y="8" width="3" height="4" rx="0.5" fill="currentColor" opacity="0.4"/>
+            <rect x="5.5" y="5" width="3" height="7" rx="0.5" fill="currentColor" opacity="0.4"/>
+            <rect x="9" y="6" width="3" height="6" rx="0.5" fill="currentColor" opacity="0.4"/>
+            <text x="3.5" y="7" font-size="4" fill="currentColor" text-anchor="middle" font-weight="bold">3</text>
+            <text x="7" y="4" font-size="4" fill="currentColor" text-anchor="middle" font-weight="bold">7</text>
+            <text x="10.5" y="5" font-size="4" fill="currentColor" text-anchor="middle" font-weight="bold">5</text>
+          </svg>
+        </button>
+      </div>
+
+      <div class="et__sep" />
+
+      <!-- Show grid -->
+      <div class="et__group">
+        <button class="et__btn" :class="{ 'et__btn--active': chartEl.axis?.showGrid !== false }" data-tip="Izgara" @click="update({ axis: { ...chartEl.axis, showGrid: chartEl.axis?.showGrid === false ? true : false } })">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <line x1="2" y1="3" x2="12" y2="3" stroke="currentColor" stroke-width="0.8" stroke-dasharray="2 1.5"/>
+            <line x1="2" y1="7" x2="12" y2="7" stroke="currentColor" stroke-width="0.8" stroke-dasharray="2 1.5"/>
+            <line x1="2" y1="11" x2="12" y2="11" stroke="currentColor" stroke-width="0.8" stroke-dasharray="2 1.5"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="et__sep" />
+
+      <!-- Background color -->
+      <div class="et__group">
+        <label class="et__color-wrap" data-tip="Arka Plan">
+          <input type="color" class="et__color" :value="chartEl.style.backgroundColor ?? '#ffffff'" @input="(e) => updateChartStyle('backgroundColor', (e.target as HTMLInputElement).value)" />
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="2" y="2" width="10" height="10" rx="1.5" :fill="chartEl.style.backgroundColor ?? '#ffffff'" stroke="#94a3b8" stroke-width="0.8"/>
+          </svg>
+        </label>
       </div>
     </template>
 

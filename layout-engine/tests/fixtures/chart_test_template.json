@@ -1,0 +1,131 @@
+{
+  "id": "chart_test",
+  "name": "Chart Visual Test",
+  "page": { "width": 210, "height": 297 },
+  "fonts": ["Noto Sans"],
+  "root": {
+    "id": "root",
+    "type": "container",
+    "position": { "type": "flow" },
+    "size": { "width": { "type": "auto" }, "height": { "type": "auto" } },
+    "direction": "column",
+    "gap": 8,
+    "padding": { "top": 15, "right": 15, "bottom": 15, "left": 15 },
+    "align": "stretch",
+    "justify": "start",
+    "style": {},
+    "children": [
+      {
+        "id": "bar_chart",
+        "type": "chart",
+        "position": { "type": "flow" },
+        "size": {
+          "width": { "type": "fr", "value": 1 },
+          "height": { "type": "fixed", "value": 80 }
+        },
+        "chartType": "bar",
+        "dataSource": { "path": "satis" },
+        "categoryField": "ay",
+        "valueField": "gelir",
+        "groupField": "kanal",
+        "groupMode": "grouped",
+        "title": {
+          "text": "Aylik Satis Geliri",
+          "fontSize": 4.0,
+          "color": "#1a1a1a"
+        },
+        "legend": {
+          "show": true,
+          "position": "bottom",
+          "fontSize": 2.8
+        },
+        "labels": {
+          "show": true,
+          "fontSize": 2.2,
+          "color": "#333333"
+        },
+        "axis": {
+          "xLabel": "Aylar",
+          "yLabel": "Gelir (TL)",
+          "showGrid": true,
+          "gridColor": "#E5E7EB"
+        },
+        "style": {
+          "colors": ["#4F46E5", "#10B981", "#F59E0B"],
+          "backgroundColor": "#FFFFFF",
+          "barGap": 0.2
+        }
+      },
+      {
+        "id": "line_chart",
+        "type": "chart",
+        "position": { "type": "flow" },
+        "size": {
+          "width": { "type": "fr", "value": 1 },
+          "height": { "type": "fixed", "value": 80 }
+        },
+        "chartType": "line",
+        "dataSource": { "path": "trend" },
+        "categoryField": "hafta",
+        "valueField": "ziyaretci",
+        "groupField": "kaynak",
+        "title": {
+          "text": "Haftalik Ziyaretci Trendi",
+          "fontSize": 4.0,
+          "color": "#1a1a1a"
+        },
+        "legend": {
+          "show": true,
+          "position": "bottom",
+          "fontSize": 2.8
+        },
+        "labels": {
+          "show": false
+        },
+        "axis": {
+          "showGrid": true,
+          "gridColor": "#E5E7EB"
+        },
+        "style": {
+          "colors": ["#EF4444", "#8B5CF6"],
+          "backgroundColor": "#FFFFFF",
+          "lineWidth": 0.5,
+          "showPoints": true
+        }
+      },
+      {
+        "id": "pie_chart",
+        "type": "chart",
+        "position": { "type": "flow" },
+        "size": {
+          "width": { "type": "fr", "value": 1 },
+          "height": { "type": "fixed", "value": 80 }
+        },
+        "chartType": "pie",
+        "dataSource": { "path": "dagilim" },
+        "categoryField": "kategori",
+        "valueField": "oran",
+        "title": {
+          "text": "Kategori Dagilimi",
+          "fontSize": 4.0,
+          "color": "#1a1a1a"
+        },
+        "legend": {
+          "show": true,
+          "position": "right",
+          "fontSize": 2.8
+        },
+        "labels": {
+          "show": true,
+          "fontSize": 2.5,
+          "color": "#FFFFFF"
+        },
+        "style": {
+          "colors": ["#4F46E5", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"],
+          "backgroundColor": "#FFFFFF",
+          "innerRadius": 0.0
+        }
+      }
+    ]
+  }
+}
