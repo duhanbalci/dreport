@@ -2,6 +2,7 @@
 node_modules/
 dist/
 *.wasm
+*.pdf
 .DS_Store
 
 # Visual test artifacts (regenerated on demand)
