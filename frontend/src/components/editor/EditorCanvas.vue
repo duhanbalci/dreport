@@ -45,9 +45,23 @@ provide('generateBarcode', generateBarcode)
 
 watch(error, (val) => emit('compile-error', val))
 
-// mm → px dönüşüm katsayısı
+// ============================================================
+// Zoom gesture: CSS transform ile anlık geri bildirim,
+// debounce ile gerçek scale commit
+// ============================================================
+
+// committedZoom: son commit edilen zoom seviyesi (bu değer scale'i belirler)
+const committedZoom = ref(editorStore.zoom)
+// Gesture sırasında hedef zoom/pan (henüz commit edilmedi)
+const gestureZoom = ref(editorStore.zoom)
+const gesturePanX = ref(editorStore.panX)
+const gesturePanY = ref(editorStore.panY)
+const isZoomGesture = ref(false)
+let zoomCommitTimer: ReturnType<typeof setTimeout> | null = null
+
+// mm → px dönüşüm katsayısı (committed zoom'a bağlı)
 const scale = computed(() => {
-  return (containerWidth.value / templateStore.template.page.width) * editorStore.zoom
+  return (containerWidth.value / templateStore.template.page.width) * committedZoom.value
 })
 
 // Layout sayfaları
@@ -56,7 +70,50 @@ const layoutPages = computed(() => layout.value?.pages ?? [])
 // Sayfa yüksekliği px cinsinden
 const pageHeightPx = computed(() => templateStore.template.page.height * scale.value)
 
-// Sayfalar container stili — tüm sayfaları kapsayan dış kutu
+// Görünür sayfa indeksleri — viewport dışındaki sayfaların DOM elemanları render edilmez
+// Stabil: sadece gerçek indeksler değiştiğinde yeni Set oluştur
+const _lastVisibleKey = ref('')
+const _lastVisibleSet = ref(new Set<number>([0]))
+
+const visiblePageIndices = computed(() => {
+  // Gesture sırasında gesture değerlerini, yoksa store değerlerini kullan
+  const currentPanY = isZoomGesture.value ? gesturePanY.value : editorStore.panY
+  const currentZoom = isZoomGesture.value ? gestureZoom.value : editorStore.zoom
+  const baseScale = containerWidth.value / templateStore.template.page.width
+  const currentScale = baseScale * currentZoom
+  const pageH = templateStore.template.page.height * currentScale
+  const gap = 24
+  const count = layoutPages.value.length
+  if (count === 0) return _lastVisibleSet.value
+
+  const pagesTop = 60 + currentPanY
+  const viewH = containerHeight.value
+
+  const indices: number[] = []
+  for (let i = 0; i < count; i++) {
+    const pageTop = pagesTop + i * (pageH + gap)
+    const pageBottom = pageTop + pageH
+    const buffer = pageH
+    if (pageBottom > -buffer && pageTop < viewH + buffer) {
+      indices.push(i)
+    }
+  }
+
+  const key = indices.join(',')
+  if (key !== _lastVisibleKey.value) {
+    _lastVisibleKey.value = key
+    _lastVisibleSet.value = new Set(indices)
+  }
+  return _lastVisibleSet.value
+})
+
+// CSS transform zoom oranı — gesture sırasında visual feedback
+const zoomCssRatio = computed(() => {
+  if (!isZoomGesture.value) return 1
+  return gestureZoom.value / committedZoom.value
+})
+
+// Sayfalar container stili — committed scale'e göre
 const pagesContainerStyle = computed(() => {
   const w = templateStore.template.page.width * scale.value
   const m = templateStore.template.root.padding
@@ -68,6 +125,7 @@ const pagesContainerStyle = computed(() => {
     height: `${totalH}px`,
     position: 'relative' as const,
     flexShrink: 0,
+    willChange: 'transform' as const,
     '--page-margin-top': `${m.top * scale.value}px`,
     '--page-margin-right': `${m.right * scale.value}px`,
     '--page-margin-bottom': `${m.bottom * scale.value}px`,
@@ -76,19 +134,19 @@ const pagesContainerStyle = computed(() => {
 })
 
 // Pan sınırları
-// pan=0 → sayfa yatayda viewport ortasında, dikeyde üstte.
-// Kural: sayfanın en az yarısı viewport'ta görünsün.
-function clampPan(x: number, y: number): [number, number] {
-  const pageW = templateStore.template.page.width * scale.value
+function clampPan(x: number, y: number, zoomOverride?: number): [number, number] {
+  const z = zoomOverride ?? committedZoom.value
+  const baseScale = containerWidth.value / templateStore.template.page.width
+  const s = baseScale * z
+  const pageW = templateStore.template.page.width * s
   const pageCount = Math.max(1, layoutPages.value.length)
   const pageGap = 24
-  const totalH = pageHeightPx.value * pageCount + pageGap * (pageCount - 1)
+  const phPx = templateStore.template.page.height * s
+  const totalH = phPx * pageCount + pageGap * (pageCount - 1)
 
   const viewH = (containerRef.value?.clientHeight ?? 600) - 60 - 40
 
-  // Yatay: pageLeft = (viewW - pageW)/2 + panX → sayfanın yarısı viewport'ta kalmalı
   const clampX = pageW / 2
-  // Dikey: pageTop = panY → sayfanın yarısı viewport'ta kalmalı
   const maxY = viewH * 0.5
   const minY = viewH * 0.5 - totalH
 
@@ -98,11 +156,70 @@ function clampPan(x: number, y: number): [number, number] {
   ]
 }
 
-// Pan transform — sayfa container'ına uygulanacak
-const panTransform = computed(() => {
-  if (editorStore.panX === 0 && editorStore.panY === 0) return undefined
-  return `translate(${editorStore.panX}px, ${editorStore.panY}px)`
+// Pages container transform — pan + gesture zoom CSS scale
+const pagesTransform = computed(() => {
+  const ratio = zoomCssRatio.value
+  const panX = isZoomGesture.value ? gesturePanX.value : editorStore.panX
+  const panY = isZoomGesture.value ? gesturePanY.value : editorStore.panY
+
+  if (ratio === 1) {
+    if (panX === 0 && panY === 0) return undefined
+    return `translate(${panX}px, ${panY}px)`
+  }
+
+  // Scale from top-left (0 0). Centering düzeltmesi:
+  // Flex container ortalar → naturalLeft = (containerW - w) / 2
+  // Scale sonrası visual width = w * ratio, visual center kayar
+  // Düzeltme: tx += w * (1 - ratio) / 2
+  const w = templateStore.template.page.width * scale.value
+  const centerCorrection = w * (1 - ratio) / 2
+  const tx = panX + centerCorrection
+  const ty = panY
+
+  return `translate(${tx}px, ${ty}px) scale(${ratio})`
 })
+
+const pagesTransformOrigin = computed(() => {
+  if (zoomCssRatio.value === 1) return undefined
+  return '0 0'
+})
+
+// Zoom commit: gesture sonunda gerçek scale'i güncelle
+function commitZoom() {
+  const z = gestureZoom.value
+  const px = gesturePanX.value
+  let py = gesturePanY.value
+
+  const ratio = z / committedZoom.value
+  const pageCount = layoutPages.value.length
+
+  // Gap düzeltmesi: CSS scale sırasında 24px gap'ler de ratio ile ölçekleniyor.
+  // Commit sonrası gap'ler tekrar 24px'e dönüyor → dikey kayma.
+  // Viewport merkezindeki sayfanın üstündeki gap sayısı × 24 × (ratio - 1) kadar düzelt.
+  if (ratio !== 1 && pageCount > 1) {
+    const pageH_dom = templateStore.template.page.height * scale.value // committed scale'de
+    const strideVisual = (pageH_dom + 24) * ratio
+
+    // Viewport merkezinin container visual koordinatındaki Y pozisyonu
+    const viewCenterY = containerHeight.value / 2 - 60 - py
+    if (viewCenterY > 0 && strideVisual > 0) {
+      const gapsAbove = Math.min(pageCount - 1, Math.max(0, Math.floor(viewCenterY / strideVisual)))
+      py += gapsAbove * 24 * (ratio - 1)
+    }
+  }
+
+  committedZoom.value = z
+  editorStore.setZoom(z)
+  const [cx, cy] = clampPan(px, py, z)
+  editorStore.setPan(cx, cy)
+  isZoomGesture.value = false
+  zoomCommitTimer = null
+}
+
+function scheduleZoomCommit() {
+  if (zoomCommitTimer) clearTimeout(zoomCommitTimer)
+  zoomCommitTimer = setTimeout(commitZoom, 120)
+}
 
 // Pan: Space+drag veya orta fare tuşu
 const isPanning = ref(false)
@@ -137,8 +254,17 @@ onMounted(() => {
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
   dispose()
+  if (zoomCommitTimer) clearTimeout(zoomCommitTimer)
   window.removeEventListener('keydown', onKeyDown)
   window.removeEventListener('keyup', onKeyUp)
+})
+
+// Store'daki zoom değiştiğinde (dışarıdan, ör. zoom butonları) committed'ı da güncelle
+watch(() => editorStore.zoom, (z) => {
+  if (!isZoomGesture.value) {
+    committedZoom.value = z
+    gestureZoom.value = z
+  }
 })
 
 // Zoom & Pan via wheel/trackpad
@@ -170,8 +296,17 @@ function onWheel(e: WheelEvent) {
   } else {
     // İki parmak pan (touchpad) veya normal scroll
     e.preventDefault()
-    const [cx, cy] = clampPan(editorStore.panX - e.deltaX, editorStore.panY - e.deltaY)
-    editorStore.setPan(cx, cy)
+    const curPanX = isZoomGesture.value ? gesturePanX.value : editorStore.panX
+    const curPanY = isZoomGesture.value ? gesturePanY.value : editorStore.panY
+    const curZoom = isZoomGesture.value ? gestureZoom.value : editorStore.zoom
+    const [cx, cy] = clampPan(curPanX - e.deltaX, curPanY - e.deltaY, curZoom)
+
+    if (isZoomGesture.value) {
+      gesturePanX.value = cx
+      gesturePanY.value = cy
+    } else {
+      editorStore.setPan(cx, cy)
+    }
   }
 }
 
@@ -179,30 +314,40 @@ function applyZoom(delta: number, clientX: number, clientY: number) {
   const pageEl = pageRef.value
   if (!pageEl) return
 
-  const oldZoom = editorStore.zoom
+  // Gesture başlat veya devam et
+  if (!isZoomGesture.value) {
+    isZoomGesture.value = true
+    gestureZoom.value = editorStore.zoom
+    gesturePanX.value = editorStore.panX
+    gesturePanY.value = editorStore.panY
+  }
+
+  const oldZoom = gestureZoom.value
   const zoomFactor = Math.pow(0.99, delta)
   const newZoom = Math.max(0.25, Math.min(4, oldZoom * zoomFactor))
   if (newZoom === oldZoom) return
 
-  // Sayfa elemanının şu anki ekran pozisyonunu al (centering + pan dahil)
-  const pageRect = pageEl.getBoundingClientRect()
-
   // Mouse'un sayfa üzerindeki pozisyonu (mm cinsinden)
+  // pageRef'in ekran pozisyonunu al (CSS transform dahil)
+  const pageRect = pageEl.getBoundingClientRect()
   const baseScale = containerWidth.value / templateStore.template.page.width
-  const oldScale = baseScale * oldZoom
-  const newScale = baseScale * newZoom
-  const mousePageMmX = (clientX - pageRect.left) / oldScale
-  const mousePageMmY = (clientY - pageRect.top) / oldScale
+  const oldGestureScale = baseScale * oldZoom
+  const newGestureScale = baseScale * newZoom
+  const mousePageMmX = (clientX - pageRect.left) / oldGestureScale
+  const mousePageMmY = (clientY - pageRect.top) / oldGestureScale
 
   const pageW = templateStore.template.page.width
 
   // Yeni pan: mouse'un gösterdiği mm noktası aynı ekran pozisyonunda kalmalı
-  const newPanX = editorStore.panX + (mousePageMmX - pageW / 2) * (oldScale - newScale)
-  const newPanY = editorStore.panY + mousePageMmY * (oldScale - newScale)
+  const newPanX = gesturePanX.value + (mousePageMmX - pageW / 2) * (oldGestureScale - newGestureScale)
+  const newPanY = gesturePanY.value + mousePageMmY * (oldGestureScale - newGestureScale)
 
-  editorStore.setZoom(newZoom)
-  const [cx, cy] = clampPan(newPanX, newPanY)
-  editorStore.setPan(cx, cy)
+  gestureZoom.value = newZoom
+  const [cx, cy] = clampPan(newPanX, newPanY, newZoom)
+  gesturePanX.value = cx
+  gesturePanY.value = cy
+
+  scheduleZoomCommit()
 }
 
 function onKeyDown(e: KeyboardEvent) {
@@ -253,6 +398,12 @@ function onMinimapNavigate(x: number, y: number) {
   const [cx, cy] = clampPan(x, y)
   editorStore.setPan(cx, cy)
 }
+
+// Minimap'e gerçek scale'i geçir (gesture dahil)
+const minimapScale = computed(() => {
+  const z = isZoomGesture.value ? gestureZoom.value : editorStore.zoom
+  return (containerWidth.value / templateStore.template.page.width) * z
+})
 </script>
 
 <template>
@@ -261,9 +412,9 @@ function onMinimapNavigate(x: number, y: number) {
     <RulerBar
       :page-width="templateStore.template.page.width"
       :page-height="templateStore.template.page.height"
-      :scale="scale"
-      :pan-x="editorStore.panX"
-      :pan-y="editorStore.panY"
+      :scale="minimapScale"
+      :pan-x="isZoomGesture ? gesturePanX : editorStore.panX"
+      :pan-y="isZoomGesture ? gesturePanY : editorStore.panY"
       :container-width="containerWidth"
       :page-count="layoutPages.length"
       :page-gap="24"
@@ -283,9 +434,13 @@ function onMinimapNavigate(x: number, y: number) {
       <div
         ref="pageRef"
         class="editor-canvas__pages"
-        :style="[pagesContainerStyle, panTransform ? { transform: panTransform } : {}]"
+        :style="[
+          pagesContainerStyle,
+          pagesTransform ? { transform: pagesTransform } : {},
+          pagesTransformOrigin ? { transformOrigin: pagesTransformOrigin } : {},
+        ]"
       >
-        <LayoutRenderer :layout="layout" :scale="scale" />
+        <LayoutRenderer :layout="layout" :scale="scale" :visible-page-indices="visiblePageIndices" />
         <InteractionOverlay
           :scale="scale"
           :layout-map="layoutMap"
@@ -307,16 +462,16 @@ function onMinimapNavigate(x: number, y: number) {
         :layout="layout"
         :page-width="templateStore.template.page.width"
         :page-height="templateStore.template.page.height"
-        :zoom="editorStore.zoom"
-        :pan-x="editorStore.panX"
-        :pan-y="editorStore.panY"
+        :zoom="isZoomGesture ? gestureZoom : editorStore.zoom"
+        :pan-x="isZoomGesture ? gesturePanX : editorStore.panX"
+        :pan-y="isZoomGesture ? gesturePanY : editorStore.panY"
         :container-width="containerWidth"
         :container-height="containerHeight"
-        :scale="scale"
+        :scale="minimapScale"
         :page-gap="24"
         @navigate="onMinimapNavigate"
       />
-      <div class="editor-canvas__zoom">%{{ editorStore.zoomPercent }}</div>
+      <div class="editor-canvas__zoom">%{{ Math.round((isZoomGesture ? gestureZoom : editorStore.zoom) * 100) }}</div>
     </div>
   </div>
 </template>

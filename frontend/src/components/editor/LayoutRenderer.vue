@@ -5,6 +5,7 @@ import type { ElementLayout, PageLayout, LayoutResult } from '../../core/layout-
 const props = defineProps<{
   layout: LayoutResult | null
   scale: number
+  visiblePageIndices?: Set<number>
 }>()
 
 // WASM barcode üretme fonksiyonu (EditorCanvas'tan provide edilir)
@@ -196,7 +197,7 @@ watch(
       class="layout-page"
       :style="pageContainerStyle(page)"
     >
-      <template v-for="el in page.elements" :key="el.id">
+      <template v-if="!visiblePageIndices || visiblePageIndices.has(pageIdx)" v-for="el in page.elements" :key="el.id">
         <!-- Page break: dashed horizontal line -->
         <div
           v-if="el.element_type === 'page_break'"
