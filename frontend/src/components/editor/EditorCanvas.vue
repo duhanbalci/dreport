@@ -7,6 +7,7 @@ import { useLayoutEngine } from '../../composables/useLayoutEngine'
 import LayoutRenderer from './LayoutRenderer.vue'
 import InteractionOverlay from './InteractionOverlay.vue'
 import RulerBar from './RulerBar.vue'
+import MinimapOverlay from './MinimapOverlay.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -23,6 +24,7 @@ const { template, mockData, layoutVersion } = storeToRefs(templateStore)
 
 const containerRef = ref<HTMLElement | null>(null)
 const containerWidth = ref(800)
+const containerHeight = ref(600)
 
 const emit = defineEmits<{
   'compile-error': [error: string | null]
@@ -73,6 +75,29 @@ const pagesContainerStyle = computed(() => {
   }
 })
 
+// Pan sınırları
+// pan=0 → sayfa yatayda viewport ortasında, dikeyde üstte.
+// Kural: sayfanın en az yarısı viewport'ta görünsün.
+function clampPan(x: number, y: number): [number, number] {
+  const pageW = templateStore.template.page.width * scale.value
+  const pageCount = Math.max(1, layoutPages.value.length)
+  const pageGap = 24
+  const totalH = pageHeightPx.value * pageCount + pageGap * (pageCount - 1)
+
+  const viewH = (containerRef.value?.clientHeight ?? 600) - 60 - 40
+
+  // Yatay: pageLeft = (viewW - pageW)/2 + panX → sayfanın yarısı viewport'ta kalmalı
+  const clampX = pageW / 2
+  // Dikey: pageTop = panY → sayfanın yarısı viewport'ta kalmalı
+  const maxY = viewH * 0.5
+  const minY = viewH * 0.5 - totalH
+
+  return [
+    Math.max(-clampX, Math.min(clampX, x)),
+    Math.max(minY, Math.min(maxY, y)),
+  ]
+}
+
 // Pan transform — sayfa container'ına uygulanacak
 const panTransform = computed(() => {
   if (editorStore.panX === 0 && editorStore.panY === 0) return undefined
@@ -98,7 +123,10 @@ onMounted(() => {
   if (containerRef.value) {
     resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0]
-      if (entry) containerWidth.value = entry.contentRect.width
+      if (entry) {
+        containerWidth.value = entry.contentRect.width
+        containerHeight.value = entry.contentRect.height
+      }
     })
     resizeObserver.observe(containerRef.value)
   }
@@ -142,7 +170,8 @@ function onWheel(e: WheelEvent) {
   } else {
     // İki parmak pan (touchpad) veya normal scroll
     e.preventDefault()
-    editorStore.setPan(editorStore.panX - e.deltaX, editorStore.panY - e.deltaY)
+    const [cx, cy] = clampPan(editorStore.panX - e.deltaX, editorStore.panY - e.deltaY)
+    editorStore.setPan(cx, cy)
   }
 }
 
@@ -172,7 +201,8 @@ function applyZoom(delta: number, clientX: number, clientY: number) {
   const newPanY = editorStore.panY + mousePageMmY * (oldScale - newScale)
 
   editorStore.setZoom(newZoom)
-  editorStore.setPan(newPanX, newPanY)
+  const [cx, cy] = clampPan(newPanX, newPanY)
+  editorStore.setPan(cx, cy)
 }
 
 function onKeyDown(e: KeyboardEvent) {
@@ -208,7 +238,8 @@ function onPointerDown(e: PointerEvent) {
 
 function onPointerMove(e: PointerEvent) {
   if (!isPanning.value) return
-  editorStore.setPan(e.clientX - panStart.value.x, e.clientY - panStart.value.y)
+  const [cx2, cy2] = clampPan(e.clientX - panStart.value.x, e.clientY - panStart.value.y)
+  editorStore.setPan(cx2, cy2)
 }
 
 function onPointerUp(e: PointerEvent) {
@@ -216,6 +247,11 @@ function onPointerUp(e: PointerEvent) {
     isPanning.value = false
     ;(e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId)
   }
+}
+
+function onMinimapNavigate(x: number, y: number) {
+  const [cx, cy] = clampPan(x, y)
+  editorStore.setPan(cx, cy)
 }
 </script>
 
@@ -228,6 +264,9 @@ function onPointerUp(e: PointerEvent) {
       :scale="scale"
       :pan-x="editorStore.panX"
       :pan-y="editorStore.panY"
+      :container-width="containerWidth"
+      :page-count="layoutPages.length"
+      :page-gap="24"
     />
 
     <!-- Scroll alanı -->
@@ -261,7 +300,24 @@ function onPointerUp(e: PointerEvent) {
       {{ error }}
     </div>
     <div v-if="compiling" class="editor-canvas__compiling">Derleniyor...</div>
-    <div class="editor-canvas__zoom">%{{ editorStore.zoomPercent }}</div>
+
+    <!-- Minimap + zoom göstergesi -->
+    <div class="editor-canvas__minimap-area">
+      <MinimapOverlay
+        :layout="layout"
+        :page-width="templateStore.template.page.width"
+        :page-height="templateStore.template.page.height"
+        :zoom="editorStore.zoom"
+        :pan-x="editorStore.panX"
+        :pan-y="editorStore.panY"
+        :container-width="containerWidth"
+        :container-height="containerHeight"
+        :scale="scale"
+        :page-gap="24"
+        @navigate="onMinimapNavigate"
+      />
+      <div class="editor-canvas__zoom">%{{ editorStore.zoomPercent }}</div>
+    </div>
   </div>
 </template>
 
@@ -318,15 +374,22 @@ function onPointerUp(e: PointerEvent) {
   z-index: 100;
 }
 
-.editor-canvas__zoom {
+.editor-canvas__minimap-area {
   position: absolute;
   bottom: 12px;
   right: 16px;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.editor-canvas__zoom {
   background: rgba(0, 0, 0, 0.6);
   color: white;
   border-radius: 4px;
   padding: 2px 8px;
   font-size: 12px;
-  z-index: 100;
 }
 </style>

@@ -12,6 +12,12 @@ const props = defineProps<{
   panX: number
   /** Pan offset Y (px) */
   panY: number
+  /** editor-canvas content width (px) — ResizeObserver'dan */
+  containerWidth: number
+  /** Sayfa sayısı */
+  pageCount: number
+  /** Sayfalar arası boşluk (px) */
+  pageGap?: number
   /** Cetvel kalınlığı px */
   rulerSize?: number
 }>()
@@ -69,19 +75,8 @@ function drawTicks(
   size: number,
 ) {
   const s = props.scale
-  const pageMm = direction === 'horizontal' ? props.pageWidth : props.pageHeight
-  const pan = direction === 'horizontal' ? props.panX : props.panY
-
-  // Sayfa başlangıcı: ortaya hizalı + pan
-  // EditorCanvas sayfayı ortalar, ruler da buna uymalı
-  // Yatay: canvas ortası - sayfa genişliği/2
-  // Sayfanın canvas üzerindeki orijin px'i
-  const canvasCenter =
-    direction === 'horizontal'
-      ? length / 2 // flex centering approximation
-      : 40 // EditorCanvas padding-top: 40px
-
-  const pageStartPx = canvasCenter - (pageMm * s) / 2 + pan
+  const rulerSz = RULER_SIZE.value
+  const gap = props.pageGap ?? 24
 
   // Tick aralığı belirleme (zoom'a göre)
   const mmPerPx = 1 / s
@@ -98,11 +93,41 @@ function drawTicks(
   ctx.font = '9px system-ui, sans-serif'
   ctx.textBaseline = 'top'
 
-  // Sayfanın mm aralığını çiz
-  const startMm = 0
-  const endMm = pageMm
+  if (direction === 'horizontal') {
+    // Yatay cetvel: tek sayfa genişliği, flex-center ile hizalı
+    // editor-canvas padding: left=60, right=40; ruler canvas left=rulerSize
+    // pageLeft_in_wrapper = 60 + (containerWidth - pageWidthPx) / 2
+    // pageLeft_in_ruler = pageLeft_in_wrapper - rulerSz + panX
+    const pageWidthPx = props.pageWidth * s
+    const pageStartPx = (60 - rulerSz) + (props.containerWidth - pageWidthPx) / 2 + props.panX
 
-  for (let mm = startMm; mm <= endMm; mm += tickMm) {
+    drawPageTicks(ctx, direction, length, size, pageStartPx, props.pageWidth, tickMm)
+  } else {
+    // Dikey cetvel: her sayfa için ayrı tick çiz
+    // editor-canvas padding-top=60; ruler canvas top=rulerSize
+    // pageTop for page i = (60 - rulerSz) + panY + i * (pageHeightPx + gap)
+    const pageHeightPx = props.pageHeight * s
+    const pageCount = Math.max(1, props.pageCount)
+
+    for (let i = 0; i < pageCount; i++) {
+      const pageStartPx = (60 - rulerSz) + props.panY + i * (pageHeightPx + gap)
+      drawPageTicks(ctx, direction, length, size, pageStartPx, props.pageHeight, tickMm)
+    }
+  }
+}
+
+function drawPageTicks(
+  ctx: CanvasRenderingContext2D,
+  direction: 'horizontal' | 'vertical',
+  length: number,
+  size: number,
+  pageStartPx: number,
+  pageMm: number,
+  tickMm: number,
+) {
+  const s = props.scale
+
+  for (let mm = 0; mm <= pageMm; mm += tickMm) {
     const px = pageStartPx + mm * s
 
     if (px < -10 || px > length + 10) continue
@@ -141,7 +166,7 @@ function drawTicks(
     }
   }
 
-  // Sayfa kenar çizgileri (margin göstergesi)
+  // Sayfa kenar çizgileri
   ctx.strokeStyle = 'rgba(59, 130, 246, 0.3)'
   ctx.lineWidth = 1
   const startPx = pageStartPx
@@ -159,6 +184,11 @@ function drawTicks(
     ctx.lineTo(size, endPx)
   }
   ctx.stroke()
+
+  // Renkleri geri al (sonraki sayfa için)
+  ctx.fillStyle = '#94a3b8'
+  ctx.strokeStyle = '#94a3b8'
+  ctx.lineWidth = 0.5
 }
 
 function redraw() {
@@ -166,7 +196,7 @@ function redraw() {
   drawRuler(vCanvas.value, 'vertical')
 }
 
-watch(() => [props.scale, props.panX, props.panY, props.pageWidth, props.pageHeight], redraw)
+watch(() => [props.scale, props.panX, props.panY, props.pageWidth, props.pageHeight, props.containerWidth, props.pageCount], redraw)
 
 let resizeObserver: ResizeObserver | null = null
 
@@ -205,7 +235,7 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 0;
   left: 20px;
-  right: 0;
+  width: calc(100% - 20px);
   z-index: 50;
   pointer-events: none;
 }
@@ -214,7 +244,7 @@ onBeforeUnmount(() => {
   position: absolute;
   top: 20px;
   left: 0;
-  bottom: 0;
+  height: calc(100% - 20px);
   z-index: 50;
   pointer-events: none;
 }

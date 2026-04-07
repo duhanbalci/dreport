@@ -12,7 +12,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 dreport-core = { version = "0.2.0", path = "../core", registry = "gitea" }
-dexpr = { version = "0.1.0", registry = "gitea" }
+dexpr = { version = "0.3.0", registry = "gitea" }
 rust_decimal = "1.41"
 taffy = "0.9"
 cosmic-text = { version = "0.18", default-features = false, features = ["std", "swash"] }

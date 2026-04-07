@@ -64,7 +64,9 @@ pub struct YTick {
 
 pub struct XLabelLayout {
     pub labels: Vec<XLabel>,
-    pub needs_rotate: bool,
+    /// Rotation angle in degrees (0 = horizontal, 90 = fully vertical).
+    /// Dynamically computed based on available space vs label length.
+    pub rotate_angle: f64,
 }
 
 pub struct XLabel {
@@ -545,14 +547,14 @@ pub fn compute_chart_layout(
         } else {
             available_w
         };
-        let max_chars_fit = (cat_width / 1.25).max(1.0) as usize;
-        let will_rotate = max_label_len > max_chars_fit;
-        if will_rotate {
-            let char_w_mm = 1.1;
+        let rotate_angle = compute_label_rotation(max_label_len, cat_width);
+        if rotate_angle > 0.0 {
+            let char_w_mm = 2.5 * 0.6;
             let max_text_w = max_label_len as f64 * char_w_mm;
-            let label_v = max_text_w * 0.707;
+            let angle_rad = rotate_angle.to_radians();
+            let label_v = max_text_w * angle_rad.sin();
             margin_bottom += label_v.clamp(6.0, 25.0);
-            let label_h = max_text_w * 0.707;
+            let label_h = max_text_w * angle_rad.cos();
             let extra_left = (label_h - cat_width / 2.0).max(0.0);
             margin_left += extra_left.min(10.0);
         } else {
@@ -622,6 +624,29 @@ pub fn compute_y_axis(
     }
 }
 
+/// Compute dynamic label rotation angle (degrees) based on available space.
+/// Uses Chart.js-style algorithm: rotate only when labels overflow their slot,
+/// and use the minimum angle that prevents overlap.
+fn compute_label_rotation(max_label_len: usize, slot_width: f64) -> f64 {
+    let label_font_size = 2.5_f64;
+    let char_w_mm = label_font_size * 0.6;
+    let max_label_w = max_label_len as f64 * char_w_mm;
+    let padding = label_font_size * 0.5;
+
+    // Labels fit horizontally — no rotation needed
+    if (max_label_w + padding) <= slot_width {
+        return 0.0;
+    }
+
+    // Chart.js Constraint A: sin(angle) = (label_height + padding) / slot_width
+    // This finds the minimum angle where the rotated label's projected height
+    // fits within the tick slot width, preventing horizontal overlap.
+    let label_h = label_font_size;
+    let sin_val = ((label_h + padding) / slot_width).clamp(0.0, 1.0);
+    let angle_deg = sin_val.asin().to_degrees();
+    angle_deg.clamp(0.0, 50.0)
+}
+
 /// Compute X label positions for bar chart (slot-based spacing).
 pub fn compute_x_labels_bar(
     categories: &[String],
@@ -633,12 +658,12 @@ pub fn compute_x_labels_bar(
     if n_cats == 0 {
         return XLabelLayout {
             labels: vec![],
-            needs_rotate: false,
+            rotate_angle: 0.0,
         };
     }
     let cat_width = pw / n_cats as f64;
-    let max_chars = (cat_width / 1.25).max(1.0) as usize;
-    let needs_rotate = categories.iter().any(|c| c.len() > max_chars);
+    let max_label_len = categories.iter().map(|c| c.len()).max().unwrap_or(0);
+    let rotate_angle = compute_label_rotation(max_label_len, cat_width);
     let labels = categories
         .iter()
         .enumerate()
@@ -650,7 +675,7 @@ pub fn compute_x_labels_bar(
         .collect();
     XLabelLayout {
         labels,
-        needs_rotate,
+        rotate_angle,
     }
 }
 
@@ -665,7 +690,7 @@ pub fn compute_x_labels_line(
     if n_cats == 0 {
         return XLabelLayout {
             labels: vec![],
-            needs_rotate: false,
+            rotate_angle: 0.0,
         };
     }
     let spacing = if n_cats == 1 {
@@ -673,8 +698,8 @@ pub fn compute_x_labels_line(
     } else {
         pw / (n_cats - 1) as f64
     };
-    let max_chars = (spacing / 1.25).max(1.0) as usize;
-    let needs_rotate = categories.iter().any(|c| c.len() > max_chars);
+    let max_label_len = categories.iter().map(|c| c.len()).max().unwrap_or(0);
+    let rotate_angle = compute_label_rotation(max_label_len, spacing);
     let labels = categories
         .iter()
         .enumerate()
@@ -693,7 +718,7 @@ pub fn compute_x_labels_line(
         .collect();
     XLabelLayout {
         labels,
-        needs_rotate,
+        rotate_angle,
     }
 }
 

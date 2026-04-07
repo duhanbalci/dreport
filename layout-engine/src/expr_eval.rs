@@ -65,6 +65,10 @@ fn dexpr_value_to_string(val: &DexprValue) -> String {
                 .collect();
             format!("{{{}}}", items.join(", "))
         }
+        DexprValue::List(list) => {
+            let items: Vec<String> = list.iter().map(|v| dexpr_value_to_string(v)).collect();
+            format!("[{}]", items.join(", "))
+        }
     }
 }
 
@@ -357,5 +361,32 @@ mod tests {
             decimal_separator: ".".to_string(),
         };
         assert_eq!(format_currency("1500.25", &config), "$1,500.25");
+    }
+
+    #[test]
+    fn test_array_field_sum() {
+        let data = json!({
+            "kalemler": [
+                {"adi": "A", "tutar": 100},
+                {"adi": "B", "tutar": 200},
+                {"adi": "C", "tutar": 50}
+            ]
+        });
+        assert_eq!(evaluate_expression("kalemler.tutar.sum()", &data), "350");
+    }
+
+    #[test]
+    fn test_array_field_sum_in_arithmetic() {
+        let data = json!({
+            "kalemler": [
+                {"tutar": 1000},
+                {"tutar": 2000}
+            ],
+            "toplamlar": {"kdvOrani": 20}
+        });
+        assert_eq!(
+            evaluate_expression("kalemler.tutar.sum() * toplamlar.kdvOrani / 100", &data),
+            "600"
+        );
     }
 }

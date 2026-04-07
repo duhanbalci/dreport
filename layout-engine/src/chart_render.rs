@@ -337,12 +337,13 @@ fn render_y_axis_svg(svg: &mut String, y_axis: &chart_layout::YAxisLayout) {
 }
 
 fn render_x_labels_svg(svg: &mut String, x_labels: &chart_layout::XLabelLayout) {
+    let angle = x_labels.rotate_angle;
     for label in &x_labels.labels {
-        if x_labels.needs_rotate {
+        if angle > 0.0 {
             write!(
                 svg,
-                r##"<text x="{:.2}" y="{:.2}" font-size="2.2" fill="#666" text-anchor="end" transform="rotate(-45,{:.2},{:.2})">{}</text>"##,
-                label.x, label.y, label.x, label.y, escape_xml(&label.text)
+                r##"<text x="{:.2}" y="{:.2}" font-size="2.2" fill="#666" text-anchor="end" transform="rotate(-{:.1},{:.2},{:.2})">{}</text>"##,
+                label.x, label.y, angle, label.x, label.y, escape_xml(&label.text)
             )
             .unwrap();
         } else {

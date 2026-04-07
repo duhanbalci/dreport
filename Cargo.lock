@@ -397,9 +397,9 @@ dependencies = [
 
 [[package]]
 name = "dexpr"
-version = "0.1.0"
+version = "0.3.0"
 source = "sparse+https://gitea.duhanbalci.com/api/packages/duhanbalci/cargo/"
-checksum = "37e0a98f2810bb770c76ef1e99d07066a15997086f9ead93917a82711274af25"
+checksum = "e65e74adffaab8b52681e3e3e5006365f0f8c5e3e07870cbd58ca74769eb150a"
 dependencies = [
  "bumpalo",
  "indexmap",

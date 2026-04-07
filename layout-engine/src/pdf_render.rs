@@ -1406,11 +1406,13 @@ fn render_chart_x_labels(
     fonts: &FontCollection,
     measurer: &mut TextMeasurer,
 ) {
+    let angle = x_labels.rotate_angle;
     for label in &x_labels.labels {
-        if x_labels.needs_rotate {
+        if angle > 0.0 {
             surface.push_transform(&Transform::from_translate(pt(label.x), pt(label.y)));
-            let c = std::f32::consts::FRAC_PI_4.cos();
-            let s = std::f32::consts::FRAC_PI_4.sin();
+            let angle_rad = (angle as f32).to_radians();
+            let c = angle_rad.cos();
+            let s = angle_rad.sin();
             surface.push_transform(&Transform::from_row(c, -s, s, c, 0.0, 0.0));
             chart_text_end(
                 surface,
