@@ -1,13 +1,21 @@
 <script setup lang="ts">
 import { useTemplateStore } from '../../stores/template'
+import PropSection from './shared/PropSection.vue'
+import PropSelect from './shared/PropSelect.vue'
+import PropNumberInput from './shared/PropNumberInput.vue'
 import type { TemplateElement } from '../../core/types'
 import '../../styles/properties.css'
 
 const props = defineProps<{ element: TemplateElement }>()
 const templateStore = useTemplateStore()
 
-function togglePositioning() {
-  if (props.element.position.type === 'flow') {
+const positionOptions = [
+  { value: 'flow', label: 'Flow' },
+  { value: 'absolute', label: 'Absolute' },
+]
+
+function togglePositioning(value: string) {
+  if (value === 'absolute') {
     templateStore.updateElementPosition(props.element.id, { type: 'absolute', x: 0, y: 0 })
   } else {
     templateStore.updateElementPosition(props.element.id, { type: 'flow' })
@@ -16,54 +24,43 @@ function togglePositioning() {
 </script>
 
 <template>
-  <div class="prop-section">
-    <div class="prop-section__title">Pozisyon</div>
-    <div class="prop-row" data-tip="Flow: otomatik dizilim, Absolute: sabit konum">
-      <label class="prop-label">Mod</label>
-      <select
-        class="prop-input prop-select"
-        :value="element.position.type"
-        @change="togglePositioning"
-      >
-        <option value="flow">Flow</option>
-        <option value="absolute">Absolute</option>
-      </select>
-    </div>
+  <PropSection title="Pozisyon">
+    <PropSelect
+      label="Mod"
+      :model-value="element.position.type"
+      :options="positionOptions"
+      data-tip="Flow: otomatik dizilim, Absolute: sabit konum"
+      @update:model-value="togglePositioning"
+    />
     <template v-if="element.position.type === 'absolute'">
-      <div class="prop-row" data-tip="Yatay pozisyon — parent sol kenardan uzaklik (mm)">
-        <label class="prop-label">X (mm)</label>
-        <input
-          class="prop-input"
-          type="number"
-          step="0.5"
-          :value="element.position.x"
-          @input="
-            (e) =>
-              templateStore.updateElementPosition(element.id, {
-                type: 'absolute',
-                x: parseFloat((e.target as HTMLInputElement).value) || 0,
-                y: (element.position as any).y ?? 0,
-              })
-          "
-        />
-      </div>
-      <div class="prop-row" data-tip="Dikey pozisyon — parent ust kenardan uzaklik (mm)">
-        <label class="prop-label">Y (mm)</label>
-        <input
-          class="prop-input"
-          type="number"
-          step="0.5"
-          :value="element.position.y"
-          @input="
-            (e) =>
-              templateStore.updateElementPosition(element.id, {
-                type: 'absolute',
-                x: (element.position as any).x ?? 0,
-                y: parseFloat((e.target as HTMLInputElement).value) || 0,
-              })
-          "
-        />
-      </div>
+      <PropNumberInput
+        label="X (mm)"
+        :model-value="(element.position as any).x ?? 0"
+        :step="0.5"
+        data-tip="Yatay pozisyon — parent sol kenardan uzaklik (mm)"
+        @update:model-value="
+          (v) =>
+            templateStore.updateElementPosition(element.id, {
+              type: 'absolute',
+              x: v,
+              y: (element.position as any).y ?? 0,
+            })
+        "
+      />
+      <PropNumberInput
+        label="Y (mm)"
+        :model-value="(element.position as any).y ?? 0"
+        :step="0.5"
+        data-tip="Dikey pozisyon — parent ust kenardan uzaklik (mm)"
+        @update:model-value="
+          (v) =>
+            templateStore.updateElementPosition(element.id, {
+              type: 'absolute',
+              x: (element.position as any).x ?? 0,
+              y: v,
+            })
+        "
+      />
     </template>
-  </div>
+  </PropSection>
 </template>

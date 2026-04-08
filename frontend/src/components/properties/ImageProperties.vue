@@ -1,28 +1,28 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useTemplateStore } from '../../stores/template'
-import { useEditorStore } from '../../stores/editor'
+import { usePropertyUpdate } from '../../composables/usePropertyUpdate'
 import { useSchemaStore } from '../../stores/schema'
-import type { ImageElement, TemplateElement } from '../../core/types'
+import PropSection from './shared/PropSection.vue'
+import PropSelect from './shared/PropSelect.vue'
+import PropFieldSelect from './shared/PropFieldSelect.vue'
+import type { ImageElement } from '../../core/types'
 import '../../styles/properties.css'
 
 const props = defineProps<{ element: ImageElement }>()
-const templateStore = useTemplateStore()
-const editorStore = useEditorStore()
+const { update, updateStyle } = usePropertyUpdate(() => props.element)
 const schemaStore = useSchemaStore()
 
-/** Statik mi dinamik mi? */
 const isDynamic = computed(() => !!props.element.binding)
 
-function update(updates: Partial<TemplateElement>) {
-  const id = editorStore.selectedElementId
-  if (!id) return
-  templateStore.updateElement(id, updates)
-}
+const imageScalarFields = computed(() =>
+  schemaStore.scalarFields.filter((f) => f.format === 'image' || f.type === 'string'),
+)
 
-function updateStyle(key: string, value: unknown) {
-  update({ style: { ...props.element.style, [key]: value } } as Partial<TemplateElement>)
-}
+const fitOptions = [
+  { value: 'contain', label: 'Sigdir' },
+  { value: 'cover', label: 'Kap' },
+  { value: 'stretch', label: 'Esnet' },
+]
 
 function onImageFileSelect(e: Event) {
   const input = e.target as HTMLInputElement
@@ -30,40 +30,24 @@ function onImageFileSelect(e: Event) {
   if (!file) return
   const reader = new FileReader()
   reader.onload = () => {
-    update({ src: reader.result as string, binding: undefined } as Partial<TemplateElement>)
+    update({ src: reader.result as string, binding: undefined } as any)
   }
   reader.readAsDataURL(file)
 }
 
 function setMode(mode: 'static' | 'dynamic') {
   if (mode === 'static') {
-    update({ binding: undefined } as Partial<TemplateElement>)
+    update({ binding: undefined } as any)
   } else {
-    // Dinamik moda geç — ilk uygun alanı seç veya boş bırak
-    const imageFields = schemaStore.scalarFields.filter(
-      (f) => f.format === 'image' || f.type === 'string',
-    )
-    const path = imageFields.length > 0 ? imageFields[0].path : ''
-    update({ src: undefined, binding: { type: 'scalar', path } } as Partial<TemplateElement>)
+    const path = imageScalarFields.value.length > 0 ? imageScalarFields.value[0].path : ''
+    update({ src: undefined, binding: { type: 'scalar', path } } as any)
   }
 }
-
-function setBindingPath(path: string) {
-  update({ binding: { type: 'scalar', path } } as Partial<TemplateElement>)
-}
-
-/** Schema'dan görsel olabilecek alanlar (format: image veya string) */
-const imageScalarFields = computed(() => {
-  return schemaStore.scalarFields.filter((f) => f.format === 'image' || f.type === 'string')
-})
 </script>
 
 <template>
-  <div class="prop-section">
-    <div class="prop-section__title">Gorsel</div>
-
-    <!-- Statik / Dinamik toggle -->
-    <div class="prop-row" data-tip="Gorsel kaynagi: dosya veya veri alanından">
+  <PropSection title="Gorsel">
+    <div class="prop-row" data-tip="Gorsel kaynagi: dosya veya veri alanindan">
       <label class="prop-label">Mod</label>
       <div class="prop-toggle-group">
         <button
@@ -83,7 +67,6 @@ const imageScalarFields = computed(() => {
       </div>
     </div>
 
-    <!-- Statik: dosya seçimi -->
     <template v-if="!isDynamic">
       <div class="prop-row" data-tip="Gorsel dosyasi secin (PNG, JPG, SVG)">
         <label class="prop-label">Kaynak</label>
@@ -104,41 +87,28 @@ const imageScalarFields = computed(() => {
       </div>
     </template>
 
-    <!-- Dinamik: schema alan seçimi -->
     <template v-else>
-      <div class="prop-row" data-tip="Gorsel URL'sinin gelecegi veri alani">
-        <label class="prop-label">Veri Alani</label>
-        <select
-          class="prop-input prop-select"
-          :value="element.binding?.path ?? ''"
-          @change="(e) => setBindingPath((e.target as HTMLSelectElement).value)"
-        >
-          <option value="" disabled>Secin...</option>
-          <option v-for="field in imageScalarFields" :key="field.path" :value="field.path">
-            {{ field.title }} ({{ field.path }})
-          </option>
-        </select>
-      </div>
+      <PropFieldSelect
+        label="Veri Alani"
+        :model-value="element.binding?.path ?? ''"
+        :fields="imageScalarFields"
+        data-tip="Gorsel URL'sinin gelecegi veri alani"
+        @update:model-value="(v) => update({ binding: { type: 'scalar', path: v } } as any)"
+      />
       <div v-if="element.binding?.path" class="prop-row">
         <label class="prop-label">Path</label>
         <span class="prop-info">{{ element.binding.path }}</span>
       </div>
     </template>
 
-    <!-- Sığdırma modu (ortak) -->
-    <div class="prop-row" data-tip="Gorselin alana sigdirma modu">
-      <label class="prop-label">Sigdirma</label>
-      <select
-        class="prop-input prop-select"
-        :value="element.style.objectFit ?? 'contain'"
-        @change="(e) => updateStyle('objectFit', (e.target as HTMLSelectElement).value)"
-      >
-        <option value="contain">Sigdir</option>
-        <option value="cover">Kap</option>
-        <option value="stretch">Esnet</option>
-      </select>
-    </div>
-  </div>
+    <PropSelect
+      label="Sigdirma"
+      :model-value="element.style.objectFit ?? 'contain'"
+      :options="fitOptions"
+      data-tip="Gorselin alana sigdirma modu"
+      @update:model-value="(v) => updateStyle('objectFit', v)"
+    />
+  </PropSection>
 </template>
 
 <style scoped>

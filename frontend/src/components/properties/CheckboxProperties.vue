@@ -1,63 +1,44 @@
 <script setup lang="ts">
-import { useTemplateStore } from '../../stores/template'
-import { useEditorStore } from '../../stores/editor'
-import type { CheckboxElement, TemplateElement } from '../../core/types'
+import { usePropertyUpdate } from '../../composables/usePropertyUpdate'
+import PropSection from './shared/PropSection.vue'
+import PropNumberInput from './shared/PropNumberInput.vue'
+import PropColorInput from './shared/PropColorInput.vue'
+import PropCheckbox from './shared/PropCheckbox.vue'
+import type { CheckboxElement } from '../../core/types'
 import '../../styles/properties.css'
 
 const props = defineProps<{ element: CheckboxElement }>()
-const templateStore = useTemplateStore()
-const editorStore = useEditorStore()
-
-function update(updates: Partial<TemplateElement>) {
-  const id = editorStore.selectedElementId
-  if (!id) return
-  templateStore.updateElement(id, updates)
-}
-
-function updateStyle(key: string, value: unknown) {
-  update({ style: { ...props.element.style, [key]: value } } as Partial<TemplateElement>)
-}
+const { update, updateStyle } = usePropertyUpdate(() => props.element)
 </script>
 
 <template>
-  <div class="prop-section">
-    <div class="prop-section__title">Onay Kutusu</div>
-    <div v-if="!element.binding" class="prop-row" data-tip="Onay kutusunun varsayilan durumu">
-      <label class="prop-label">Isaretli</label>
-      <input
-        type="checkbox"
-        :checked="element.checked ?? false"
-        @change="(e) => update({ checked: (e.target as HTMLInputElement).checked } as any)"
-      />
-    </div>
-    <div class="prop-row" data-tip="Onay kutusu boyutu (mm)">
-      <label class="prop-label">Boyut (mm)</label>
-      <input
-        class="prop-input"
-        type="number"
-        step="0.5"
-        min="1"
-        :value="element.style.size ?? 4"
-        @input="(e) => updateStyle('size', parseFloat((e.target as HTMLInputElement).value) || 4)"
-      />
-    </div>
-    <div class="prop-row" data-tip="Isaret (tik) rengi">
-      <label class="prop-label">Isaret Rengi</label>
-      <input
-        class="prop-input prop-color"
-        type="color"
-        :value="element.style.checkColor ?? '#000000'"
-        @input="(e) => updateStyle('checkColor', (e.target as HTMLInputElement).value)"
-      />
-    </div>
-    <div class="prop-row" data-tip="Kutu kenarlik rengi">
-      <label class="prop-label">Kenar Rengi</label>
-      <input
-        class="prop-input prop-color"
-        type="color"
-        :value="element.style.borderColor ?? '#333333'"
-        @input="(e) => updateStyle('borderColor', (e.target as HTMLInputElement).value)"
-      />
-    </div>
-  </div>
+  <PropSection title="Onay Kutusu">
+    <PropCheckbox
+      v-if="!element.binding"
+      label="Isaretli"
+      :model-value="element.checked ?? false"
+      data-tip="Onay kutusunun varsayilan durumu"
+      @update:model-value="(v) => update({ checked: v } as any)"
+    />
+    <PropNumberInput
+      label="Boyut (mm)"
+      :model-value="element.style.size ?? 4"
+      :step="0.5"
+      :min="1"
+      data-tip="Onay kutusu boyutu (mm)"
+      @update:model-value="(v) => updateStyle('size', v)"
+    />
+    <PropColorInput
+      label="Isaret Rengi"
+      :model-value="element.style.checkColor ?? '#000000'"
+      data-tip="Isaret (tik) rengi"
+      @update:model-value="(v) => updateStyle('checkColor', v)"
+    />
+    <PropColorInput
+      label="Kenar Rengi"
+      :model-value="element.style.borderColor ?? '#333333'"
+      data-tip="Kutu kenarlik rengi"
+      @update:model-value="(v) => updateStyle('borderColor', v)"
+    />
+  </PropSection>
 </template>

@@ -1,25 +1,26 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { useTemplateStore } from '../../stores/template'
-import { useEditorStore } from '../../stores/editor'
+import { usePropertyUpdate } from '../../composables/usePropertyUpdate'
 import { useSchemaStore } from '../../stores/schema'
-import type { BarcodeElement, BarcodeFormat, TemplateElement } from '../../core/types'
+import PropSection from './shared/PropSection.vue'
+import PropSelect from './shared/PropSelect.vue'
+import PropColorInput from './shared/PropColorInput.vue'
+import PropCheckbox from './shared/PropCheckbox.vue'
+import PropFieldSelect from './shared/PropFieldSelect.vue'
+import type { BarcodeElement, BarcodeFormat } from '../../core/types'
 import '../../styles/properties.css'
 
 const props = defineProps<{ element: BarcodeElement }>()
-const templateStore = useTemplateStore()
-const editorStore = useEditorStore()
+const { update, updateStyle } = usePropertyUpdate(() => props.element)
 const schemaStore = useSchemaStore()
 
-function update(updates: Partial<TemplateElement>) {
-  const id = editorStore.selectedElementId
-  if (!id) return
-  templateStore.updateElement(id, updates)
-}
-
-function updateStyle(key: string, value: unknown) {
-  update({ style: { ...props.element.style, [key]: value } } as Partial<TemplateElement>)
-}
+const formatOptions = [
+  { value: 'qr', label: 'QR Kod' },
+  { value: 'ean13', label: 'EAN-13' },
+  { value: 'ean8', label: 'EAN-8' },
+  { value: 'code128', label: 'Code 128' },
+  { value: 'code39', label: 'Code 39' },
+]
 
 const barcodeDefaults: Record<BarcodeFormat, string> = {
   qr: 'https://example.com',
@@ -73,7 +74,6 @@ watch(
 function onBarcodeValueInput(e: Event) {
   const val = (e.target as HTMLInputElement).value
   barcodeInputValue.value = val
-
   if (validateBarcode(props.element.format, val)) {
     barcodeInputInvalid.value = false
     update({ value: val } as any)
@@ -82,38 +82,29 @@ function onBarcodeValueInput(e: Event) {
   }
 }
 
-function onBarcodeFormatChange(newFormat: BarcodeFormat) {
+function onBarcodeFormatChange(newFormat: string) {
+  const fmt = newFormat as BarcodeFormat
   const currentValue = props.element.value ?? ''
-  if (validateBarcode(newFormat, currentValue)) {
-    update({ format: newFormat } as any)
+  if (validateBarcode(fmt, currentValue)) {
+    update({ format: fmt } as any)
   } else {
-    const defaultVal = barcodeDefaults[newFormat]
+    const defaultVal = barcodeDefaults[fmt]
     barcodeInputValue.value = defaultVal
     barcodeInputInvalid.value = false
-    update({ format: newFormat, value: defaultVal } as any)
+    update({ format: fmt, value: defaultVal } as any)
   }
 }
 </script>
 
 <template>
-  <div class="prop-section">
-    <div class="prop-section__title">Barkod Ayarlari</div>
-    <div class="prop-row" data-tip="Barkod formati">
-      <label class="prop-label">Format</label>
-      <select
-        class="prop-input prop-select"
-        :value="element.format"
-        @change="
-          (e) => onBarcodeFormatChange((e.target as HTMLSelectElement).value as BarcodeFormat)
-        "
-      >
-        <option value="qr">QR Kod</option>
-        <option value="ean13">EAN-13</option>
-        <option value="ean8">EAN-8</option>
-        <option value="code128">Code 128</option>
-        <option value="code39">Code 39</option>
-      </select>
-    </div>
+  <PropSection title="Barkod Ayarlari">
+    <PropSelect
+      label="Format"
+      :model-value="element.format"
+      :options="formatOptions"
+      data-tip="Barkod formati"
+      @update:model-value="onBarcodeFormatChange"
+    />
     <div class="prop-row" data-tip="Barkod icerigi — formata uygun olmali">
       <label class="prop-label">Deger</label>
       <input
@@ -124,63 +115,36 @@ function onBarcodeFormatChange(newFormat: BarcodeFormat) {
         @input="onBarcodeValueInput"
       />
     </div>
-    <div class="prop-row" data-tip="Barkod cizgi/modül rengi">
-      <label class="prop-label">Renk</label>
-      <div class="prop-row-inline">
-        <input
-          class="prop-input prop-color"
-          type="color"
-          :value="element.style.color ?? '#000000'"
-          @input="(e) => updateStyle('color', (e.target as HTMLInputElement).value)"
-        />
-        <button
-          v-if="element.style.color"
-          class="prop-clear"
-          @click="updateStyle('color', undefined)"
-        >
-          x
-        </button>
-      </div>
-    </div>
-    <div
+    <PropColorInput
+      label="Renk"
+      :model-value="element.style.color ?? '#000000'"
+      :clearable="true"
+      data-tip="Barkod cizgi/modul rengi"
+      @update:model-value="(v) => updateStyle('color', v)"
+    />
+    <PropCheckbox
       v-if="element.format !== 'qr'"
-      class="prop-row"
+      label="Metin Goster"
+      :model-value="
+        element.style.includeText ?? (element.format === 'ean13' || element.format === 'ean8')
+      "
       data-tip="Barkod altinda degeri metin olarak goster"
-    >
-      <label class="prop-label">Metin Goster</label>
-      <input
-        type="checkbox"
-        :checked="
-          element.style.includeText ?? (element.format === 'ean13' || element.format === 'ean8')
-        "
-        @change="(e) => updateStyle('includeText', (e.target as HTMLInputElement).checked)"
-      />
-    </div>
-    <div
+      @update:model-value="(v) => updateStyle('includeText', v)"
+    />
+    <PropFieldSelect
       v-if="schemaStore.scalarFields.length > 0"
-      class="prop-row"
+      label="Veri Baglama"
+      :model-value="element.binding?.path ?? ''"
+      :fields="schemaStore.scalarFields"
+      :allow-empty="true"
+      empty-label="Yok (statik deger)"
       data-tip="Schema'dan dinamik veri baglama"
-    >
-      <label class="prop-label">Veri Baglama</label>
-      <select
-        class="prop-input prop-select"
-        :value="element.binding?.path ?? ''"
-        @change="
-          (e) => {
-            const val = (e.target as HTMLSelectElement).value
-            if (val) {
-              update({ binding: { type: 'scalar', path: val } } as any)
-            } else {
-              update({ binding: undefined } as any)
-            }
-          }
-        "
-      >
-        <option value="">Yok (statik deger)</option>
-        <option v-for="field in schemaStore.scalarFields" :key="field.path" :value="field.path">
-          {{ field.title }} ({{ field.path }})
-        </option>
-      </select>
-    </div>
-  </div>
+      @update:model-value="
+        (v) => {
+          if (v) update({ binding: { type: 'scalar', path: v } } as any)
+          else update({ binding: undefined } as any)
+        }
+      "
+    />
+  </PropSection>
 </template>

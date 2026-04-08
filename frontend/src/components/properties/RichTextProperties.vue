@@ -1,27 +1,19 @@
 <script setup lang="ts">
-import { useTemplateStore } from '../../stores/template'
-import { useEditorStore } from '../../stores/editor'
+import { usePropertyUpdate } from '../../composables/usePropertyUpdate'
+import PropSection from './shared/PropSection.vue'
+import PropColorInput from './shared/PropColorInput.vue'
+import PropSelect from './shared/PropSelect.vue'
+import PropTextStyleGroup from './shared/PropTextStyleGroup.vue'
 import type { RichTextElement, RichTextSpan, TextStyle } from '../../core/types'
 import '../../styles/properties.css'
 
 const props = defineProps<{ element: RichTextElement }>()
-const templateStore = useTemplateStore()
-const editorStore = useEditorStore()
-
-function update(updates: Partial<RichTextElement>) {
-  const id = editorStore.selectedElementId
-  if (!id) return
-  templateStore.updateElement(id, updates as any)
-}
-
-function updateStyle(key: string, value: unknown) {
-  update({ style: { ...props.element.style, [key]: value } } as Partial<RichTextElement>)
-}
+const { update, updateStyle } = usePropertyUpdate(() => props.element)
 
 function updateSpan(index: number, updates: Partial<RichTextSpan>) {
   const content = [...props.element.content]
   content[index] = { ...content[index], ...updates }
-  update({ content })
+  update({ content } as any)
 }
 
 function updateSpanStyle(index: number, key: string, value: unknown) {
@@ -31,60 +23,39 @@ function updateSpanStyle(index: number, key: string, value: unknown) {
 
 function addSpan() {
   const content = [...props.element.content, { text: 'yeni', style: {} }]
-  update({ content })
+  update({ content } as any)
 }
 
 function removeSpan(index: number) {
   if (props.element.content.length <= 1) return
   const content = props.element.content.filter((_, i) => i !== index)
-  update({ content })
+  update({ content } as any)
 }
+
+const weightOptions = [
+  { value: '', label: 'Varsayilan' },
+  { value: 'normal', label: 'Normal' },
+  { value: 'bold', label: 'Kalin' },
+]
 </script>
 
 <template>
-  <div class="prop-section">
-    <div class="prop-section__title">Varsayilan Stil</div>
-    <div class="prop-row" data-tip="Varsayilan yazi tipi boyutu (point)">
-      <label class="prop-label">Boyut (pt)</label>
-      <input
-        class="prop-input"
-        type="number"
-        step="1"
-        min="1"
-        :value="element.style.fontSize ?? 11"
-        @input="
-          (e) => updateStyle('fontSize', parseFloat((e.target as HTMLInputElement).value) || 11)
-        "
-      />
-    </div>
-    <div class="prop-row" data-tip="Varsayilan metin rengi">
-      <label class="prop-label">Renk</label>
-      <input
-        class="prop-input prop-color"
-        type="color"
-        :value="element.style.color ?? '#000000'"
-        @input="(e) => updateStyle('color', (e.target as HTMLInputElement).value)"
-      />
-    </div>
-    <div class="prop-row" data-tip="Metnin yatay hizalamasi">
-      <label class="prop-label">Hizalama</label>
-      <select
-        class="prop-input prop-select"
-        :value="element.style.align ?? 'left'"
-        @change="(e) => updateStyle('align', (e.target as HTMLSelectElement).value)"
-      >
-        <option value="left">Sol</option>
-        <option value="center">Orta</option>
-        <option value="right">Sag</option>
-      </select>
-    </div>
-  </div>
+  <PropSection title="Varsayilan Stil">
+    <PropTextStyleGroup
+      :font-size="element.style.fontSize ?? 11"
+      :color="element.style.color ?? '#000000'"
+      :align="element.style.align ?? 'left'"
+      :show-weight="false"
+      @update:font-size="(v) => updateStyle('fontSize', v)"
+      @update:color="(v) => updateStyle('color', v)"
+      @update:align="(v) => updateStyle('align', v)"
+    />
+  </PropSection>
 
-  <div class="prop-section">
-    <div class="prop-section__title">
-      Span'lar
+  <PropSection title="Span'lar">
+    <template #actions>
       <button class="prop-add-btn" @click="addSpan" title="Span ekle">+</button>
-    </div>
+    </template>
 
     <div v-for="(span, idx) in element.content" :key="idx" class="prop-span-card">
       <div class="prop-span-card__header">
@@ -125,57 +96,24 @@ function removeSpan(index: number) {
           "
         />
       </div>
-      <div class="prop-row" data-tip="Span yazi kalinligi">
-        <label class="prop-label">Kalinlik</label>
-        <select
-          class="prop-input prop-select"
-          :value="(span.style as TextStyle).fontWeight ?? ''"
-          @change="
-            (e) => {
-              const v = (e.target as HTMLSelectElement).value
-              updateSpanStyle(idx, 'fontWeight', v || undefined)
-            }
-          "
-        >
-          <option value="">Varsayilan</option>
-          <option value="normal">Normal</option>
-          <option value="bold">Kalin</option>
-        </select>
-      </div>
-      <div class="prop-row" data-tip="Span metin rengi">
-        <label class="prop-label">Renk</label>
-        <input
-          class="prop-input prop-color"
-          type="color"
-          :value="(span.style as TextStyle).color ?? element.style.color ?? '#000000'"
-          @input="(e) => updateSpanStyle(idx, 'color', (e.target as HTMLInputElement).value)"
-        />
-      </div>
+      <PropSelect
+        label="Kalinlik"
+        :model-value="(span.style as TextStyle).fontWeight ?? ''"
+        :options="weightOptions"
+        data-tip="Span yazi kalinligi"
+        @update:model-value="(v) => updateSpanStyle(idx, 'fontWeight', v || undefined)"
+      />
+      <PropColorInput
+        label="Renk"
+        :model-value="(span.style as TextStyle).color ?? element.style.color ?? '#000000'"
+        data-tip="Span metin rengi"
+        @update:model-value="(v) => updateSpanStyle(idx, 'color', v)"
+      />
     </div>
-  </div>
+  </PropSection>
 </template>
 
 <style scoped>
-.prop-add-btn {
-  float: right;
-  background: #3b82f6;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  width: 22px;
-  height: 22px;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.prop-add-btn:hover {
-  background: #2563eb;
-}
-
 .prop-span-card {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
