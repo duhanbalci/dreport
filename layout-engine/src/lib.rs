@@ -223,6 +223,75 @@ pub struct ResolvedStyle {
     pub barcode_include_text: Option<bool>,
 }
 
+// --- From<&XStyle> for ResolvedStyle ---
+
+impl From<&dreport_core::models::TextStyle> for ResolvedStyle {
+    fn from(s: &dreport_core::models::TextStyle) -> Self {
+        Self {
+            font_size: s.font_size,
+            font_weight: s.font_weight.clone(),
+            font_style: s.font_style.clone(),
+            font_family: s.font_family.clone(),
+            color: s.color.clone(),
+            text_align: s.align.clone(),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<&dreport_core::models::ContainerStyle> for ResolvedStyle {
+    fn from(s: &dreport_core::models::ContainerStyle) -> Self {
+        Self {
+            background_color: s.background_color.clone(),
+            border_color: s.border_color.clone(),
+            border_width: s.border_width,
+            border_radius: s.border_radius,
+            border_style: s.border_style.clone(),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<&dreport_core::models::LineStyle> for ResolvedStyle {
+    fn from(s: &dreport_core::models::LineStyle) -> Self {
+        Self {
+            stroke_color: s.stroke_color.clone(),
+            stroke_width: s.stroke_width,
+            ..Default::default()
+        }
+    }
+}
+
+impl From<&dreport_core::models::ImageStyle> for ResolvedStyle {
+    fn from(s: &dreport_core::models::ImageStyle) -> Self {
+        Self {
+            object_fit: s.object_fit.clone(),
+            ..Default::default()
+        }
+    }
+}
+
+impl From<&dreport_core::models::BarcodeStyle> for ResolvedStyle {
+    fn from(s: &dreport_core::models::BarcodeStyle) -> Self {
+        Self {
+            barcode_color: s.color.clone(),
+            barcode_include_text: s.include_text,
+            ..Default::default()
+        }
+    }
+}
+
+impl From<&dreport_core::models::CheckboxStyle> for ResolvedStyle {
+    fn from(s: &dreport_core::models::CheckboxStyle) -> Self {
+        Self {
+            color: s.check_color.clone(),
+            border_color: s.border_color.clone(),
+            border_width: s.border_width,
+            ..Default::default()
+        }
+    }
+}
+
 /// Ana layout hesaplama fonksiyonu.
 /// Template + data + font verileri alır, her element için pozisyon döner.
 pub fn compute_layout(

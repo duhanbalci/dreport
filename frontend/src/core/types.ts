@@ -116,10 +116,19 @@ export interface BarcodeStyle {
   includeText?: boolean // barkod altına değer yazılsın mı (QR hariç)
 }
 
+// --- Condition (koşullu gösterim) ---
+
+export interface Condition {
+  path: string
+  operator: string
+  value?: unknown
+}
+
 // --- Element tipleri ---
 
 interface BaseElement {
   id: string
+  condition?: Condition
   position: PositionMode
   size: SizeConstraint
 }

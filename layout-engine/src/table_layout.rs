@@ -186,7 +186,7 @@ pub fn expand_table_cached(
 ) -> ContainerElement {
     let rows = resolved
         .tables
-        .get(&table.id)
+        .get(&table.base.id)
         .map(|t| t.rows.as_slice())
         .unwrap_or(&[]);
     let key = table_cache_key(table, rows, available_width_mm);
@@ -211,7 +211,7 @@ pub fn expand_table(
     measurer: &mut TextMeasurer,
     available_width_mm: f64,
 ) -> ContainerElement {
-    let resolved_table = resolved.tables.get(&table.id);
+    let resolved_table = resolved.tables.get(&table.base.id);
     let rows = resolved_table.map(|t| t.rows.as_slice()).unwrap_or(&[]);
 
     // Auto sütunlar için içerik bazlı genişlik hesapla
@@ -232,17 +232,14 @@ pub fn expand_table(
         .enumerate()
         .map(|(i, col)| {
             let text = TemplateElement::StaticText(StaticTextElement {
-                id: format!("{}_hdr_{}", table.id, i),
-                condition: None,
-                position: PositionMode::Flow,
-                size: SizeConstraint {
-                    width: SizeValue::Fr { value: 1.0 },
-                    height: SizeValue::Auto,
-                    min_width: None,
-                    min_height: None,
-                    max_width: None,
-                    max_height: None,
-                },
+                base: ElementBase::flow(
+                    format!("{}_hdr_{}", table.base.id, i),
+                    SizeConstraint {
+                        width: SizeValue::Fr { value: 1.0 },
+                        height: SizeValue::Auto,
+                        ..Default::default()
+                    },
+                ),
                 style: TextStyle {
                     font_size: table.style.header_font_size.or(table.style.font_size),
                     font_weight: Some("bold".to_string()),
@@ -254,25 +251,13 @@ pub fn expand_table(
                 content: col.title.clone(),
             });
             TemplateElement::Container(ContainerElement {
-                id: format!("{}_hdr_{}_wrap", table.id, i),
-                condition: None,
-                position: PositionMode::Flow,
-                size: SizeConstraint {
-                    width: effective_widths[i].clone(),
-                    height: SizeValue::Auto,
-                    min_width: None,
-                    min_height: None,
-                    max_width: None,
-                    max_height: None,
-                },
+                base: ElementBase::flow(
+                    format!("{}_hdr_{}_wrap", table.base.id, i),
+                    SizeConstraint { width: effective_widths[i].clone(), ..Default::default() },
+                ),
                 direction: "column".to_string(),
                 gap: 0.0,
-                padding: Padding {
-                    top: header_pad_v,
-                    right: header_pad_h,
-                    bottom: header_pad_v,
-                    left: header_pad_h,
-                },
+                padding: Padding { top: header_pad_v, right: header_pad_h, bottom: header_pad_v, left: header_pad_h },
                 align: "stretch".to_string(),
                 justify: "start".to_string(),
                 style: ContainerStyle::default(),
@@ -283,31 +268,16 @@ pub fn expand_table(
         .collect();
 
     children.push(TemplateElement::Container(ContainerElement {
-        id: format!("{}_header", table.id),
-        condition: None,
-        position: PositionMode::Flow,
-        size: SizeConstraint {
-            width: SizeValue::Fr { value: 1.0 },
-            height: SizeValue::Auto,
-            min_width: None,
-            min_height: None,
-            max_width: None,
-            max_height: None,
-        },
+        base: ElementBase::flow(
+            format!("{}_header", table.base.id),
+            SizeConstraint { width: SizeValue::Fr { value: 1.0 }, ..Default::default() },
+        ),
         direction: "row".to_string(),
         gap: 0.0,
-        padding: Padding {
-            top: 0.0,
-            right: 0.0,
-            bottom: 0.0,
-            left: 0.0,
-        },
+        padding: Padding::default(),
         align: "stretch".to_string(),
         justify: "start".to_string(),
-        style: ContainerStyle {
-            background_color: table.style.header_bg.clone(),
-            ..Default::default()
-        },
+        style: ContainerStyle { background_color: table.style.header_bg.clone(), ..Default::default() },
         children: header_cells,
         break_inside: "auto".to_string(),
     }));
@@ -315,17 +285,10 @@ pub fn expand_table(
     // Header altına ayırıcı çizgi
     if table.style.border_color.is_some() {
         children.push(TemplateElement::Line(LineElement {
-            id: format!("{}_header_line", table.id),
-            condition: None,
-            position: PositionMode::Flow,
-            size: SizeConstraint {
-                width: SizeValue::Fr { value: 1.0 },
-                height: SizeValue::Auto,
-                min_width: None,
-                min_height: None,
-                max_width: None,
-                max_height: None,
-            },
+            base: ElementBase::flow(
+                format!("{}_header_line", table.base.id),
+                SizeConstraint { width: SizeValue::Fr { value: 1.0 }, ..Default::default() },
+            ),
             style: LineStyle {
                 stroke_color: table.style.border_color.clone(),
                 stroke_width: table.style.border_width,
@@ -343,17 +306,10 @@ pub fn expand_table(
                 let text_content = row_data.get(col_idx).cloned().unwrap_or_default();
 
                 let text = TemplateElement::StaticText(StaticTextElement {
-                    id: format!("{}_r{}c{}", table.id, row_idx, col_idx),
-                    condition: None,
-                    position: PositionMode::Flow,
-                    size: SizeConstraint {
-                        width: SizeValue::Fr { value: 1.0 },
-                        height: SizeValue::Auto,
-                        min_width: None,
-                        min_height: None,
-                        max_width: None,
-                        max_height: None,
-                    },
+                    base: ElementBase::flow(
+                        format!("{}_r{}c{}", table.base.id, row_idx, col_idx),
+                        SizeConstraint { width: SizeValue::Fr { value: 1.0 }, ..Default::default() },
+                    ),
                     style: TextStyle {
                         font_size: table.style.font_size,
                         font_weight: None,
@@ -365,25 +321,13 @@ pub fn expand_table(
                     content: text_content,
                 });
                 TemplateElement::Container(ContainerElement {
-                    id: format!("{}_r{}c{}_wrap", table.id, row_idx, col_idx),
-                    condition: None,
-                    position: PositionMode::Flow,
-                    size: SizeConstraint {
-                        width: effective_widths[col_idx].clone(),
-                        height: SizeValue::Auto,
-                        min_width: None,
-                        min_height: None,
-                        max_width: None,
-                        max_height: None,
-                    },
+                    base: ElementBase::flow(
+                        format!("{}_r{}c{}_wrap", table.base.id, row_idx, col_idx),
+                        SizeConstraint { width: effective_widths[col_idx].clone(), ..Default::default() },
+                    ),
                     direction: "column".to_string(),
                     gap: 0.0,
-                    padding: Padding {
-                        top: cell_pad_v,
-                        right: cell_pad_h,
-                        bottom: cell_pad_v,
-                        left: cell_pad_h,
-                    },
+                    padding: Padding { top: cell_pad_v, right: cell_pad_h, bottom: cell_pad_v, left: cell_pad_h },
                     align: "stretch".to_string(),
                     justify: "start".to_string(),
                     style: ContainerStyle::default(),
@@ -401,31 +345,16 @@ pub fn expand_table(
         };
 
         children.push(TemplateElement::Container(ContainerElement {
-            id: format!("{}_row_{}", table.id, row_idx),
-            condition: None,
-            position: PositionMode::Flow,
-            size: SizeConstraint {
-                width: SizeValue::Fr { value: 1.0 },
-                height: SizeValue::Auto,
-                min_width: None,
-                min_height: None,
-                max_width: None,
-                max_height: None,
-            },
+            base: ElementBase::flow(
+                format!("{}_row_{}", table.base.id, row_idx),
+                SizeConstraint { width: SizeValue::Fr { value: 1.0 }, ..Default::default() },
+            ),
             direction: "row".to_string(),
             gap: 0.0,
-            padding: Padding {
-                top: 0.0,
-                right: 0.0,
-                bottom: 0.0,
-                left: 0.0,
-            },
+            padding: Padding::default(),
             align: "stretch".to_string(),
             justify: "start".to_string(),
-            style: ContainerStyle {
-                background_color: bg,
-                ..Default::default()
-            },
+            style: ContainerStyle { background_color: bg, ..Default::default() },
             children: cells,
             break_inside: "auto".to_string(),
         }));
@@ -433,18 +362,15 @@ pub fn expand_table(
 
     // Wrapper container (column direction, tüm tablo)
     ContainerElement {
-        id: table.id.clone(),
-        condition: None,
-        position: table.position.clone(),
-        size: table.size.clone(),
+        base: ElementBase {
+            id: table.base.id.clone(),
+            condition: None,
+            position: table.base.position.clone(),
+            size: table.base.size.clone(),
+        },
         direction: "column".to_string(),
         gap: 0.0,
-        padding: Padding {
-            top: 0.0,
-            right: 0.0,
-            bottom: 0.0,
-            left: 0.0,
-        },
+        padding: Padding::default(),
         align: "stretch".to_string(),
         justify: "start".to_string(),
         style: ContainerStyle {
@@ -478,14 +404,10 @@ mod tests {
             .collect();
 
         RepeatingTableElement {
-            id: "tbl".to_string(),
-            condition: None,
-            position: PositionMode::Flow,
-            size: SizeConstraint {
-                width: SizeValue::Fr { value: 1.0 },
-                height: SizeValue::Auto,
-                ..Default::default()
-            },
+            base: ElementBase::flow(
+                "tbl".to_string(),
+                SizeConstraint { width: SizeValue::Fr { value: 1.0 }, ..Default::default() },
+            ),
             data_source: ArrayBinding {
                 path: "items".to_string(),
             },
@@ -554,7 +476,7 @@ mod tests {
         let container = expand_table(&table, &resolved, &mut measurer, 180.0);
 
         // Wrapper container properties
-        assert_eq!(container.id, "tbl");
+        assert_eq!(container.base.id, "tbl");
         assert_eq!(container.direction, "column");
 
         // Children: header row + 2 data rows (no border_color so no separator line)
@@ -563,7 +485,7 @@ mod tests {
         // First child is header row container
         match &container.children[0] {
             TemplateElement::Container(c) => {
-                assert_eq!(c.id, "tbl_header");
+                assert_eq!(c.base.id, "tbl_header");
                 assert_eq!(c.direction, "row");
                 assert_eq!(c.children.len(), 2); // 2 columns
                 // Check header cell text (inside wrapper container)
@@ -577,7 +499,7 @@ mod tests {
         for (row_idx, child) in container.children[1..].iter().enumerate() {
             match child {
                 TemplateElement::Container(c) => {
-                    assert_eq!(c.id, format!("tbl_row_{}", row_idx));
+                    assert_eq!(c.base.id, format!("tbl_row_{}", row_idx));
                     assert_eq!(c.direction, "row");
                     assert_eq!(c.children.len(), 2);
                 }
@@ -666,7 +588,7 @@ mod tests {
         // Second child should be a Line
         match &container.children[1] {
             TemplateElement::Line(l) => {
-                assert_eq!(l.id, "tbl_header_line");
+                assert_eq!(l.base.id, "tbl_header_line");
             }
             _ => panic!("Expected Line separator after header"),
         }
@@ -738,14 +660,10 @@ mod tests {
         ];
 
         let table = RepeatingTableElement {
-            id: "tbl".to_string(),
-            condition: None,
-            position: PositionMode::Flow,
-            size: SizeConstraint {
-                width: SizeValue::Fr { value: 1.0 },
-                height: SizeValue::Auto,
-                ..Default::default()
-            },
+            base: ElementBase::flow(
+                "tbl".to_string(),
+                SizeConstraint { width: SizeValue::Fr { value: 1.0 }, ..Default::default() },
+            ),
             data_source: ArrayBinding {
                 path: "items".to_string(),
             },
@@ -769,14 +687,14 @@ mod tests {
         match &container.children[0] {
             TemplateElement::Container(c) => {
                 let w0 = match &c.children[0] {
-                    TemplateElement::Container(wrap) => match &wrap.size.width {
+                    TemplateElement::Container(wrap) => match &wrap.base.size.width {
                         SizeValue::Fixed { value } => *value,
                         _ => panic!("Expected Fixed width for auto column wrapper"),
                     },
                     _ => panic!("Expected Container wrapper"),
                 };
                 let w1 = match &c.children[1] {
-                    TemplateElement::Container(wrap) => match &wrap.size.width {
+                    TemplateElement::Container(wrap) => match &wrap.base.size.width {
                         SizeValue::Fixed { value } => *value,
                         _ => panic!("Expected Fixed width for auto column wrapper"),
                     },
@@ -811,7 +729,7 @@ mod tests {
         // Second call — same inputs — cache hit
         let result2 = expand_table_cached(&table, &resolved, &mut measurer, 180.0, &mut cache);
         assert_eq!(cache.len(), 1); // no new entry
-        assert_eq!(result1.id, result2.id);
+        assert_eq!(result1.base.id, result2.base.id);
         assert_eq!(result1.children.len(), result2.children.len());
     }
 

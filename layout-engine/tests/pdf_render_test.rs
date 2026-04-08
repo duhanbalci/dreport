@@ -23,10 +23,7 @@ fn simple_template() -> Template {
         format_config: None,
         locale: None,
         root: ContainerElement {
-            id: "root".to_string(),
-            condition: None,
-            position: PositionMode::Flow,
-            size: SizeConstraint::default(),
+            base: ElementBase::flow("root".to_string(), SizeConstraint::default()),
             direction: "column".to_string(),
             gap: 5.0,
             padding: Padding {
@@ -40,14 +37,11 @@ fn simple_template() -> Template {
             style: ContainerStyle::default(),
             break_inside: "auto".to_string(),
             children: vec![TemplateElement::StaticText(StaticTextElement {
-                id: "title".to_string(),
-                condition: None,
-                position: PositionMode::Flow,
-                size: SizeConstraint {
+                base: ElementBase::flow("title".to_string(), SizeConstraint {
                     width: SizeValue::Fr { value: 1.0 },
                     height: SizeValue::Auto,
                     ..Default::default()
-                },
+                }),
                 style: TextStyle {
                     font_size: Some(18.0),
                     font_weight: Some("bold".to_string()),
@@ -94,10 +88,7 @@ fn test_render_pdf_with_multiple_elements() {
         format_config: None,
         locale: None,
         root: ContainerElement {
-            id: "root".to_string(),
-            condition: None,
-            position: PositionMode::Flow,
-            size: SizeConstraint::default(),
+            base: ElementBase::flow("root".to_string(), SizeConstraint::default()),
             direction: "column".to_string(),
             gap: 5.0,
             padding: Padding {
@@ -112,14 +103,11 @@ fn test_render_pdf_with_multiple_elements() {
             break_inside: "auto".to_string(),
             children: vec![
                 TemplateElement::StaticText(StaticTextElement {
-                    id: "header".to_string(),
-                    condition: None,
-                    position: PositionMode::Flow,
-                    size: SizeConstraint {
+                    base: ElementBase::flow("header".to_string(), SizeConstraint {
                         width: SizeValue::Fr { value: 1.0 },
                         height: SizeValue::Auto,
                         ..Default::default()
-                    },
+                    }),
                     style: TextStyle {
                         font_size: Some(16.0),
                         font_weight: Some("bold".to_string()),
@@ -128,28 +116,22 @@ fn test_render_pdf_with_multiple_elements() {
                     content: "FATURA".to_string(),
                 }),
                 TemplateElement::Line(LineElement {
-                    id: "sep".to_string(),
-                    condition: None,
-                    position: PositionMode::Flow,
-                    size: SizeConstraint {
+                    base: ElementBase::flow("sep".to_string(), SizeConstraint {
                         width: SizeValue::Fr { value: 1.0 },
                         height: SizeValue::Auto,
                         ..Default::default()
-                    },
+                    }),
                     style: LineStyle {
                         stroke_color: Some("#000000".to_string()),
                         stroke_width: Some(0.5),
                     },
                 }),
                 TemplateElement::StaticText(StaticTextElement {
-                    id: "body".to_string(),
-                    condition: None,
-                    position: PositionMode::Flow,
-                    size: SizeConstraint {
+                    base: ElementBase::flow("body".to_string(), SizeConstraint {
                         width: SizeValue::Fr { value: 1.0 },
                         height: SizeValue::Auto,
                         ..Default::default()
-                    },
+                    }),
                     style: TextStyle {
                         font_size: Some(11.0),
                         ..Default::default()
@@ -192,10 +174,7 @@ fn test_render_pdf_with_container_styles() {
         format_config: None,
         locale: None,
         root: ContainerElement {
-            id: "root".to_string(),
-            condition: None,
-            position: PositionMode::Flow,
-            size: SizeConstraint::default(),
+            base: ElementBase::flow("root".to_string(), SizeConstraint::default()),
             direction: "column".to_string(),
             gap: 0.0,
             padding: Padding {
@@ -214,14 +193,11 @@ fn test_render_pdf_with_container_styles() {
             },
             break_inside: "auto".to_string(),
             children: vec![TemplateElement::StaticText(StaticTextElement {
-                id: "text".to_string(),
-                condition: None,
-                position: PositionMode::Flow,
-                size: SizeConstraint {
+                base: ElementBase::flow("text".to_string(), SizeConstraint {
                     width: SizeValue::Fr { value: 1.0 },
                     height: SizeValue::Auto,
                     ..Default::default()
-                },
+                }),
                 style: TextStyle {
                     font_size: Some(12.0),
                     color: Some("#ff0000".to_string()),
@@ -257,10 +233,7 @@ fn test_page_break_produces_multiple_pages() {
         format_config: None,
         locale: None,
         root: ContainerElement {
-            id: "root".to_string(),
-            condition: None,
-            position: PositionMode::Flow,
-            size: SizeConstraint::default(),
+            base: ElementBase::flow("root".to_string(), SizeConstraint::default()),
             direction: "column".to_string(),
             gap: 5.0,
             padding: Padding {
@@ -275,14 +248,11 @@ fn test_page_break_produces_multiple_pages() {
             break_inside: "auto".to_string(),
             children: vec![
                 TemplateElement::StaticText(StaticTextElement {
-                    id: "t1".to_string(),
-                    condition: None,
-                    position: PositionMode::Flow,
-                    size: SizeConstraint {
+                    base: ElementBase::flow("t1".to_string(), SizeConstraint {
                         width: SizeValue::Fr { value: 1.0 },
                         height: SizeValue::Auto,
                         ..Default::default()
-                    },
+                    }),
                     style: TextStyle {
                         font_size: Some(18.0),
                         ..Default::default()
@@ -290,18 +260,14 @@ fn test_page_break_produces_multiple_pages() {
                     content: "Page 1 content".to_string(),
                 }),
                 TemplateElement::PageBreak(PageBreakElement {
-                    id: "pb1".to_string(),
-                    condition: None,
+                    base: ElementBase::flow("pb1".to_string(), SizeConstraint::default()),
                 }),
                 TemplateElement::StaticText(StaticTextElement {
-                    id: "t2".to_string(),
-                    condition: None,
-                    position: PositionMode::Flow,
-                    size: SizeConstraint {
+                    base: ElementBase::flow("t2".to_string(), SizeConstraint {
                         width: SizeValue::Fr { value: 1.0 },
                         height: SizeValue::Auto,
                         ..Default::default()
-                    },
+                    }),
                     style: TextStyle {
                         font_size: Some(18.0),
                         ..Default::default()

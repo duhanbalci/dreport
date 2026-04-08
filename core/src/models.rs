@@ -247,11 +247,8 @@ pub struct ChartStyle {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChartElement {
-    pub id: String,
-    #[serde(default)]
-    pub condition: Option<Condition>,
-    pub position: PositionMode,
-    pub size: SizeConstraint,
+    #[serde(flatten)]
+    pub base: ElementBase,
     pub chart_type: ChartType,
     pub data_source: ArrayBinding,
     pub category_field: String,
@@ -270,6 +267,138 @@ pub struct ChartElement {
     pub axis: Option<ChartAxis>,
     #[serde(default)]
     pub style: ChartStyle,
+}
+
+// --- Element Base (ortak alanlar) ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ElementBase {
+    pub id: String,
+    #[serde(default)]
+    pub condition: Option<Condition>,
+    #[serde(default)]
+    pub position: PositionMode,
+    #[serde(default)]
+    pub size: SizeConstraint,
+}
+
+impl ElementBase {
+    /// Flow pozisyonlu, condition'sız, verilen size ile base oluştur
+    pub fn flow(id: String, size: SizeConstraint) -> Self {
+        Self {
+            id,
+            condition: None,
+            position: PositionMode::Flow,
+            size,
+        }
+    }
+}
+
+pub trait HasBase {
+    fn base(&self) -> &ElementBase;
+    fn base_mut(&mut self) -> &mut ElementBase;
+}
+
+macro_rules! impl_has_base {
+    ($($t:ty),+ $(,)?) => {
+        $(impl HasBase for $t {
+            fn base(&self) -> &ElementBase { &self.base }
+            fn base_mut(&mut self) -> &mut ElementBase { &mut self.base }
+        })+
+    };
+}
+
+impl_has_base!(
+    ContainerElement,
+    StaticTextElement,
+    TextElement,
+    LineElement,
+    ImageElement,
+    PageNumberElement,
+    BarcodeElement,
+    RepeatingTableElement,
+    PageBreakElement,
+    CurrentDateElement,
+    ShapeElement,
+    CheckboxElement,
+    CalculatedTextElement,
+    RichTextElement,
+    ChartElement,
+);
+
+pub trait ElementTypeStr {
+    fn type_str(&self) -> &'static str;
+}
+
+macro_rules! impl_type_str {
+    ($($t:ty => $s:literal),+ $(,)?) => {
+        $(impl ElementTypeStr for $t {
+            fn type_str(&self) -> &'static str { $s }
+        })+
+    };
+}
+
+impl_type_str!(
+    ContainerElement => "container",
+    StaticTextElement => "static_text",
+    TextElement => "text",
+    LineElement => "line",
+    ImageElement => "image",
+    PageNumberElement => "page_number",
+    BarcodeElement => "barcode",
+    RepeatingTableElement => "repeating_table",
+    PageBreakElement => "page_break",
+    CurrentDateElement => "current_date",
+    ShapeElement => "shape",
+    CheckboxElement => "checkbox",
+    CalculatedTextElement => "calculated_text",
+    RichTextElement => "rich_text",
+    ChartElement => "chart",
+);
+
+pub trait HasTextStyle {
+    fn text_style(&self) -> &TextStyle;
+}
+
+macro_rules! impl_has_text_style {
+    ($($t:ty),+ $(,)?) => {
+        $(impl HasTextStyle for $t {
+            fn text_style(&self) -> &TextStyle { &self.style }
+        })+
+    };
+}
+
+impl_has_text_style!(
+    StaticTextElement,
+    TextElement,
+    PageNumberElement,
+    CurrentDateElement,
+    CalculatedTextElement,
+    RichTextElement,
+);
+
+pub trait HasOptionalBinding {
+    fn binding(&self) -> Option<&ScalarBinding>;
+    fn static_value(&self) -> Option<&str>;
+}
+
+impl HasOptionalBinding for ImageElement {
+    fn binding(&self) -> Option<&ScalarBinding> {
+        self.binding.as_ref()
+    }
+    fn static_value(&self) -> Option<&str> {
+        self.src.as_deref()
+    }
+}
+
+impl HasOptionalBinding for BarcodeElement {
+    fn binding(&self) -> Option<&ScalarBinding> {
+        self.binding.as_ref()
+    }
+    fn static_value(&self) -> Option<&str> {
+        self.value.as_deref()
+    }
 }
 
 // --- Element tipleri ---
@@ -316,91 +445,59 @@ pub enum TemplateElement {
 }
 
 impl TemplateElement {
-    pub fn id(&self) -> &str {
+    fn inner_base(&self) -> &ElementBase {
         match self {
-            Self::Container(e) => &e.id,
-            Self::StaticText(e) => &e.id,
-            Self::Text(e) => &e.id,
-            Self::Line(e) => &e.id,
-            Self::RepeatingTable(e) => &e.id,
-            Self::Image(e) => &e.id,
-            Self::PageNumber(e) => &e.id,
-            Self::Barcode(e) => &e.id,
-            Self::PageBreak(e) => &e.id,
-            Self::CurrentDate(e) => &e.id,
-            Self::Shape(e) => &e.id,
-            Self::Checkbox(e) => &e.id,
-            Self::CalculatedText(e) => &e.id,
-            Self::RichText(e) => &e.id,
-            Self::Chart(e) => &e.id,
+            Self::Container(e) => e.base(),
+            Self::StaticText(e) => e.base(),
+            Self::Text(e) => e.base(),
+            Self::Line(e) => e.base(),
+            Self::RepeatingTable(e) => e.base(),
+            Self::Image(e) => e.base(),
+            Self::PageNumber(e) => e.base(),
+            Self::Barcode(e) => e.base(),
+            Self::PageBreak(e) => e.base(),
+            Self::CurrentDate(e) => e.base(),
+            Self::Shape(e) => e.base(),
+            Self::Checkbox(e) => e.base(),
+            Self::CalculatedText(e) => e.base(),
+            Self::RichText(e) => e.base(),
+            Self::Chart(e) => e.base(),
         }
+    }
+
+    pub fn id(&self) -> &str {
+        &self.inner_base().id
     }
 
     pub fn position(&self) -> &PositionMode {
-        match self {
-            Self::Container(e) => &e.position,
-            Self::StaticText(e) => &e.position,
-            Self::Text(e) => &e.position,
-            Self::Line(e) => &e.position,
-            Self::RepeatingTable(e) => &e.position,
-            Self::Image(e) => &e.position,
-            Self::PageNumber(e) => &e.position,
-            Self::Barcode(e) => &e.position,
-            Self::PageBreak(_) => &PositionMode::Flow,
-            Self::CurrentDate(e) => &e.position,
-            Self::Shape(e) => &e.position,
-            Self::Checkbox(e) => &e.position,
-            Self::CalculatedText(e) => &e.position,
-            Self::RichText(e) => &e.position,
-            Self::Chart(e) => &e.position,
-        }
+        &self.inner_base().position
     }
 
     pub fn condition(&self) -> Option<&Condition> {
-        match self {
-            Self::Container(e) => e.condition.as_ref(),
-            Self::StaticText(e) => e.condition.as_ref(),
-            Self::Text(e) => e.condition.as_ref(),
-            Self::Line(e) => e.condition.as_ref(),
-            Self::RepeatingTable(e) => e.condition.as_ref(),
-            Self::Image(e) => e.condition.as_ref(),
-            Self::PageNumber(e) => e.condition.as_ref(),
-            Self::Barcode(e) => e.condition.as_ref(),
-            Self::PageBreak(e) => e.condition.as_ref(),
-            Self::CurrentDate(e) => e.condition.as_ref(),
-            Self::Shape(e) => e.condition.as_ref(),
-            Self::Checkbox(e) => e.condition.as_ref(),
-            Self::CalculatedText(e) => e.condition.as_ref(),
-            Self::RichText(e) => e.condition.as_ref(),
-            Self::Chart(e) => e.condition.as_ref(),
-        }
+        self.inner_base().condition.as_ref()
     }
 
     pub fn size(&self) -> &SizeConstraint {
-        static DEFAULT_SIZE: SizeConstraint = SizeConstraint {
-            width: SizeValue::Auto,
-            height: SizeValue::Auto,
-            min_width: None,
-            min_height: None,
-            max_width: None,
-            max_height: None,
-        };
+        &self.inner_base().size
+    }
+
+    pub fn type_str(&self) -> &'static str {
         match self {
-            Self::Container(e) => &e.size,
-            Self::StaticText(e) => &e.size,
-            Self::Text(e) => &e.size,
-            Self::Line(e) => &e.size,
-            Self::RepeatingTable(e) => &e.size,
-            Self::Image(e) => &e.size,
-            Self::PageNumber(e) => &e.size,
-            Self::Barcode(e) => &e.size,
-            Self::PageBreak(_) => &DEFAULT_SIZE,
-            Self::CurrentDate(e) => &e.size,
-            Self::Shape(e) => &e.size,
-            Self::Checkbox(e) => &e.size,
-            Self::CalculatedText(e) => &e.size,
-            Self::RichText(e) => &e.size,
-            Self::Chart(e) => &e.size,
+            Self::Container(e) => e.type_str(),
+            Self::StaticText(e) => e.type_str(),
+            Self::Text(e) => e.type_str(),
+            Self::Line(e) => e.type_str(),
+            Self::RepeatingTable(e) => e.type_str(),
+            Self::Image(e) => e.type_str(),
+            Self::PageNumber(e) => e.type_str(),
+            Self::Barcode(e) => e.type_str(),
+            Self::PageBreak(e) => e.type_str(),
+            Self::CurrentDate(e) => e.type_str(),
+            Self::Shape(e) => e.type_str(),
+            Self::Checkbox(e) => e.type_str(),
+            Self::CalculatedText(e) => e.type_str(),
+            Self::RichText(e) => e.type_str(),
+            Self::Chart(e) => e.type_str(),
         }
     }
 }
@@ -408,11 +505,8 @@ impl TemplateElement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RichTextElement {
-    pub id: String,
-    #[serde(default)]
-    pub condition: Option<Condition>,
-    pub position: PositionMode,
-    pub size: SizeConstraint,
+    #[serde(flatten)]
+    pub base: ElementBase,
     #[serde(default)]
     pub style: TextStyle, // varsayilan stil (span'lar override edebilir)
     pub content: Vec<RichTextSpan>,
@@ -421,13 +515,8 @@ pub struct RichTextElement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerElement {
-    pub id: String,
-    #[serde(default)]
-    pub condition: Option<Condition>,
-    #[serde(default)]
-    pub position: PositionMode,
-    #[serde(default)]
-    pub size: SizeConstraint,
+    #[serde(flatten)]
+    pub base: ElementBase,
     #[serde(default = "default_column")]
     pub direction: String,
     #[serde(default)]
@@ -463,11 +552,8 @@ fn default_start() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StaticTextElement {
-    pub id: String,
-    #[serde(default)]
-    pub condition: Option<Condition>,
-    pub position: PositionMode,
-    pub size: SizeConstraint,
+    #[serde(flatten)]
+    pub base: ElementBase,
     pub style: TextStyle,
     pub content: String,
 }
@@ -475,11 +561,8 @@ pub struct StaticTextElement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TextElement {
-    pub id: String,
-    #[serde(default)]
-    pub condition: Option<Condition>,
-    pub position: PositionMode,
-    pub size: SizeConstraint,
+    #[serde(flatten)]
+    pub base: ElementBase,
     pub style: TextStyle,
     pub content: Option<String>,
     pub binding: ScalarBinding,
@@ -488,22 +571,16 @@ pub struct TextElement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LineElement {
-    pub id: String,
-    #[serde(default)]
-    pub condition: Option<Condition>,
-    pub position: PositionMode,
-    pub size: SizeConstraint,
+    #[serde(flatten)]
+    pub base: ElementBase,
     pub style: LineStyle,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImageElement {
-    pub id: String,
-    #[serde(default)]
-    pub condition: Option<Condition>,
-    pub position: PositionMode,
-    pub size: SizeConstraint,
+    #[serde(flatten)]
+    pub base: ElementBase,
     pub src: Option<String>,
     pub binding: Option<ScalarBinding>,
     pub style: ImageStyle,
@@ -512,11 +589,8 @@ pub struct ImageElement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PageNumberElement {
-    pub id: String,
-    #[serde(default)]
-    pub condition: Option<Condition>,
-    pub position: PositionMode,
-    pub size: SizeConstraint,
+    #[serde(flatten)]
+    pub base: ElementBase,
     pub style: TextStyle,
     pub format: Option<String>,
 }
@@ -524,11 +598,8 @@ pub struct PageNumberElement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BarcodeElement {
-    pub id: String,
-    #[serde(default)]
-    pub condition: Option<Condition>,
-    pub position: PositionMode,
-    pub size: SizeConstraint,
+    #[serde(flatten)]
+    pub base: ElementBase,
     pub format: String, // qr, ean13, ean8, code128, code39
     pub value: Option<String>,
     pub binding: Option<ScalarBinding>,
@@ -538,11 +609,8 @@ pub struct BarcodeElement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RepeatingTableElement {
-    pub id: String,
-    #[serde(default)]
-    pub condition: Option<Condition>,
-    pub position: PositionMode,
-    pub size: SizeConstraint,
+    #[serde(flatten)]
+    pub base: ElementBase,
     pub data_source: ArrayBinding,
     pub columns: Vec<TableColumn>,
     pub style: TableStyle,
@@ -557,19 +625,15 @@ fn default_true() -> Option<bool> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PageBreakElement {
-    pub id: String,
-    #[serde(default)]
-    pub condition: Option<Condition>,
+    #[serde(flatten)]
+    pub base: ElementBase,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CurrentDateElement {
-    pub id: String,
-    #[serde(default)]
-    pub condition: Option<Condition>,
-    pub position: PositionMode,
-    pub size: SizeConstraint,
+    #[serde(flatten)]
+    pub base: ElementBase,
     pub style: TextStyle,
     pub format: Option<String>,
 }
@@ -577,11 +641,8 @@ pub struct CurrentDateElement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ShapeElement {
-    pub id: String,
-    #[serde(default)]
-    pub condition: Option<Condition>,
-    pub position: PositionMode,
-    pub size: SizeConstraint,
+    #[serde(flatten)]
+    pub base: ElementBase,
     pub shape_type: String, // rectangle, ellipse, rounded_rectangle
     pub style: ContainerStyle,
 }
@@ -598,11 +659,8 @@ pub struct CheckboxStyle {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CheckboxElement {
-    pub id: String,
-    #[serde(default)]
-    pub condition: Option<Condition>,
-    pub position: PositionMode,
-    pub size: SizeConstraint,
+    #[serde(flatten)]
+    pub base: ElementBase,
     pub checked: Option<bool>,          // statik değer
     pub binding: Option<ScalarBinding>, // dinamik boolean binding
     pub style: CheckboxStyle,
@@ -611,11 +669,8 @@ pub struct CheckboxElement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CalculatedTextElement {
-    pub id: String,
-    #[serde(default)]
-    pub condition: Option<Condition>,
-    pub position: PositionMode,
-    pub size: SizeConstraint,
+    #[serde(flatten)]
+    pub base: ElementBase,
     pub style: TextStyle,
     pub expression: String,
     pub format: Option<String>,

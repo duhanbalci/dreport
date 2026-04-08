@@ -2,6 +2,9 @@ use dreport_core::models::*;
 use serde_json::Value;
 use std::collections::HashMap;
 
+// Re-export HasOptionalBinding for convenience
+pub use dreport_core::models::HasOptionalBinding;
+
 /// Şu anki tarihi verilen format string'ine göre formatla.
 /// Desteklenen tokenlar: YYYY, MM, DD, HH, mm, ss
 /// WASM'da js_sys::Date, native'de SystemTime kullanır.
@@ -226,6 +229,15 @@ fn json_values_eq(a: &Value, b: &Value) -> bool {
     }
 }
 
+/// Çözümle optional binding: binding varsa data'dan, yoksa static value'dan
+fn resolve_optional_binding(el: &impl HasOptionalBinding, data: &Value) -> String {
+    if let Some(binding) = el.binding() {
+        value_to_string(resolve_path(data, &binding.path))
+    } else {
+        el.static_value().unwrap_or_default().to_string()
+    }
+}
+
 fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedData, format_config: &dreport_core::models::FormatConfig) {
     // Koşul kontrolü: condition varsa ve sağlanmıyorsa, hidden olarak işaretle ve çık
     if let Some(condition) = el.condition() && !evaluate_condition(condition, data) {
@@ -235,7 +247,7 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
 
     match el {
         TemplateElement::StaticText(e) => {
-            resolved.texts.insert(e.id.clone(), e.content.clone());
+            resolved.texts.insert(e.base.id.clone(), e.content.clone());
         }
         TemplateElement::Text(e) => {
             let bound_value = value_to_string(resolve_path(data, &e.binding.path));
@@ -243,7 +255,7 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
                 Some(prefix) if !prefix.is_empty() => format!("{}{}", prefix, bound_value),
                 _ => bound_value,
             };
-            resolved.texts.insert(e.id.clone(), text);
+            resolved.texts.insert(e.base.id.clone(), text);
         }
         TemplateElement::PageNumber(e) => {
             // Format string'i sakla — sayfa bölme sonrası gerçek değerlerle çözülecek
@@ -254,28 +266,18 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
                 .to_string();
             resolved
                 .page_number_formats
-                .insert(e.id.clone(), fmt.clone());
+                .insert(e.base.id.clone(), fmt.clone());
             // Placeholder koy (tek sayfalık fallback)
             resolved.texts.insert(
-                e.id.clone(),
+                e.base.id.clone(),
                 fmt.replace("{current}", "1").replace("{total}", "1"),
             );
         }
         TemplateElement::Barcode(e) => {
-            let value = if let Some(binding) = &e.binding {
-                value_to_string(resolve_path(data, &binding.path))
-            } else {
-                e.value.clone().unwrap_or_default()
-            };
-            resolved.barcodes.insert(e.id.clone(), value);
+            resolved.barcodes.insert(e.base.id.clone(), resolve_optional_binding(e, data));
         }
         TemplateElement::Image(e) => {
-            let src = if let Some(binding) = &e.binding {
-                value_to_string(resolve_path(data, &binding.path))
-            } else {
-                e.src.clone().unwrap_or_default()
-            };
-            resolved.images.insert(e.id.clone(), src);
+            resolved.images.insert(e.base.id.clone(), resolve_optional_binding(e, data));
         }
         TemplateElement::RepeatingTable(e) => {
             let array = resolve_path(data, &e.data_source.path);
@@ -302,7 +304,7 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
                 }
                 _ => vec![],
             };
-            resolved.tables.insert(e.id.clone(), ResolvedTable { rows });
+            resolved.tables.insert(e.base.id.clone(), ResolvedTable { rows });
         }
         TemplateElement::Container(e) => {
             for child in &e.children {
@@ -312,7 +314,7 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
         TemplateElement::CurrentDate(e) => {
             let fmt = e.format.as_deref().unwrap_or("DD.MM.YYYY");
             let text = format_current_date(fmt);
-            resolved.texts.insert(e.id.clone(), text);
+            resolved.texts.insert(e.base.id.clone(), text);
         }
         TemplateElement::Checkbox(e) => {
             let checked = if let Some(binding) = &e.binding {
@@ -327,7 +329,7 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
                 e.checked.unwrap_or(false)
             };
             // Store as "true"/"false" string in texts map
-            resolved.texts.insert(e.id.clone(), checked.to_string());
+            resolved.texts.insert(e.base.id.clone(), checked.to_string());
         }
         TemplateElement::CalculatedText(e) => {
             let result = crate::expr_eval::evaluate_expression(&e.expression, data);
@@ -338,7 +340,7 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
             } else {
                 formatted
             };
-            resolved.texts.insert(e.id.clone(), text);
+            resolved.texts.insert(e.base.id.clone(), text);
         }
         TemplateElement::RichText(e) => {
             let spans: Vec<ResolvedRichSpan> = e
@@ -371,7 +373,7 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
                     }
                 })
                 .collect();
-            resolved.rich_texts.insert(e.id.clone(), spans);
+            resolved.rich_texts.insert(e.base.id.clone(), spans);
         }
         TemplateElement::Chart(e) => {
             let array = resolve_path(data, &e.data_source.path);
@@ -389,7 +391,7 @@ fn resolve_element(el: &TemplateElement, data: &Value, resolved: &mut ResolvedDa
                     group_mode: e.group_mode.clone(),
                 },
             };
-            resolved.charts.insert(e.id.clone(), chart_data);
+            resolved.charts.insert(e.base.id.clone(), chart_data);
         }
         TemplateElement::Line(_) => {}
         TemplateElement::Shape(_) => {}
@@ -542,10 +544,7 @@ mod tests {
             format_config: None,
             locale: None,
             root: ContainerElement {
-                id: "root".to_string(),
-                condition: None,
-                position: PositionMode::Flow,
-                size: SizeConstraint::default(),
+                base: ElementBase::flow("root".to_string(), SizeConstraint::default()),
                 direction: "column".to_string(),
                 gap: 0.0,
                 padding: Padding::default(),
@@ -554,10 +553,7 @@ mod tests {
                 style: ContainerStyle::default(),
                 break_inside: "auto".to_string(),
                 children: vec![TemplateElement::Text(TextElement {
-                    id: "el_name".to_string(),
-                    condition: None,
-                    position: PositionMode::Flow,
-                    size: SizeConstraint::default(),
+                    base: ElementBase::flow("el_name".to_string(), SizeConstraint::default()),
                     style: TextStyle::default(),
                     content: None,
                     binding: ScalarBinding {
@@ -593,10 +589,7 @@ mod tests {
             format_config: None,
             locale: None,
             root: ContainerElement {
-                id: "root".to_string(),
-                condition: None,
-                position: PositionMode::Flow,
-                size: SizeConstraint::default(),
+                base: ElementBase::flow("root".to_string(), SizeConstraint::default()),
                 direction: "column".to_string(),
                 gap: 0.0,
                 padding: Padding::default(),
@@ -605,10 +598,7 @@ mod tests {
                 style: ContainerStyle::default(),
                 break_inside: "auto".to_string(),
                 children: vec![TemplateElement::Text(TextElement {
-                    id: "el_no".to_string(),
-                    condition: None,
-                    position: PositionMode::Flow,
-                    size: SizeConstraint::default(),
+                    base: ElementBase::flow("el_no".to_string(), SizeConstraint::default()),
                     style: TextStyle::default(),
                     content: Some("Fatura No: ".to_string()),
                     binding: ScalarBinding {
@@ -641,10 +631,7 @@ mod tests {
             format_config: None,
             locale: None,
             root: ContainerElement {
-                id: "root".to_string(),
-                condition: None,
-                position: PositionMode::Flow,
-                size: SizeConstraint::default(),
+                base: ElementBase::flow("root".to_string(), SizeConstraint::default()),
                 direction: "column".to_string(),
                 gap: 0.0,
                 padding: Padding::default(),
@@ -653,10 +640,7 @@ mod tests {
                 style: ContainerStyle::default(),
                 break_inside: "auto".to_string(),
                 children: vec![TemplateElement::StaticText(StaticTextElement {
-                    id: "title".to_string(),
-                    condition: None,
-                    position: PositionMode::Flow,
-                    size: SizeConstraint::default(),
+                    base: ElementBase::flow("title".to_string(), SizeConstraint::default()),
                     style: TextStyle::default(),
                     content: "FATURA".to_string(),
                 })],
@@ -682,10 +666,7 @@ mod tests {
             format_config: None,
             locale: None,
             root: ContainerElement {
-                id: "root".to_string(),
-                condition: None,
-                position: PositionMode::Flow,
-                size: SizeConstraint::default(),
+                base: ElementBase::flow("root".to_string(), SizeConstraint::default()),
                 direction: "column".to_string(),
                 gap: 0.0,
                 padding: Padding::default(),
@@ -694,10 +675,7 @@ mod tests {
                 style: ContainerStyle::default(),
                 break_inside: "auto".to_string(),
                 children: vec![TemplateElement::RepeatingTable(RepeatingTableElement {
-                    id: "tbl".to_string(),
-                    condition: None,
-                    position: PositionMode::Flow,
-                    size: SizeConstraint::default(),
+                    base: ElementBase::flow("tbl".to_string(), SizeConstraint::default()),
                     data_source: ArrayBinding {
                         path: "kalemler".to_string(),
                     },
@@ -754,10 +732,7 @@ mod tests {
             format_config: None,
             locale: None,
             root: ContainerElement {
-                id: "root".to_string(),
-                condition: None,
-                position: PositionMode::Flow,
-                size: SizeConstraint::default(),
+                base: ElementBase::flow("root".to_string(), SizeConstraint::default()),
                 direction: "column".to_string(),
                 gap: 0.0,
                 padding: Padding::default(),
@@ -766,10 +741,7 @@ mod tests {
                 style: ContainerStyle::default(),
                 break_inside: "auto".to_string(),
                 children: vec![TemplateElement::RepeatingTable(RepeatingTableElement {
-                    id: "tbl".to_string(),
-                    condition: None,
-                    position: PositionMode::Flow,
-                    size: SizeConstraint::default(),
+                    base: ElementBase::flow("tbl".to_string(), SizeConstraint::default()),
                     data_source: ArrayBinding {
                         path: "items".to_string(),
                     },
@@ -808,10 +780,7 @@ mod tests {
             format_config: None,
             locale: None,
             root: ContainerElement {
-                id: "root".to_string(),
-                condition: None,
-                position: PositionMode::Flow,
-                size: SizeConstraint::default(),
+                base: ElementBase::flow("root".to_string(), SizeConstraint::default()),
                 direction: "column".to_string(),
                 gap: 0.0,
                 padding: Padding::default(),
@@ -820,10 +789,7 @@ mod tests {
                 style: ContainerStyle::default(),
                 break_inside: "auto".to_string(),
                 children: vec![TemplateElement::Text(TextElement {
-                    id: "el_missing".to_string(),
-                    condition: None,
-                    position: PositionMode::Flow,
-                    size: SizeConstraint::default(),
+                    base: ElementBase::flow("el_missing".to_string(), SizeConstraint::default()),
                     style: TextStyle::default(),
                     content: None,
                     binding: ScalarBinding {

@@ -20,10 +20,7 @@ fn simple_template() -> Template {
         format_config: None,
         locale: None,
         root: ContainerElement {
-            id: "root".to_string(),
-            condition: None,
-            position: PositionMode::Flow,
-            size: SizeConstraint::default(),
+            base: ElementBase::flow("root".to_string(), SizeConstraint::default()),
             direction: "column".to_string(),
             gap: 5.0,
             padding: Padding {
@@ -37,14 +34,14 @@ fn simple_template() -> Template {
             style: ContainerStyle::default(),
             break_inside: "auto".to_string(),
             children: vec![TemplateElement::StaticText(StaticTextElement {
-                id: "title".to_string(),
-                condition: None,
-                position: PositionMode::Flow,
-                size: SizeConstraint {
-                    width: SizeValue::Fr { value: 1.0 },
-                    height: SizeValue::Auto,
-                    ..Default::default()
-                },
+                base: ElementBase::flow(
+                    "title".to_string(),
+                    SizeConstraint {
+                        width: SizeValue::Fr { value: 1.0 },
+                        height: SizeValue::Auto,
+                        ..Default::default()
+                    },
+                ),
                 style: TextStyle {
                     font_size: Some(14.0),
                     font_weight: Some("bold".to_string()),
@@ -166,10 +163,7 @@ fn test_compute_layout_with_data_binding() {
         format_config: None,
         locale: None,
         root: ContainerElement {
-            id: "root".to_string(),
-            condition: None,
-            position: PositionMode::Flow,
-            size: SizeConstraint::default(),
+            base: ElementBase::flow("root".to_string(), SizeConstraint::default()),
             direction: "column".to_string(),
             gap: 0.0,
             padding: Padding {
@@ -183,14 +177,14 @@ fn test_compute_layout_with_data_binding() {
             style: ContainerStyle::default(),
             break_inside: "auto".to_string(),
             children: vec![TemplateElement::Text(TextElement {
-                id: "bound_text".to_string(),
-                condition: None,
-                position: PositionMode::Flow,
-                size: SizeConstraint {
-                    width: SizeValue::Fr { value: 1.0 },
-                    height: SizeValue::Auto,
-                    ..Default::default()
-                },
+                base: ElementBase::flow(
+                    "bound_text".to_string(),
+                    SizeConstraint {
+                        width: SizeValue::Fr { value: 1.0 },
+                        height: SizeValue::Auto,
+                        ..Default::default()
+                    },
+                ),
                 style: TextStyle {
                     font_size: Some(12.0),
                     ..Default::default()
@@ -235,10 +229,7 @@ fn test_compute_layout_multiple_children_ordering() {
         format_config: None,
         locale: None,
         root: ContainerElement {
-            id: "root".to_string(),
-            condition: None,
-            position: PositionMode::Flow,
-            size: SizeConstraint::default(),
+            base: ElementBase::flow("root".to_string(), SizeConstraint::default()),
             direction: "column".to_string(),
             gap: 5.0,
             padding: Padding {
@@ -253,14 +244,14 @@ fn test_compute_layout_multiple_children_ordering() {
             break_inside: "auto".to_string(),
             children: vec![
                 TemplateElement::StaticText(StaticTextElement {
-                    id: "first".to_string(),
-                    condition: None,
-                    position: PositionMode::Flow,
-                    size: SizeConstraint {
-                        width: SizeValue::Fr { value: 1.0 },
-                        height: SizeValue::Auto,
-                        ..Default::default()
-                    },
+                    base: ElementBase::flow(
+                        "first".to_string(),
+                        SizeConstraint {
+                            width: SizeValue::Fr { value: 1.0 },
+                            height: SizeValue::Auto,
+                            ..Default::default()
+                        },
+                    ),
                     style: TextStyle {
                         font_size: Some(12.0),
                         ..Default::default()
@@ -268,14 +259,14 @@ fn test_compute_layout_multiple_children_ordering() {
                     content: "First".to_string(),
                 }),
                 TemplateElement::StaticText(StaticTextElement {
-                    id: "second".to_string(),
-                    condition: None,
-                    position: PositionMode::Flow,
-                    size: SizeConstraint {
-                        width: SizeValue::Fr { value: 1.0 },
-                        height: SizeValue::Auto,
-                        ..Default::default()
-                    },
+                    base: ElementBase::flow(
+                        "second".to_string(),
+                        SizeConstraint {
+                            width: SizeValue::Fr { value: 1.0 },
+                            height: SizeValue::Auto,
+                            ..Default::default()
+                        },
+                    ),
                     style: TextStyle {
                         font_size: Some(12.0),
                         ..Default::default()

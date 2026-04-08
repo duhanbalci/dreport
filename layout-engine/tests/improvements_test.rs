@@ -27,12 +27,9 @@ fn base_template() -> Template {
         format_config: None,
         locale: None,
         root: ContainerElement {
-            id: "root".to_string(),
-            position: PositionMode::Flow,
-            size: SizeConstraint::default(),
+            base: ElementBase::flow("root".to_string(), SizeConstraint::default()),
             direction: "column".to_string(),
             gap: 5.0,
-            condition: None,
             padding: Padding {
                 top: 15.0,
                 right: 15.0,
@@ -57,14 +54,11 @@ fn test_1_2_text_wrapping_layout_height() {
     // Dar bir container'da uzun metin → yükseklik tek satırdan fazla olmalı
     let mut tpl = base_template();
     tpl.root.children.push(TemplateElement::StaticText(StaticTextElement {
-        id: "long_text".to_string(),
-        position: PositionMode::Flow,
-        condition: None,
-        size: SizeConstraint {
+        base: ElementBase::flow("long_text".to_string(), SizeConstraint {
             width: SizeValue::Fixed { value: 40.0 }, // 40mm genişlik — kısa
             height: SizeValue::Auto,
             ..Default::default()
-        },
+        }),
         style: TextStyle {
             font_size: Some(12.0),
             ..Default::default()
@@ -94,14 +88,11 @@ fn test_1_2_text_wrapping_pdf_renders() {
     // PDF render sırasında text wrapping çalışmalı — crash olmamalı
     let mut tpl = base_template();
     tpl.root.children.push(TemplateElement::StaticText(StaticTextElement {
-        id: "wrap_pdf".to_string(),
-        condition: None,
-        position: PositionMode::Flow,
-        size: SizeConstraint {
+        base: ElementBase::flow("wrap_pdf".to_string(), SizeConstraint {
             width: SizeValue::Fixed { value: 50.0 },
             height: SizeValue::Auto,
             ..Default::default()
-        },
+        }),
         style: TextStyle {
             font_size: Some(11.0),
             ..Default::default()
@@ -125,14 +116,11 @@ fn test_1_2_text_wrapping_pdf_renders() {
 fn test_1_3_image_object_fit_in_layout() {
     let mut tpl = base_template();
     tpl.root.children.push(TemplateElement::Image(ImageElement {
-        id: "img_contain".to_string(),
-        position: PositionMode::Flow,
-        condition: None,
-        size: SizeConstraint {
+        base: ElementBase::flow("img_contain".to_string(), SizeConstraint {
             width: SizeValue::Fixed { value: 40.0 },
             height: SizeValue::Fixed { value: 30.0 },
             ..Default::default()
-        },
+        }),
         src: Some("data:image/png;base64,iVBORw0KGgo=".to_string()),
         binding: None,
         style: ImageStyle {
@@ -167,14 +155,11 @@ fn test_1_4_italic_font_in_pdf() {
     tpl.root
         .children
         .push(TemplateElement::StaticText(StaticTextElement {
-            id: "italic_text".to_string(),
-            position: PositionMode::Flow,
-            condition: None,
-            size: SizeConstraint {
+            base: ElementBase::flow("italic_text".to_string(), SizeConstraint {
                 width: SizeValue::Fr { value: 1.0 },
                 height: SizeValue::Auto,
                 ..Default::default()
-            },
+            }),
             style: TextStyle {
                 font_size: Some(12.0),
                 font_style: Some("italic".to_string()),
@@ -205,14 +190,11 @@ fn test_1_4_bold_italic_font_in_pdf() {
     tpl.root
         .children
         .push(TemplateElement::StaticText(StaticTextElement {
-            id: "bold_italic".to_string(),
-            position: PositionMode::Flow,
-            condition: None,
-            size: SizeConstraint {
+            base: ElementBase::flow("bold_italic".to_string(), SizeConstraint {
                 width: SizeValue::Fr { value: 1.0 },
                 height: SizeValue::Auto,
                 ..Default::default()
-            },
+            }),
             style: TextStyle {
                 font_size: Some(14.0),
                 font_weight: Some("bold".to_string()),
@@ -239,14 +221,11 @@ fn test_2_1_repeat_header_false_no_repeat_on_second_page() {
     tpl.root
         .children
         .push(TemplateElement::RepeatingTable(RepeatingTableElement {
-            id: "tbl_no_repeat".to_string(),
-            position: PositionMode::Flow,
-            condition: None,
-            size: SizeConstraint {
+            base: ElementBase::flow("tbl_no_repeat".to_string(), SizeConstraint {
                 width: SizeValue::Fr { value: 1.0 },
                 height: SizeValue::Auto,
                 ..Default::default()
-            },
+            }),
             data_source: ArrayBinding {
                 path: "items".to_string(),
             },
@@ -305,14 +284,11 @@ fn test_2_1_repeat_header_true_repeats_on_second_page() {
     tpl.root
         .children
         .push(TemplateElement::RepeatingTable(RepeatingTableElement {
-            id: "tbl_repeat".to_string(),
-            position: PositionMode::Flow,
-            condition: None,
-            size: SizeConstraint {
+            base: ElementBase::flow("tbl_repeat".to_string(), SizeConstraint {
                 width: SizeValue::Fr { value: 1.0 },
                 height: SizeValue::Auto,
                 ..Default::default()
-            },
+            }),
             data_source: ArrayBinding {
                 path: "items".to_string(),
             },
@@ -389,14 +365,11 @@ fn test_2_2_table_column_format_currency() {
     tpl.root
         .children
         .push(TemplateElement::RepeatingTable(RepeatingTableElement {
-            id: "tbl_fmt".to_string(),
-            position: PositionMode::Flow,
-            condition: None,
-            size: SizeConstraint {
+            base: ElementBase::flow("tbl_fmt".to_string(), SizeConstraint {
                 width: SizeValue::Fr { value: 1.0 },
                 height: SizeValue::Auto,
                 ..Default::default()
-            },
+            }),
             data_source: ArrayBinding {
                 path: "items".to_string(),
             },
@@ -459,14 +432,11 @@ fn test_2_2_table_column_format_currency() {
 fn test_2_3_rounded_rectangle_renders() {
     let mut tpl = base_template();
     tpl.root.children.push(TemplateElement::Shape(ShapeElement {
-        id: "rounded_shape".to_string(),
-        position: PositionMode::Flow,
-        condition: None,
-        size: SizeConstraint {
+        base: ElementBase::flow("rounded_shape".to_string(), SizeConstraint {
             width: SizeValue::Fixed { value: 50.0 },
             height: SizeValue::Fixed { value: 30.0 },
             ..Default::default()
-        },
+        }),
         shape_type: "rounded_rectangle".to_string(),
         style: ContainerStyle {
             background_color: Some("#3b82f6".to_string()),
@@ -505,14 +475,11 @@ fn test_2_3_container_border_radius_renders() {
     tpl.root
         .children
         .push(TemplateElement::StaticText(StaticTextElement {
-            id: "text_in_rounded".to_string(),
-            position: PositionMode::Flow,
-            condition: None,
-            size: SizeConstraint {
+            base: ElementBase::flow("text_in_rounded".to_string(), SizeConstraint {
                 width: SizeValue::Fr { value: 1.0 },
                 height: SizeValue::Auto,
                 ..Default::default()
-            },
+            }),
             style: TextStyle {
                 font_size: Some(12.0),
                 ..Default::default()
@@ -604,14 +571,11 @@ fn test_2_7_format_config_in_template() {
 fn test_ellipse_shape_renders() {
     let mut tpl = base_template();
     tpl.root.children.push(TemplateElement::Shape(ShapeElement {
-        id: "ellipse".to_string(),
-        position: PositionMode::Flow,
-        condition: None,
-        size: SizeConstraint {
+        base: ElementBase::flow("ellipse".to_string(), SizeConstraint {
             width: SizeValue::Fixed { value: 40.0 },
             height: SizeValue::Fixed { value: 20.0 },
             ..Default::default()
-        },
+        }),
         shape_type: "ellipse".to_string(),
         style: ContainerStyle {
             background_color: Some("#ff6600".to_string()),
@@ -635,22 +599,21 @@ fn test_ellipse_shape_renders() {
 fn test_7_1_condition_gt_hides_element() {
     let mut tpl = base_template();
     tpl.root.children.push(TemplateElement::StaticText(StaticTextElement {
-        id: "always_visible".to_string(),
-        condition: None,
-        position: PositionMode::Flow,
-        size: SizeConstraint::default(),
+        base: ElementBase::flow("always_visible".to_string(), SizeConstraint::default()),
         style: TextStyle { font_size: Some(10.0), ..Default::default() },
         content: "Visible".to_string(),
     }));
     tpl.root.children.push(TemplateElement::Text(TextElement {
-        id: "conditional_text".to_string(),
-        condition: Some(Condition {
-            path: "toplamlar.iskonto".to_string(),
-            operator: "gt".to_string(),
-            value: Some(serde_json::json!(0)),
-        }),
-        position: PositionMode::Flow,
-        size: SizeConstraint::default(),
+        base: ElementBase {
+            id: "conditional_text".to_string(),
+            condition: Some(Condition {
+                path: "toplamlar.iskonto".to_string(),
+                operator: "gt".to_string(),
+                value: Some(serde_json::json!(0)),
+            }),
+            position: PositionMode::Flow,
+            size: SizeConstraint::default(),
+        },
         style: TextStyle { font_size: Some(10.0), ..Default::default() },
         content: None,
         binding: ScalarBinding { path: "toplamlar.iskonto".to_string() },
@@ -676,14 +639,16 @@ fn test_7_1_condition_gt_hides_element() {
 fn test_7_1_condition_gt_shows_element() {
     let mut tpl = base_template();
     tpl.root.children.push(TemplateElement::Text(TextElement {
-        id: "conditional_text".to_string(),
-        condition: Some(Condition {
-            path: "toplamlar.iskonto".to_string(),
-            operator: "gt".to_string(),
-            value: Some(serde_json::json!(0)),
-        }),
-        position: PositionMode::Flow,
-        size: SizeConstraint::default(),
+        base: ElementBase {
+            id: "conditional_text".to_string(),
+            condition: Some(Condition {
+                path: "toplamlar.iskonto".to_string(),
+                operator: "gt".to_string(),
+                value: Some(serde_json::json!(0)),
+            }),
+            position: PositionMode::Flow,
+            size: SizeConstraint::default(),
+        },
         style: TextStyle { font_size: Some(10.0), ..Default::default() },
         content: None,
         binding: ScalarBinding { path: "toplamlar.iskonto".to_string() },
@@ -705,14 +670,16 @@ fn test_7_1_condition_gt_shows_element() {
 fn test_7_1_condition_eq_operator() {
     let mut tpl = base_template();
     tpl.root.children.push(TemplateElement::StaticText(StaticTextElement {
-        id: "status_text".to_string(),
-        condition: Some(Condition {
-            path: "durum".to_string(),
-            operator: "eq".to_string(),
-            value: Some(serde_json::json!("aktif")),
-        }),
-        position: PositionMode::Flow,
-        size: SizeConstraint::default(),
+        base: ElementBase {
+            id: "status_text".to_string(),
+            condition: Some(Condition {
+                path: "durum".to_string(),
+                operator: "eq".to_string(),
+                value: Some(serde_json::json!("aktif")),
+            }),
+            position: PositionMode::Flow,
+            size: SizeConstraint::default(),
+        },
         style: TextStyle { font_size: Some(10.0), ..Default::default() },
         content: "Aktif".to_string(),
     }));
@@ -732,14 +699,16 @@ fn test_7_1_condition_eq_operator() {
 fn test_7_1_condition_empty_not_empty() {
     let mut tpl = base_template();
     tpl.root.children.push(TemplateElement::StaticText(StaticTextElement {
-        id: "show_if_exists".to_string(),
-        condition: Some(Condition {
-            path: "note".to_string(),
-            operator: "not_empty".to_string(),
-            value: None,
-        }),
-        position: PositionMode::Flow,
-        size: SizeConstraint::default(),
+        base: ElementBase {
+            id: "show_if_exists".to_string(),
+            condition: Some(Condition {
+                path: "note".to_string(),
+                operator: "not_empty".to_string(),
+                value: None,
+            }),
+            position: PositionMode::Flow,
+            size: SizeConstraint::default(),
+        },
         style: TextStyle { font_size: Some(10.0), ..Default::default() },
         content: "Has note".to_string(),
     }));
@@ -763,14 +732,16 @@ fn test_7_1_condition_empty_not_empty() {
 fn test_7_1_condition_on_container_hides_children() {
     let mut tpl = base_template();
     tpl.root.children.push(TemplateElement::Container(ContainerElement {
-        id: "cond_container".to_string(),
-        condition: Some(Condition {
-            path: "show".to_string(),
-            operator: "eq".to_string(),
-            value: Some(serde_json::json!(true)),
-        }),
-        position: PositionMode::Flow,
-        size: SizeConstraint::default(),
+        base: ElementBase {
+            id: "cond_container".to_string(),
+            condition: Some(Condition {
+                path: "show".to_string(),
+                operator: "eq".to_string(),
+                value: Some(serde_json::json!(true)),
+            }),
+            position: PositionMode::Flow,
+            size: SizeConstraint::default(),
+        },
         direction: "column".to_string(),
         gap: 0.0,
         padding: Padding::default(),
@@ -779,10 +750,7 @@ fn test_7_1_condition_on_container_hides_children() {
         style: ContainerStyle::default(),
         break_inside: "auto".to_string(),
         children: vec![TemplateElement::StaticText(StaticTextElement {
-            id: "child_text".to_string(),
-            condition: None,
-            position: PositionMode::Flow,
-            size: SizeConstraint::default(),
+            base: ElementBase::flow("child_text".to_string(), SizeConstraint::default()),
             style: TextStyle { font_size: Some(10.0), ..Default::default() },
             content: "Child".to_string(),
         })],
@@ -854,10 +822,7 @@ fn test_7_5_effective_format_config_priority() {
         header: None,
         footer: None,
         root: ContainerElement {
-            id: "root".to_string(),
-            condition: None,
-            position: PositionMode::Flow,
-            size: SizeConstraint::default(),
+            base: ElementBase::flow("root".to_string(), SizeConstraint::default()),
             direction: "column".to_string(),
             gap: 0.0,
             padding: Padding::default(),
@@ -889,10 +854,7 @@ fn test_7_5_effective_format_config_locale_fallback() {
         header: None,
         footer: None,
         root: ContainerElement {
-            id: "root".to_string(),
-            condition: None,
-            position: PositionMode::Flow,
-            size: SizeConstraint::default(),
+            base: ElementBase::flow("root".to_string(), SizeConstraint::default()),
             direction: "column".to_string(),
             gap: 0.0,
             padding: Padding::default(),
@@ -915,14 +877,11 @@ fn test_7_5_locale_affects_table_currency_format() {
     let mut tpl = base_template();
     tpl.locale = Some("en-US".to_string());
     tpl.root.children.push(TemplateElement::RepeatingTable(RepeatingTableElement {
-        id: "tbl_locale".to_string(),
-        condition: None,
-        position: PositionMode::Flow,
-        size: SizeConstraint {
+        base: ElementBase::flow("tbl_locale".to_string(), SizeConstraint {
             width: SizeValue::Fr { value: 1.0 },
             height: SizeValue::Auto,
             ..Default::default()
-        },
+        }),
         data_source: ArrayBinding { path: "items".to_string() },
         columns: vec![
             TableColumn {

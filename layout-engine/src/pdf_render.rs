@@ -1603,17 +1603,14 @@ mod tests {
             format_config: None,
             locale: None,
             root: ContainerElement {
-                id: "root".to_string(),
-                condition: None,
-                position: PositionMode::Flow,
-                size: SizeConstraint {
+                base: ElementBase::flow("root".to_string(), SizeConstraint {
                     width: SizeValue::Auto,
                     height: SizeValue::Auto,
                     min_width: None,
                     min_height: None,
                     max_width: None,
                     max_height: None,
-                },
+                }),
                 direction: "column".to_string(),
                 gap: 5.0,
                 padding: Padding {
@@ -1628,17 +1625,14 @@ mod tests {
                 break_inside: "auto".to_string(),
                 children: vec![
                     TemplateElement::StaticText(StaticTextElement {
-                        id: "title".to_string(),
-                        condition: None,
-                        position: PositionMode::Flow,
-                        size: SizeConstraint {
+                        base: ElementBase::flow("title".to_string(), SizeConstraint {
                             width: SizeValue::Fr { value: 1.0 },
                             height: SizeValue::Auto,
                             min_width: None,
                             min_height: None,
                             max_width: None,
                             max_height: None,
-                        },
+                        }),
                         style: TextStyle {
                             font_size: Some(18.0),
                             font_weight: Some("bold".to_string()),
@@ -1647,34 +1641,28 @@ mod tests {
                         content: "FATURA".to_string(),
                     }),
                     TemplateElement::Line(LineElement {
-                        id: "line1".to_string(),
-                        condition: None,
-                        position: PositionMode::Flow,
-                        size: SizeConstraint {
+                        base: ElementBase::flow("line1".to_string(), SizeConstraint {
                             width: SizeValue::Fr { value: 1.0 },
                             height: SizeValue::Auto,
                             min_width: None,
                             min_height: None,
                             max_width: None,
                             max_height: None,
-                        },
+                        }),
                         style: LineStyle {
                             stroke_color: Some("#000000".to_string()),
                             stroke_width: Some(0.5),
                         },
                     }),
                     TemplateElement::Text(TextElement {
-                        id: "firma".to_string(),
-                        condition: None,
-                        position: PositionMode::Flow,
-                        size: SizeConstraint {
+                        base: ElementBase::flow("firma".to_string(), SizeConstraint {
                             width: SizeValue::Fr { value: 1.0 },
                             height: SizeValue::Auto,
                             min_width: None,
                             min_height: None,
                             max_width: None,
                             max_height: None,
-                        },
+                        }),
                         style: TextStyle {
                             font_size: Some(11.0),
                             ..Default::default()

@@ -185,7 +185,7 @@ fn collect_break_modes(root: &ContainerElement) -> HashMap<String, String> {
 
 fn collect_break_modes_recursive(el: &TemplateElement, modes: &mut HashMap<String, String>) {
     if let TemplateElement::Container(c) = el {
-        modes.insert(c.id.clone(), c.break_inside.clone());
+        modes.insert(c.base.id.clone(), c.break_inside.clone());
         for child in &c.children {
             collect_break_modes_recursive(child, modes);
         }
@@ -208,7 +208,7 @@ fn collect_no_repeat_recursive(el: &TemplateElement, set: &mut std::collections:
         }
         TemplateElement::RepeatingTable(t) => {
             if t.repeat_header == Some(false) {
-                set.insert(t.id.clone());
+                set.insert(t.base.id.clone());
             }
         }
         _ => {}
@@ -233,7 +233,7 @@ fn build_container(
     // Child'lar için kullanılabilir genişliği hesapla
     // Container'ın kendi padding ve border'ını çıkar
     let border_w = el.style.border_width.unwrap_or(0.0);
-    let container_own_width = match &el.size.width {
+    let container_own_width = match &el.base.size.width {
         SizeValue::Fixed { value } => *value,
         _ => page_width_mm, // Fr veya Auto ise parent'ın genişliğini kullan
     };
@@ -268,17 +268,10 @@ fn build_container(
     node_map.insert(
         node,
         NodeInfo {
-            element_id: el.id.clone(),
-            element_type: "container".to_string(),
+            element_id: el.base.id.clone(),
+            element_type: el.type_str().to_string(),
             content: None,
-            style: ResolvedStyle {
-                background_color: el.style.background_color.clone(),
-                border_color: el.style.border_color.clone(),
-                border_width: el.style.border_width,
-                border_radius: el.style.border_radius,
-                border_style: el.style.border_style.clone(),
-                ..Default::default()
-            },
+            style: (&el.style).into(),
             children_ids,
         },
     );
@@ -309,88 +302,63 @@ fn build_element(
             page_width_mm,
             table_cache,
         ),
-        TemplateElement::StaticText(e) => build_text_leaf(
+        TemplateElement::StaticText(e) => build_resolved_text_leaf(
+            &e.base,
+            e.type_str(),
+            &e.style,
             taffy,
             node_map,
-            &e.id,
-            "static_text",
-            resolved
-                .texts
-                .get(&e.id)
-                .map(|s| s.as_str())
-                .unwrap_or(&e.content),
-            &e.style,
-            &e.size,
-            &e.position,
+            resolved,
             parent_direction,
+            &e.content,
         ),
-        TemplateElement::Text(e) => {
-            let text = resolved.texts.get(&e.id).map(|s| s.as_str()).unwrap_or("");
-            build_text_leaf(
-                taffy,
-                node_map,
-                &e.id,
-                "text",
-                text,
-                &e.style,
-                &e.size,
-                &e.position,
-                parent_direction,
-            )
-        }
-        TemplateElement::PageNumber(e) => {
-            let text = resolved
-                .texts
-                .get(&e.id)
-                .map(|s| s.as_str())
-                .unwrap_or("1 / 1");
-            build_text_leaf(
-                taffy,
-                node_map,
-                &e.id,
-                "page_number",
-                text,
-                &e.style,
-                &e.size,
-                &e.position,
-                parent_direction,
-            )
-        }
-        TemplateElement::CurrentDate(e) => {
-            let text = resolved.texts.get(&e.id).map(|s| s.as_str()).unwrap_or("");
-            build_text_leaf(
-                taffy,
-                node_map,
-                &e.id,
-                "current_date",
-                text,
-                &e.style,
-                &e.size,
-                &e.position,
-                parent_direction,
-            )
-        }
-        TemplateElement::CalculatedText(e) => {
-            let text = resolved.texts.get(&e.id).map(|s| s.as_str()).unwrap_or("");
-            build_text_leaf(
-                taffy,
-                node_map,
-                &e.id,
-                "calculated_text",
-                text,
-                &e.style,
-                &e.size,
-                &e.position,
-                parent_direction,
-            )
-        }
+        TemplateElement::Text(e) => build_resolved_text_leaf(
+            &e.base,
+            e.type_str(),
+            &e.style,
+            taffy,
+            node_map,
+            resolved,
+            parent_direction,
+            "",
+        ),
+        TemplateElement::PageNumber(e) => build_resolved_text_leaf(
+            &e.base,
+            e.type_str(),
+            &e.style,
+            taffy,
+            node_map,
+            resolved,
+            parent_direction,
+            "1 / 1",
+        ),
+        TemplateElement::CurrentDate(e) => build_resolved_text_leaf(
+            &e.base,
+            e.type_str(),
+            &e.style,
+            taffy,
+            node_map,
+            resolved,
+            parent_direction,
+            "",
+        ),
+        TemplateElement::CalculatedText(e) => build_resolved_text_leaf(
+            &e.base,
+            e.type_str(),
+            &e.style,
+            taffy,
+            node_map,
+            resolved,
+            parent_direction,
+            "",
+        ),
         TemplateElement::Line(e) => {
             let stroke_w = e.style.stroke_width.unwrap_or(0.5);
-            let style = sizing::leaf_style(&e.size, &e.position, parent_direction);
+            let style = sizing::leaf_style(&e.base.size, &e.base.position, parent_direction);
 
             // Line: genişlik parent'tan, yükseklik stroke width
             let mut leaf_style = style;
-            if matches!(e.size.height, SizeValue::Auto) {
+            if matches!(e.base.size.height, SizeValue::Auto) {
                 leaf_style.size.height = Dimension::length(mm_to_pt(stroke_w));
             }
 
@@ -398,13 +366,13 @@ fn build_element(
             node_map.insert(
                 node,
                 NodeInfo {
-                    element_id: e.id.clone(),
-                    element_type: "line".to_string(),
+                    element_id: e.base.id.clone(),
+                    element_type: e.type_str().to_string(),
                     content: Some(ResolvedContent::Line),
-                    style: ResolvedStyle {
-                        stroke_color: e.style.stroke_color.clone(),
-                        stroke_width: Some(stroke_w),
-                        ..Default::default()
+                    style: {
+                        let mut s: ResolvedStyle = (&e.style).into();
+                        s.stroke_width = Some(stroke_w);
+                        s
                     },
                     children_ids: vec![],
                 },
@@ -412,37 +380,34 @@ fn build_element(
             Ok(node)
         }
         TemplateElement::Image(e) => {
-            let style = sizing::leaf_style(&e.size, &e.position, parent_direction);
-            let src = resolved.images.get(&e.id).cloned().unwrap_or_default();
+            let style = sizing::leaf_style(&e.base.size, &e.base.position, parent_direction);
+            let src = resolved.images.get(&e.base.id).cloned().unwrap_or_default();
 
             let node = taffy.new_leaf(style)?;
             node_map.insert(
                 node,
                 NodeInfo {
-                    element_id: e.id.clone(),
-                    element_type: "image".to_string(),
+                    element_id: e.base.id.clone(),
+                    element_type: e.type_str().to_string(),
                     content: Some(ResolvedContent::Image { src }),
-                    style: ResolvedStyle {
-                        object_fit: e.style.object_fit.clone(),
-                        ..Default::default()
-                    },
+                    style: (&e.style).into(),
                     children_ids: vec![],
                 },
             );
             Ok(node)
         }
         TemplateElement::Barcode(e) => {
-            let mut style = sizing::leaf_style(&e.size, &e.position, parent_direction);
-            let value = resolved.barcodes.get(&e.id).cloned().unwrap_or_default();
+            let mut style = sizing::leaf_style(&e.base.size, &e.base.position, parent_direction);
+            let value = resolved.barcodes.get(&e.base.id).cloned().unwrap_or_default();
 
             // Barcode leaf'e minimum boyut ver (MeasureFunc yok, Auto=0 olur)
             let is_qr = e.format == "qr";
             let default_h = if is_qr { 20.0 } else { 15.0 }; // mm
             let default_w = if is_qr { 20.0 } else { 40.0 }; // mm
-            if matches!(e.size.height, SizeValue::Auto) {
+            if matches!(e.base.size.height, SizeValue::Auto) {
                 style.min_size.height = Dimension::length(mm_to_pt(default_h));
             }
-            if matches!(e.size.width, SizeValue::Auto) {
+            if matches!(e.base.size.width, SizeValue::Auto) {
                 style.min_size.width = Dimension::length(mm_to_pt(default_w));
             }
 
@@ -450,17 +415,13 @@ fn build_element(
             node_map.insert(
                 node,
                 NodeInfo {
-                    element_id: e.id.clone(),
-                    element_type: "barcode".to_string(),
+                    element_id: e.base.id.clone(),
+                    element_type: e.type_str().to_string(),
                     content: Some(ResolvedContent::Barcode {
                         format: e.format.clone(),
                         value,
                     }),
-                    style: ResolvedStyle {
-                        barcode_color: e.style.color.clone(),
-                        barcode_include_text: e.style.include_text,
-                        ..Default::default()
-                    },
+                    style: (&e.style).into(),
                     children_ids: vec![],
                 },
             );
@@ -497,23 +458,17 @@ fn build_element(
             )
         }
         TemplateElement::Shape(e) => {
-            let style = sizing::leaf_style(&e.size, &e.position, parent_direction);
+            let style = sizing::leaf_style(&e.base.size, &e.base.position, parent_direction);
             let node = taffy.new_leaf(style)?;
             node_map.insert(
                 node,
                 NodeInfo {
-                    element_id: e.id.clone(),
-                    element_type: "shape".to_string(),
+                    element_id: e.base.id.clone(),
+                    element_type: e.type_str().to_string(),
                     content: Some(ResolvedContent::Shape {
                         shape_type: e.shape_type.clone(),
                     }),
-                    style: ResolvedStyle {
-                        background_color: e.style.background_color.clone(),
-                        border_color: e.style.border_color.clone(),
-                        border_width: e.style.border_width,
-                        border_radius: e.style.border_radius,
-                        ..Default::default()
-                    },
+                    style: (&e.style).into(),
                     children_ids: vec![],
                 },
             );
@@ -522,19 +477,19 @@ fn build_element(
         TemplateElement::Checkbox(e) => {
             let checked_str = resolved
                 .texts
-                .get(&e.id)
+                .get(&e.base.id)
                 .map(|s| s.as_str())
                 .unwrap_or("false");
             let checked = checked_str == "true";
             let box_size_mm = e.style.size.unwrap_or(4.0);
-            let style = sizing::leaf_style(&e.size, &e.position, parent_direction);
+            let style = sizing::leaf_style(&e.base.size, &e.base.position, parent_direction);
 
             // Auto size → square based on style.size
             let mut leaf_style = style;
-            if matches!(e.size.width, SizeValue::Auto) {
+            if matches!(e.base.size.width, SizeValue::Auto) {
                 leaf_style.size.width = Dimension::length(mm_to_pt(box_size_mm));
             }
-            if matches!(e.size.height, SizeValue::Auto) {
+            if matches!(e.base.size.height, SizeValue::Auto) {
                 leaf_style.size.height = Dimension::length(mm_to_pt(box_size_mm));
             }
 
@@ -542,22 +497,17 @@ fn build_element(
             node_map.insert(
                 node,
                 NodeInfo {
-                    element_id: e.id.clone(),
-                    element_type: "checkbox".to_string(),
+                    element_id: e.base.id.clone(),
+                    element_type: e.type_str().to_string(),
                     content: Some(ResolvedContent::Checkbox { checked }),
-                    style: ResolvedStyle {
-                        color: e.style.check_color.clone(),
-                        border_color: e.style.border_color.clone(),
-                        border_width: e.style.border_width,
-                        ..Default::default()
-                    },
+                    style: (&e.style).into(),
                     children_ids: vec![],
                 },
             );
             Ok(node)
         }
         TemplateElement::RichText(e) => {
-            let spans = resolved.rich_texts.get(&e.id).cloned().unwrap_or_default();
+            let spans = resolved.rich_texts.get(&e.base.id).cloned().unwrap_or_default();
             let rich_span_measures: Vec<crate::text_measure::RichSpanMeasure> = spans
                 .iter()
                 .map(|s| crate::text_measure::RichSpanMeasure {
@@ -573,7 +523,7 @@ fn build_element(
                 .map(|s| s.font_size_pt)
                 .fold(11.0f32, f32::max);
 
-            let style = sizing::leaf_style(&e.size, &e.position, parent_direction);
+            let style = sizing::leaf_style(&e.base.size, &e.base.position, parent_direction);
 
             let context = MeasureContext {
                 text: String::new(),
@@ -600,39 +550,32 @@ fn build_element(
             node_map.insert(
                 node,
                 NodeInfo {
-                    element_id: e.id.clone(),
-                    element_type: "rich_text".to_string(),
+                    element_id: e.base.id.clone(),
+                    element_type: e.type_str().to_string(),
                     content: Some(ResolvedContent::RichText {
                         spans: resolved_spans,
                     }),
-                    style: ResolvedStyle {
-                        font_size: e.style.font_size,
-                        font_weight: e.style.font_weight.clone(),
-                        font_family: e.style.font_family.clone(),
-                        color: e.style.color.clone(),
-                        text_align: e.style.align.clone(),
-                        ..Default::default()
-                    },
+                    style: (&e.style).into(),
                     children_ids: vec![],
                 },
             );
             Ok(node)
         }
         TemplateElement::Chart(e) => {
-            let mut style = sizing::leaf_style(&e.size, &e.position, parent_direction);
+            let mut style = sizing::leaf_style(&e.base.size, &e.base.position, parent_direction);
             // Default minimum boyut — Auto ise chart cok kucuk olmasin
-            if matches!(e.size.width, SizeValue::Auto) {
+            if matches!(e.base.size.width, SizeValue::Auto) {
                 style.min_size.width = Dimension::length(mm_to_pt(80.0));
             }
-            if matches!(e.size.height, SizeValue::Auto) {
+            if matches!(e.base.size.height, SizeValue::Auto) {
                 style.min_size.height = Dimension::length(mm_to_pt(60.0));
             }
             let node = taffy.new_leaf(style)?;
             node_map.insert(
                 node,
                 NodeInfo {
-                    element_id: e.id.clone(),
-                    element_type: "chart".to_string(),
+                    element_id: e.base.id.clone(),
+                    element_type: e.type_str().to_string(),
                     content: None, // SVG collect_layout'ta uretilecek
                     style: ResolvedStyle::default(),
                     children_ids: vec![],
@@ -653,8 +596,8 @@ fn build_element(
             node_map.insert(
                 node,
                 NodeInfo {
-                    element_id: e.id.clone(),
-                    element_type: "page_break".to_string(),
+                    element_id: e.base.id.clone(),
+                    element_type: e.type_str().to_string(),
                     content: None,
                     style: ResolvedStyle::default(),
                     children_ids: vec![],
@@ -669,7 +612,7 @@ fn build_element(
 fn register_expanded_texts(el: &TemplateElement, resolved: &mut ResolvedData) {
     match el {
         TemplateElement::StaticText(e) => {
-            resolved.texts.insert(e.id.clone(), e.content.clone());
+            resolved.texts.insert(e.base.id.clone(), e.content.clone());
         }
         TemplateElement::Container(e) => {
             for child in &e.children {
@@ -678,6 +621,35 @@ fn register_expanded_texts(el: &TemplateElement, resolved: &mut ResolvedData) {
         }
         _ => {}
     }
+}
+
+/// Generic text leaf builder — HasTextStyle trait ile text-benzeri elementleri tek yerde build eder
+fn build_resolved_text_leaf(
+    el_base: &ElementBase,
+    el_type_str: &str,
+    text_style: &TextStyle,
+    taffy: &mut TaffyTree<MeasureContext>,
+    node_map: &mut HashMap<NodeId, NodeInfo>,
+    resolved: &ResolvedData,
+    parent_direction: Option<&str>,
+    fallback_text: &str,
+) -> Result<NodeId, LayoutError> {
+    let text = resolved
+        .texts
+        .get(&el_base.id)
+        .map(|s| s.as_str())
+        .unwrap_or(fallback_text);
+    build_text_leaf(
+        taffy,
+        node_map,
+        &el_base.id,
+        el_type_str,
+        text,
+        text_style,
+        &el_base.size,
+        &el_base.position,
+        parent_direction,
+    )
 }
 
 /// Text leaf node oluştur (static_text, text, page_number için ortak)
@@ -714,15 +686,7 @@ fn build_text_leaf(
             content: Some(ResolvedContent::Text {
                 value: text.to_string(),
             }),
-            style: ResolvedStyle {
-                font_size: text_style.font_size,
-                font_weight: text_style.font_weight.clone(),
-                font_style: text_style.font_style.clone(),
-                font_family: text_style.font_family.clone(),
-                color: text_style.color.clone(),
-                text_align: text_style.align.clone(),
-                ..Default::default()
-            },
+            style: text_style.into(),
             children_ids: vec![],
         },
     );
@@ -902,17 +866,14 @@ mod tests {
             format_config: None,
             locale: None,
             root: ContainerElement {
-                id: "root".to_string(),
-                condition: None,
-                position: PositionMode::Flow,
-                size: SizeConstraint {
+                base: ElementBase::flow("root".to_string(), SizeConstraint {
                     width: SizeValue::Auto,
                     height: SizeValue::Auto,
                     min_width: None,
                     min_height: None,
                     max_width: None,
                     max_height: None,
-                },
+                }),
                 direction: "column".to_string(),
                 gap: 5.0,
                 padding: Padding {
@@ -927,17 +888,14 @@ mod tests {
                 break_inside: "auto".to_string(),
                 children: vec![
                     TemplateElement::StaticText(StaticTextElement {
-                        id: "title".to_string(),
-                        condition: None,
-                        position: PositionMode::Flow,
-                        size: SizeConstraint {
+                        base: ElementBase::flow("title".to_string(), SizeConstraint {
                             width: SizeValue::Fr { value: 1.0 },
                             height: SizeValue::Auto,
                             min_width: None,
                             min_height: None,
                             max_width: None,
                             max_height: None,
-                        },
+                        }),
                         style: TextStyle {
                             font_size: Some(18.0),
                             font_weight: Some("bold".to_string()),
@@ -946,34 +904,28 @@ mod tests {
                         content: "FATURA".to_string(),
                     }),
                     TemplateElement::Line(LineElement {
-                        id: "line1".to_string(),
-                        condition: None,
-                        position: PositionMode::Flow,
-                        size: SizeConstraint {
+                        base: ElementBase::flow("line1".to_string(), SizeConstraint {
                             width: SizeValue::Fr { value: 1.0 },
                             height: SizeValue::Auto,
                             min_width: None,
                             min_height: None,
                             max_width: None,
                             max_height: None,
-                        },
+                        }),
                         style: LineStyle {
                             stroke_color: Some("#000000".to_string()),
                             stroke_width: Some(0.5),
                         },
                     }),
                     TemplateElement::StaticText(StaticTextElement {
-                        id: "body".to_string(),
-                        condition: None,
-                        position: PositionMode::Flow,
-                        size: SizeConstraint {
+                        base: ElementBase::flow("body".to_string(), SizeConstraint {
                             width: SizeValue::Fr { value: 1.0 },
                             height: SizeValue::Auto,
                             min_width: None,
                             min_height: None,
                             max_width: None,
                             max_height: None,
-                        },
+                        }),
                         style: TextStyle {
                             font_size: Some(11.0),
                             ..Default::default()
@@ -1051,17 +1003,14 @@ mod tests {
             format_config: None,
             locale: None,
             root: ContainerElement {
-                id: "root".to_string(),
-                condition: None,
-                position: PositionMode::Flow,
-                size: SizeConstraint {
+                base: ElementBase::flow("root".to_string(), SizeConstraint {
                     width: SizeValue::Auto,
                     height: SizeValue::Auto,
                     min_width: None,
                     min_height: None,
                     max_width: None,
                     max_height: None,
-                },
+                }),
                 direction: "column".to_string(),
                 gap: 0.0,
                 padding: Padding {
@@ -1075,17 +1024,14 @@ mod tests {
                 style: ContainerStyle::default(),
                 break_inside: "auto".to_string(),
                 children: vec![TemplateElement::Container(ContainerElement {
-                    id: "row".to_string(),
-                    condition: None,
-                    position: PositionMode::Flow,
-                    size: SizeConstraint {
+                    base: ElementBase::flow("row".to_string(), SizeConstraint {
                         width: SizeValue::Fr { value: 1.0 },
                         height: SizeValue::Auto,
                         min_width: None,
                         min_height: None,
                         max_width: None,
                         max_height: None,
-                    },
+                    }),
                     direction: "row".to_string(),
                     gap: 5.0,
                     padding: Padding {
@@ -1100,17 +1046,14 @@ mod tests {
                     break_inside: "auto".to_string(),
                     children: vec![
                         TemplateElement::StaticText(StaticTextElement {
-                            id: "left".to_string(),
-                            condition: None,
-                            position: PositionMode::Flow,
-                            size: SizeConstraint {
+                            base: ElementBase::flow("left".to_string(), SizeConstraint {
                                 width: SizeValue::Fr { value: 1.0 },
                                 height: SizeValue::Auto,
                                 min_width: None,
                                 min_height: None,
                                 max_width: None,
                                 max_height: None,
-                            },
+                            }),
                             style: TextStyle {
                                 font_size: Some(11.0),
                                 ..Default::default()
@@ -1118,17 +1061,14 @@ mod tests {
                             content: "Sol".to_string(),
                         }),
                         TemplateElement::StaticText(StaticTextElement {
-                            id: "right".to_string(),
-                            condition: None,
-                            position: PositionMode::Flow,
-                            size: SizeConstraint {
+                            base: ElementBase::flow("right".to_string(), SizeConstraint {
                                 width: SizeValue::Fr { value: 1.0 },
                                 height: SizeValue::Auto,
                                 min_width: None,
                                 min_height: None,
                                 max_width: None,
                                 max_height: None,
-                            },
+                            }),
                             style: TextStyle {
                                 font_size: Some(11.0),
                                 ..Default::default()
@@ -1184,17 +1124,14 @@ mod tests {
             format_config: None,
             locale: None,
             root: ContainerElement {
-                id: "root".to_string(),
-                condition: None,
-                position: PositionMode::Flow,
-                size: SizeConstraint {
+                base: ElementBase::flow("root".to_string(), SizeConstraint {
                     width: SizeValue::Auto,
                     height: SizeValue::Auto,
                     min_width: None,
                     min_height: None,
                     max_width: None,
                     max_height: None,
-                },
+                }),
                 direction: "column".to_string(),
                 gap: 0.0,
                 padding: Padding {
@@ -1208,16 +1145,18 @@ mod tests {
                 style: ContainerStyle::default(),
                 break_inside: "auto".to_string(),
                 children: vec![TemplateElement::StaticText(StaticTextElement {
-                    id: "abs_text".to_string(),
-                    condition: None,
-                    position: PositionMode::Absolute { x: 50.0, y: 80.0 },
-                    size: SizeConstraint {
-                        width: SizeValue::Fixed { value: 100.0 },
-                        height: SizeValue::Auto,
-                        min_width: None,
-                        min_height: None,
-                        max_width: None,
-                        max_height: None,
+                    base: ElementBase {
+                        id: "abs_text".to_string(),
+                        condition: None,
+                        position: PositionMode::Absolute { x: 50.0, y: 80.0 },
+                        size: SizeConstraint {
+                            width: SizeValue::Fixed { value: 100.0 },
+                            height: SizeValue::Auto,
+                            min_width: None,
+                            min_height: None,
+                            max_width: None,
+                            max_height: None,
+                        },
                     },
                     style: TextStyle {
                         font_size: Some(14.0),
@@ -1276,10 +1215,7 @@ mod tests {
             format_config: None,
             locale: None,
             root: ContainerElement {
-                id: "root".to_string(),
-                condition: None,
-                position: PositionMode::Flow,
-                size: sz_auto.clone(),
+                base: ElementBase::flow("root".to_string(), sz_auto.clone()),
                 direction: "column".to_string(),
                 gap: 5.0,
                 padding: Padding {
@@ -1295,10 +1231,7 @@ mod tests {
                 children: vec![
                     // Header row
                     TemplateElement::Container(ContainerElement {
-                        id: "c_header".to_string(),
-                        condition: None,
-                        position: PositionMode::Flow,
-                        size: sz_fr_auto.clone(),
+                        base: ElementBase::flow("c_header".to_string(), sz_fr_auto.clone()),
                         direction: "row".to_string(),
                         gap: 5.0,
                         padding: p0.clone(),
@@ -1309,10 +1242,7 @@ mod tests {
                         children: vec![
                             // Sol: firma bilgileri
                             TemplateElement::Container(ContainerElement {
-                                id: "c_firma".to_string(),
-                                condition: None,
-                                position: PositionMode::Flow,
-                                size: sz_fr_auto.clone(),
+                                base: ElementBase::flow("c_firma".to_string(), sz_fr_auto.clone()),
                                 direction: "column".to_string(),
                                 gap: 1.0,
                                 padding: p0.clone(),
@@ -1322,10 +1252,7 @@ mod tests {
                                 break_inside: "auto".to_string(),
                                 children: vec![
                                     TemplateElement::StaticText(StaticTextElement {
-                                        id: "el_firma_unvan".to_string(),
-                                        condition: None,
-                                        position: PositionMode::Flow,
-                                        size: sz_auto.clone(),
+                                        base: ElementBase::flow("el_firma_unvan".to_string(), sz_auto.clone()),
                                         style: TextStyle {
                                             font_size: Some(14.0),
                                             font_weight: Some("bold".to_string()),
@@ -1334,10 +1261,7 @@ mod tests {
                                         content: "Teknova Yazılım ve Danışmanlık A.Ş.".to_string(),
                                     }),
                                     TemplateElement::StaticText(StaticTextElement {
-                                        id: "el_firma_adres".to_string(),
-                                        condition: None,
-                                        position: PositionMode::Flow,
-                                        size: sz_auto.clone(),
+                                        base: ElementBase::flow("el_firma_adres".to_string(), sz_auto.clone()),
                                         style: TextStyle {
                                             font_size: Some(9.0),
                                             ..Default::default()
@@ -1346,10 +1270,7 @@ mod tests {
                                             .to_string(),
                                     }),
                                     TemplateElement::StaticText(StaticTextElement {
-                                        id: "el_firma_il".to_string(),
-                                        condition: None,
-                                        position: PositionMode::Flow,
-                                        size: sz_auto.clone(),
+                                        base: ElementBase::flow("el_firma_il".to_string(), sz_auto.clone()),
                                         style: TextStyle {
                                             font_size: Some(9.0),
                                             ..Default::default()
@@ -1357,10 +1278,7 @@ mod tests {
                                         content: "Istanbul".to_string(),
                                     }),
                                     TemplateElement::StaticText(StaticTextElement {
-                                        id: "el_firma_tel".to_string(),
-                                        condition: None,
-                                        position: PositionMode::Flow,
-                                        size: sz_auto.clone(),
+                                        base: ElementBase::flow("el_firma_tel".to_string(), sz_auto.clone()),
                                         style: TextStyle {
                                             font_size: Some(9.0),
                                             ..Default::default()
@@ -1368,10 +1286,7 @@ mod tests {
                                         content: "Tel: +90 212 555 0042".to_string(),
                                     }),
                                     TemplateElement::StaticText(StaticTextElement {
-                                        id: "el_firma_vd".to_string(),
-                                        condition: None,
-                                        position: PositionMode::Flow,
-                                        size: sz_auto.clone(),
+                                        base: ElementBase::flow("el_firma_vd".to_string(), sz_auto.clone()),
                                         style: TextStyle {
                                             font_size: Some(9.0),
                                             ..Default::default()
@@ -1379,10 +1294,7 @@ mod tests {
                                         content: "VD: Levent VD".to_string(),
                                     }),
                                     TemplateElement::StaticText(StaticTextElement {
-                                        id: "el_firma_vn".to_string(),
-                                        condition: None,
-                                        position: PositionMode::Flow,
-                                        size: sz_auto.clone(),
+                                        base: ElementBase::flow("el_firma_vn".to_string(), sz_auto.clone()),
                                         style: TextStyle {
                                             font_size: Some(9.0),
                                             ..Default::default()
@@ -1393,10 +1305,7 @@ mod tests {
                             }),
                             // Sağ: fatura başlığı
                             TemplateElement::Container(ContainerElement {
-                                id: "c_fatura_baslik".to_string(),
-                                condition: None,
-                                position: PositionMode::Flow,
-                                size: sz_auto.clone(),
+                                base: ElementBase::flow("c_fatura_baslik".to_string(), sz_auto.clone()),
                                 direction: "column".to_string(),
                                 gap: 2.0,
                                 padding: p0.clone(),
@@ -1406,10 +1315,7 @@ mod tests {
                                 break_inside: "auto".to_string(),
                                 children: vec![
                                     TemplateElement::StaticText(StaticTextElement {
-                                        id: "el_fatura_baslik".to_string(),
-                                        condition: None,
-                                        position: PositionMode::Flow,
-                                        size: sz_auto.clone(),
+                                        base: ElementBase::flow("el_fatura_baslik".to_string(), sz_auto.clone()),
                                         style: TextStyle {
                                             font_size: Some(18.0),
                                             font_weight: Some("bold".to_string()),
@@ -1418,10 +1324,7 @@ mod tests {
                                         content: "FATURA".to_string(),
                                     }),
                                     TemplateElement::StaticText(StaticTextElement {
-                                        id: "el_fatura_no".to_string(),
-                                        condition: None,
-                                        position: PositionMode::Flow,
-                                        size: sz_auto.clone(),
+                                        base: ElementBase::flow("el_fatura_no".to_string(), sz_auto.clone()),
                                         style: TextStyle {
                                             font_size: Some(10.0),
                                             ..Default::default()
@@ -1429,10 +1332,7 @@ mod tests {
                                         content: "No: FTR-2026-001547".to_string(),
                                     }),
                                     TemplateElement::StaticText(StaticTextElement {
-                                        id: "el_fatura_tarih".to_string(),
-                                        condition: None,
-                                        position: PositionMode::Flow,
-                                        size: sz_auto.clone(),
+                                        base: ElementBase::flow("el_fatura_tarih".to_string(), sz_auto.clone()),
                                         style: TextStyle {
                                             font_size: Some(10.0),
                                             ..Default::default()
@@ -1440,10 +1340,7 @@ mod tests {
                                         content: "Tarih: 2026-03-29".to_string(),
                                     }),
                                     TemplateElement::StaticText(StaticTextElement {
-                                        id: "el_fatura_vade".to_string(),
-                                        condition: None,
-                                        position: PositionMode::Flow,
-                                        size: sz_auto.clone(),
+                                        base: ElementBase::flow("el_fatura_vade".to_string(), sz_auto.clone()),
                                         style: TextStyle {
                                             font_size: Some(10.0),
                                             ..Default::default()

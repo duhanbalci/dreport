@@ -138,7 +138,7 @@ pub fn container_to_style(el: &ContainerElement, parent_direction: Option<&str>)
     };
 
     // Pozisyon moduna göre
-    match &el.position {
+    match &el.base.position {
         PositionMode::Absolute { x, y } => {
             style.position = Position::Absolute;
             style.inset = Rect {
@@ -152,7 +152,7 @@ pub fn container_to_style(el: &ContainerElement, parent_direction: Option<&str>)
     }
 
     // Boyut
-    apply_size_to_style(&mut style, &el.size, parent_direction);
+    apply_size_to_style(&mut style, &el.base.size, parent_direction);
 
     // Container border
     if let Some(bw) = el.style.border_width {
@@ -197,7 +197,7 @@ pub fn leaf_style(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use dreport_core::models::{ContainerStyle, Padding};
+    use dreport_core::models::{ContainerStyle, ElementBase, Padding};
 
     #[test]
     fn test_mm_to_pt_conversion() {
@@ -327,10 +327,7 @@ mod tests {
     #[test]
     fn test_container_to_style_direction() {
         let el = ContainerElement {
-            id: "test".to_string(),
-            condition: None,
-            position: PositionMode::Flow,
-            size: SizeConstraint::default(),
+            base: ElementBase::flow("test".to_string(), SizeConstraint::default()),
             direction: "row".to_string(),
             gap: 5.0,
             padding: Padding {
@@ -354,10 +351,12 @@ mod tests {
     #[test]
     fn test_container_to_style_absolute() {
         let el = ContainerElement {
-            id: "test".to_string(),
-            condition: None,
-            position: PositionMode::Absolute { x: 20.0, y: 30.0 },
-            size: SizeConstraint::default(),
+            base: ElementBase {
+                id: "test".to_string(),
+                condition: None,
+                position: PositionMode::Absolute { x: 20.0, y: 30.0 },
+                size: SizeConstraint::default(),
+            },
             direction: "column".to_string(),
             gap: 0.0,
             padding: Padding::default(),
