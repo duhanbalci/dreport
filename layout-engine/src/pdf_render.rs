@@ -21,11 +21,6 @@ fn mm(v: f64) -> f32 {
     v as f32 * MM_TO_PT
 }
 
-/// f64 mm degerini f32 pt'ye cevir (chart render icin)
-fn pt(mm_val: f64) -> f32 {
-    mm_val as f32 * MM_TO_PT
-}
-
 /// Hex renk (#RRGGBB veya #RGB) → rgb::Color
 fn parse_color(hex: &str) -> rgb::Color {
     let hex = hex.trim_start_matches('#');
@@ -45,6 +40,18 @@ fn parse_color(hex: &str) -> rgb::Color {
     };
     rgb::Color::new(r, g, b)
 }
+
+fn fill_from_color(color: rgb::Color) -> Fill {
+    Fill {
+        paint: color.into(),
+        opacity: NormalizedF32::ONE,
+        rule: Default::default(),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Path builders
+// ---------------------------------------------------------------------------
 
 /// Rounded rectangle path oluştur. radius 0 ise düz dikdörtgen.
 fn build_rect_path(x: f32, y: f32, w: f32, h: f32, radius: f32) -> Option<krilla::geom::Path> {
@@ -92,11 +99,132 @@ fn build_ellipse_path(x: f32, y: f32, w: f32, h: f32) -> Option<krilla::geom::Pa
     pb.finish()
 }
 
-fn fill_from_color(color: rgb::Color) -> Fill {
-    Fill {
-        paint: color.into(),
-        opacity: NormalizedF32::ONE,
-        rule: Default::default(),
+/// Merkez + radius'tan daire path'i oluştur (build_ellipse_path'in kısa hali)
+fn build_circle_path(cx: f32, cy: f32, r: f32) -> Option<krilla::geom::Path> {
+    build_ellipse_path(cx - r, cy - r, r * 2.0, r * 2.0)
+}
+
+// ---------------------------------------------------------------------------
+// SurfaceExt — krilla surface üzerinde tekrar eden draw kalıplarını soyutlar
+// ---------------------------------------------------------------------------
+
+trait SurfaceExt {
+    fn draw_filled(&mut self, path: &krilla::geom::Path, color: rgb::Color);
+    fn draw_stroked(&mut self, path: &krilla::geom::Path, color: rgb::Color, width: f32);
+    fn draw_filled_stroked(
+        &mut self,
+        path: &krilla::geom::Path,
+        fill: Option<rgb::Color>,
+        stroke_color: rgb::Color,
+        stroke_width: f32,
+    );
+}
+
+impl SurfaceExt for krilla::surface::Surface<'_> {
+    fn draw_filled(&mut self, path: &krilla::geom::Path, color: rgb::Color) {
+        self.set_fill(Some(fill_from_color(color)));
+        self.set_stroke(None);
+        self.draw_path(path);
+        self.set_fill(None);
+    }
+
+    fn draw_stroked(&mut self, path: &krilla::geom::Path, color: rgb::Color, width: f32) {
+        self.set_fill(None);
+        self.set_stroke(Some(Stroke {
+            paint: color.into(),
+            width,
+            opacity: NormalizedF32::ONE,
+            ..Default::default()
+        }));
+        self.draw_path(path);
+        self.set_stroke(None);
+    }
+
+    fn draw_filled_stroked(
+        &mut self,
+        path: &krilla::geom::Path,
+        fill: Option<rgb::Color>,
+        stroke_color: rgb::Color,
+        stroke_width: f32,
+    ) {
+        self.set_fill(fill.map(fill_from_color));
+        self.set_stroke(Some(Stroke {
+            paint: stroke_color.into(),
+            width: stroke_width,
+            opacity: NormalizedF32::ONE,
+            ..Default::default()
+        }));
+        self.draw_path(path);
+        self.set_fill(None);
+        self.set_stroke(None);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// draw_box — container ve shape'in ortak fill+border çizim mantığı
+// ---------------------------------------------------------------------------
+
+/// Kutu şekli: dikdörtgen, yuvarlatılmış dikdörtgen veya elips.
+enum BoxShape {
+    Rect { radius: f32 },
+    Ellipse,
+}
+
+/// Arka plan + border'ı tek seferde çizer (CSS border-box modeli).
+/// Container ve shape render'larının ortak kodu.
+fn draw_box(
+    surface: &mut krilla::surface::Surface<'_>,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    bg_color: Option<&str>,
+    border_color: Option<&str>,
+    border_width: Option<f64>,
+    shape: BoxShape,
+) {
+    let has_bg = bg_color.is_some();
+    let has_border = border_color.is_some() && border_width.unwrap_or(0.0) > 0.0;
+
+    if !has_bg && !has_border {
+        return;
+    }
+
+    let build_path = |bx: f32, by: f32, bw: f32, bh: f32, shape: &BoxShape| -> Option<krilla::geom::Path> {
+        match shape {
+            BoxShape::Ellipse => build_ellipse_path(bx, by, bw, bh),
+            BoxShape::Rect { radius } => build_rect_path(bx, by, bw, bh, *radius),
+        }
+    };
+
+    if has_border {
+        let bw = mm(border_width.unwrap_or(0.5));
+        let bc = parse_color(border_color.unwrap_or("#000000"));
+        let inset = bw / 2.0;
+
+        // Border durumunda radius'u inset kadar küçült
+        let inset_shape = match shape {
+            BoxShape::Ellipse => BoxShape::Ellipse,
+            BoxShape::Rect { radius } => BoxShape::Rect {
+                radius: (radius - inset).max(0.0),
+            },
+        };
+
+        let path = build_path(x + inset, y + inset, w - bw, h - bw, &inset_shape);
+        if let Some(p) = path {
+            surface.draw_filled_stroked(
+                &p,
+                bg_color.map(parse_color),
+                bc,
+                bw,
+            );
+        }
+    } else {
+        let fill = parse_color(bg_color.unwrap_or("#ffffff"));
+        let path = build_path(x, y, w, h, &shape);
+        if let Some(p) = path {
+            surface.draw_filled(&p, fill);
+        }
     }
 }
 
@@ -329,80 +457,29 @@ fn render_shape(
     style: &ResolvedStyle,
     content: &Option<ResolvedContent>,
 ) {
-    let has_bg = style.background_color.is_some();
-    let has_border = style.border_color.is_some() && style.border_width.unwrap_or(0.0) > 0.0;
-
-    if !has_bg && !has_border {
-        return;
-    }
-
     let shape_type = match content {
         Some(ResolvedContent::Shape { shape_type }) => shape_type.as_str(),
         _ => "rectangle",
     };
 
-    let rect_radius = |s: &ResolvedStyle| -> f32 {
-        if shape_type == "rounded_rectangle" {
-            s.border_radius.map(mm).unwrap_or(mm(3.0))
-        } else {
-            s.border_radius.map(mm).unwrap_or(0.0)
-        }
+    let shape = match shape_type {
+        "ellipse" => BoxShape::Ellipse,
+        "rounded_rectangle" => BoxShape::Rect {
+            radius: style.border_radius.map(mm).unwrap_or(mm(3.0)),
+        },
+        _ => BoxShape::Rect {
+            radius: style.border_radius.map(mm).unwrap_or(0.0),
+        },
     };
 
-    if has_border {
-        let border_width = mm(style.border_width.unwrap_or(0.5));
-        let border_color = parse_color(style.border_color.as_deref().unwrap_or("#000000"));
-        let inset = border_width / 2.0;
-
-        // Fill + stroke tek path ile — anti-aliasing uyumu
-        if let Some(ref bg) = style.background_color {
-            surface.set_fill(Some(fill_from_color(parse_color(bg))));
-        } else {
-            surface.set_fill(None);
-        }
-        surface.set_stroke(Some(Stroke {
-            paint: border_color.into(),
-            width: border_width,
-            opacity: NormalizedF32::ONE,
-            ..Default::default()
-        }));
-
-        let path = match shape_type {
-            "ellipse" => {
-                build_ellipse_path(x + inset, y + inset, w - border_width, h - border_width)
-            }
-            _ => {
-                let radius = rect_radius(style);
-                build_rect_path(
-                    x + inset,
-                    y + inset,
-                    w - border_width,
-                    h - border_width,
-                    (radius - inset).max(0.0),
-                )
-            }
-        };
-        if let Some(p) = path {
-            surface.draw_path(&p);
-        }
-    } else {
-        // Sadece fill, border yok
-        surface.set_fill(Some(fill_from_color(parse_color(
-            style.background_color.as_deref().unwrap_or("#ffffff"),
-        ))));
-        surface.set_stroke(None);
-
-        let path = match shape_type {
-            "ellipse" => build_ellipse_path(x, y, w, h),
-            _ => build_rect_path(x, y, w, h, rect_radius(style)),
-        };
-        if let Some(p) = path {
-            surface.draw_path(&p);
-        }
-    }
-
-    surface.set_fill(None);
-    surface.set_stroke(None);
+    draw_box(
+        surface,
+        x, y, w, h,
+        style.background_color.as_deref(),
+        style.border_color.as_deref(),
+        style.border_width,
+        shape,
+    );
 }
 
 fn render_checkbox(
@@ -418,54 +495,24 @@ fn render_checkbox(
     let border_width = mm(style.border_width.unwrap_or(0.3));
     let inset = border_width / 2.0;
 
-    // Draw box outline (inset for CSS border-box match)
-    surface.set_fill(None);
-    surface.set_stroke(Some(Stroke {
-        paint: border_color.into(),
-        width: border_width,
-        opacity: NormalizedF32::ONE,
-        ..Default::default()
-    }));
-
-    if let Some(p) = build_rect_path(
-        x + inset,
-        y + inset,
-        w - border_width,
-        h - border_width,
-        0.0,
-    ) {
-        surface.draw_path(&p);
+    if let Some(p) = build_rect_path(x + inset, y + inset, w - border_width, h - border_width, 0.0) {
+        surface.draw_stroked(&p, border_color, border_width);
     }
 
-    // Draw checkmark if checked
     if checked {
         let check_color = parse_color(style.color.as_deref().unwrap_or("#000000"));
         let stroke_w = w.min(h) * 0.12;
-        surface.set_fill(None);
-        surface.set_stroke(Some(Stroke {
-            paint: check_color.into(),
-            width: stroke_w,
-            opacity: NormalizedF32::ONE,
-            ..Default::default()
-        }));
-
-        // Checkmark: two lines forming a "✓"
         let check_path = {
             let mut pb = PathBuilder::new();
-            let mx = w * 0.2;
-            let my = h * 0.5;
-            pb.move_to(x + mx, y + my);
+            pb.move_to(x + w * 0.2, y + h * 0.5);
             pb.line_to(x + w * 0.4, y + h * 0.75);
             pb.line_to(x + w * 0.8, y + h * 0.25);
             pb.finish()
         };
         if let Some(p) = check_path {
-            surface.draw_path(&p);
+            surface.draw_stroked(&p, check_color, stroke_w);
         }
     }
-
-    surface.set_fill(None);
-    surface.set_stroke(None);
 }
 
 fn render_container_bg(
@@ -476,55 +523,16 @@ fn render_container_bg(
     h: f32,
     style: &ResolvedStyle,
 ) {
-    let has_bg = style.background_color.is_some();
-    let has_border = style.border_color.is_some() && style.border_width.unwrap_or(0.0) > 0.0;
-
-    if !has_bg && !has_border {
-        return;
-    }
-
-    let radius = style.border_radius.map(mm).unwrap_or(0.0);
-
-    if has_border {
-        let border_width = mm(style.border_width.unwrap_or(0.5));
-        let border_color = parse_color(style.border_color.as_deref().unwrap_or("#000000"));
-        let inset = border_width / 2.0;
-
-        // CSS border-box: stroke path'i border_width/2 içeri çek.
-        // Tek draw_path ile hem fill hem stroke çizerek anti-aliasing uyumunu sağla.
-        if let Some(ref bg) = style.background_color {
-            surface.set_fill(Some(fill_from_color(parse_color(bg))));
-        } else {
-            surface.set_fill(None);
-        }
-        surface.set_stroke(Some(Stroke {
-            paint: border_color.into(),
-            width: border_width,
-            opacity: NormalizedF32::ONE,
-            ..Default::default()
-        }));
-        if let Some(path) = build_rect_path(
-            x + inset,
-            y + inset,
-            w - border_width,
-            h - border_width,
-            (radius - inset).max(0.0),
-        ) {
-            surface.draw_path(&path);
-        }
-    } else {
-        // Sadece background, border yok
-        surface.set_fill(Some(fill_from_color(parse_color(
-            style.background_color.as_deref().unwrap_or("#ffffff"),
-        ))));
-        surface.set_stroke(None);
-        if let Some(path) = build_rect_path(x, y, w, h, radius) {
-            surface.draw_path(&path);
-        }
-    }
-
-    surface.set_fill(None);
-    surface.set_stroke(None);
+    draw_box(
+        surface,
+        x, y, w, h,
+        style.background_color.as_deref(),
+        style.border_color.as_deref(),
+        style.border_width,
+        BoxShape::Rect {
+            radius: style.border_radius.map(mm).unwrap_or(0.0),
+        },
+    );
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -707,32 +715,16 @@ fn render_line(
     h: f32,
     style: &ResolvedStyle,
 ) {
-    let stroke_color = style
+    let color = style
         .stroke_color
         .as_deref()
         .map(parse_color)
         .unwrap_or(rgb::Color::new(0, 0, 0));
 
     // Çizgiyi filled rectangle olarak çiz — CSS borderTop ile aynı davranış.
-    // Stroke kullanmak sub-pixel anti-aliasing farkları yaratır.
-    surface.set_fill(Some(fill_from_color(stroke_color)));
-    surface.set_stroke(None);
-
-    let rect_path = {
-        let mut pb = PathBuilder::new();
-        // Eleman yüksekliği layout engine tarafından stroke_width olarak hesaplandı.
-        // Tüm eleman alanını dolduran ince dikdörtgen çiz.
-        if let Some(rect) = krilla::geom::Rect::from_xywh(x, y, w, h) {
-            pb.push_rect(rect);
-        }
-        pb.finish()
-    };
-
-    if let Some(p) = rect_path {
-        surface.draw_path(&p);
+    if let Some(path) = build_rect_path(x, y, w, h, 0.0) {
+        surface.draw_filled(&path, color);
     }
-
-    surface.set_fill(None);
 }
 
 #[derive(Debug, PartialEq)]
@@ -935,14 +927,14 @@ fn render_chart(
         if let Some(f) = font {
             surface.set_fill(Some(fill_from_color(color)));
             surface.set_stroke(None);
-            let fs_pt = pt(title.font_size);
+            let fs_pt = mm(title.font_size);
             let (tw, _) = measurer.measure(&title.text, None, fs_pt, Some("bold"), None);
             let tx = match title.align.as_str() {
-                "left" => pt(title.x),
-                "right" => pt(title.x) - tw,
-                _ => pt(title.x) - tw / 2.0,
+                "left" => mm(title.x),
+                "right" => mm(title.x) - tw,
+                _ => mm(title.x) - tw / 2.0,
             };
-            let ty = pt(title.y);
+            let ty = mm(title.y);
             surface.draw_text(
                 Point::from_xy(tx, ty),
                 f.clone(),
@@ -966,26 +958,28 @@ fn render_chart(
                     if bl.stacked {
                         if bar.value > 0.0 {
                             let label = format_value(bar.value);
-                            chart_text_centered(
+                            chart_text(
                                 surface,
                                 bar.label_x,
                                 bar.label_y,
                                 &label,
                                 bl.label_font,
                                 &bl.label_color,
+                                ChartTextAlign::Center,
                                 fonts,
                                 measurer,
                             );
                         }
                     } else {
                         let label = format_value(bar.value);
-                        chart_text_centered(
+                        chart_text(
                             surface,
                             bar.label_x,
                             bar.label_y,
                             &label,
                             bl.label_font,
                             &bl.label_color,
+                            ChartTextAlign::Center,
                             fonts,
                             measurer,
                         );
@@ -1015,7 +1009,7 @@ fn render_chart(
                 surface.set_fill(None);
                 surface.set_stroke(Some(Stroke {
                     paint: color.into(),
-                    width: pt(ll.line_width),
+                    width: mm(ll.line_width),
                     opacity: NormalizedF32::ONE,
                     ..Default::default()
                 }));
@@ -1023,9 +1017,9 @@ fn render_chart(
                     let mut pb = PathBuilder::new();
                     for (i, (lx, ly)) in points.iter().enumerate() {
                         if i == 0 {
-                            pb.move_to(pt(*lx), pt(*ly));
+                            pb.move_to(mm(*lx), mm(*ly));
                         } else {
-                            pb.line_to(pt(*lx), pt(*ly));
+                            pb.line_to(mm(*lx), mm(*ly));
                         }
                     }
                     pb.finish()
@@ -1037,24 +1031,8 @@ fn render_chart(
                 // Points
                 if ll.show_points {
                     for (lx, ly) in &points {
-                        let r = pt(0.8);
-                        let cx = pt(*lx);
-                        let cy = pt(*ly);
-                        surface.set_fill(Some(fill_from_color(color)));
-                        surface.set_stroke(None);
-                        let circle = {
-                            let mut pb = PathBuilder::new();
-                            let k = r * 0.5522848;
-                            pb.move_to(cx, cy - r);
-                            pb.cubic_to(cx + k, cy - r, cx + r, cy - k, cx + r, cy);
-                            pb.cubic_to(cx + r, cy + k, cx + k, cy + r, cx, cy + r);
-                            pb.cubic_to(cx - k, cy + r, cx - r, cy + k, cx - r, cy);
-                            pb.cubic_to(cx - r, cy - k, cx - k, cy - r, cx, cy - r);
-                            pb.close();
-                            pb.finish()
-                        };
-                        if let Some(p) = circle {
-                            surface.draw_path(&p);
+                        if let Some(circle) = build_circle_path(mm(*lx), mm(*ly), mm(0.8)) {
+                            surface.draw_filled(&circle, color);
                         }
                     }
                 }
@@ -1063,13 +1041,14 @@ fn render_chart(
                 if ll.show_labels {
                     for lp in &series_layout.points {
                         let label = format_value(lp.value);
-                        chart_text_centered(
+                        chart_text(
                             surface,
                             lp.x,
                             lp.y - 1.5,
                             &label,
                             ll.label_font,
                             &ll.label_color,
+                            ChartTextAlign::Center,
                             fonts,
                             measurer,
                         );
@@ -1114,13 +1093,14 @@ fn render_chart(
                 if pl.show_labels {
                     let pct = (slice.fraction * 100.0).round();
                     let label = format!("{}%", pct);
-                    chart_text_centered(
+                    chart_text(
                         surface,
                         slice.label_x,
                         slice.label_y,
                         &label,
                         pl.label_font,
                         &pl.label_color,
+                        ChartTextAlign::Center,
                         fonts,
                         measurer,
                     );
@@ -1136,29 +1116,22 @@ fn render_chart(
                         parse_color("#999999"),
                         0.5,
                     );
-                    if slice.cat_label_anchor_end {
-                        chart_text_end(
-                            surface,
-                            slice.cat_label_x,
-                            slice.cat_label_y,
-                            &slice.cat_label_text,
-                            2.5,
-                            "#555555",
-                            fonts,
-                            measurer,
-                        );
+                    let align = if slice.cat_label_anchor_end {
+                        ChartTextAlign::End
                     } else {
-                        chart_text_start(
-                            surface,
-                            slice.cat_label_x,
-                            slice.cat_label_y,
-                            &slice.cat_label_text,
-                            2.5,
-                            "#555555",
-                            fonts,
-                            measurer,
-                        );
-                    }
+                        ChartTextAlign::Start
+                    };
+                    chart_text(
+                        surface,
+                        slice.cat_label_x,
+                        slice.cat_label_y,
+                        &slice.cat_label_text,
+                        2.5,
+                        "#555555",
+                        align,
+                        fonts,
+                        measurer,
+                    );
                 }
             }
         }
@@ -1177,13 +1150,14 @@ fn render_chart(
                 legend.swatch_size,
                 color,
             );
-            chart_text_start(
+            chart_text(
                 surface,
                 item.text_x,
                 item.text_y,
                 &item.name,
                 legend.font_size,
                 "#666666",
+                ChartTextAlign::Start,
                 fonts,
                 measurer,
             );
@@ -1196,14 +1170,14 @@ fn render_chart(
         if let Some(ref x_label) = data.x_label {
             let lx = cl.plot_x + cl.plot_w / 2.0;
             let ly = base_y_mm + h_mm - 2.0;
-            chart_text_centered(surface, lx, ly, x_label, 2.8, "#666666", fonts, measurer);
+            chart_text(surface, lx, ly, x_label, 2.8, "#666666", ChartTextAlign::Center, fonts, measurer);
         }
         if let Some(ref y_label) = data.y_label {
             let lx = base_x_mm + 3.0;
             let ly = cl.plot_y + cl.plot_h / 2.0;
-            surface.push_transform(&Transform::from_translate(pt(lx), pt(ly)));
+            surface.push_transform(&Transform::from_translate(mm(lx), mm(ly)));
             surface.push_transform(&Transform::from_row(0.0, -1.0, 1.0, 0.0, 0.0, 0.0));
-            chart_text_centered(surface, 0.0, 0.0, y_label, 2.8, "#666666", fonts, measurer);
+            chart_text(surface, 0.0, 0.0, y_label, 2.8, "#666666", ChartTextAlign::Center, fonts, measurer);
             surface.pop();
             surface.pop();
         }
@@ -1219,7 +1193,7 @@ fn chart_rect(
     rh: f64,
     color: rgb::Color,
 ) {
-    let (rx, ry, rw, rh) = (pt(rx), pt(ry), pt(rw), pt(rh));
+    let (rx, ry, rw, rh) = (mm(rx), mm(ry), mm(rw), mm(rh));
     surface.set_fill(Some(fill_from_color(color)));
     surface.set_stroke(None);
     let path = {
@@ -1243,7 +1217,7 @@ fn chart_line_seg(
     color: rgb::Color,
     width: f32,
 ) {
-    let (x1, y1, x2, y2) = (pt(x1), pt(y1), pt(x2), pt(y2));
+    let (x1, y1, x2, y2) = (mm(x1), mm(y1), mm(x2), mm(y2));
     surface.set_fill(None);
     surface.set_stroke(Some(Stroke {
         paint: color.into(),
@@ -1262,93 +1236,52 @@ fn chart_line_seg(
     }
 }
 
-/// Chart icin metin ciz — tek satirlik, centered
-/// font_size_mm: SVG viewBox'taki mm cinsinden boyut, pt'ye cevrilir
-#[allow(clippy::too_many_arguments)]
-fn chart_text_centered(
-    surface: &mut krilla::surface::Surface<'_>,
-    cx_mm: f64,
-    cy_mm: f64,
-    text: &str,
-    font_size_mm: f64,
-    color_hex: &str,
-    fonts: &FontCollection,
-    measurer: &mut TextMeasurer,
-) {
-    let font = fonts.get(None, None, None);
-    let Some(f) = font else {
-        return;
-    };
-    let color = parse_color(color_hex);
-    let fs_pt = pt(font_size_mm);
-    let (tw, _) = measurer.measure(text, None, fs_pt, None, None);
-    surface.set_fill(Some(fill_from_color(color)));
-    surface.set_stroke(None);
-    surface.draw_text(
-        Point::from_xy(pt(cx_mm) - tw / 2.0, pt(cy_mm)),
-        f.clone(),
-        fs_pt,
-        text,
-        false,
-        TextDirection::Auto,
-    );
+/// Chart metin hizalama modu
+enum ChartTextAlign {
+    Start,
+    Center,
+    End,
 }
 
-/// Chart icin metin ciz — end-aligned (sag hizali)
+/// Chart için tek satır metin çiz (mm cinsinden koordinatlar, pt'ye çevrilir)
 #[allow(clippy::too_many_arguments)]
-fn chart_text_end(
-    surface: &mut krilla::surface::Surface<'_>,
-    right_x_mm: f64,
-    cy_mm: f64,
-    text: &str,
-    font_size_mm: f64,
-    color_hex: &str,
-    fonts: &FontCollection,
-    measurer: &mut TextMeasurer,
-) {
-    let font = fonts.get(None, None, None);
-    let Some(f) = font else {
-        return;
-    };
-    let color = parse_color(color_hex);
-    let fs_pt = pt(font_size_mm);
-    let (tw, _) = measurer.measure(text, None, fs_pt, None, None);
-    surface.set_fill(Some(fill_from_color(color)));
-    surface.set_stroke(None);
-    surface.draw_text(
-        Point::from_xy(pt(right_x_mm) - tw, pt(cy_mm)),
-        f.clone(),
-        fs_pt,
-        text,
-        false,
-        TextDirection::Auto,
-    );
-}
-
-/// Chart icin metin ciz — start-aligned (sol hizali)
-#[allow(clippy::too_many_arguments)]
-fn chart_text_start(
+fn chart_text(
     surface: &mut krilla::surface::Surface<'_>,
     x_mm: f64,
-    cy_mm: f64,
+    y_mm: f64,
     text: &str,
     font_size_mm: f64,
     color_hex: &str,
+    align: ChartTextAlign,
     fonts: &FontCollection,
-    _measurer: &mut TextMeasurer,
+    measurer: &mut TextMeasurer,
 ) {
-    let font = fonts.get(None, None, None);
-    let Some(f) = font else {
+    let Some(font) = fonts.get(None, None, None) else {
         return;
     };
     let color = parse_color(color_hex);
-    let fs_pt = pt(font_size_mm);
+    let fs = mm(font_size_mm);
+    let px = mm(x_mm);
+    let py = mm(y_mm);
+
+    let draw_x = match align {
+        ChartTextAlign::Start => px,
+        ChartTextAlign::Center => {
+            let (tw, _) = measurer.measure(text, None, fs, None, None);
+            px - tw / 2.0
+        }
+        ChartTextAlign::End => {
+            let (tw, _) = measurer.measure(text, None, fs, None, None);
+            px - tw
+        }
+    };
+
     surface.set_fill(Some(fill_from_color(color)));
     surface.set_stroke(None);
     surface.draw_text(
-        Point::from_xy(pt(x_mm), pt(cy_mm)),
-        f.clone(),
-        fs_pt,
+        Point::from_xy(draw_x, py),
+        font.clone(),
+        fs,
         text,
         false,
         TextDirection::Auto,
@@ -1363,13 +1296,14 @@ fn render_chart_y_axis(
     measurer: &mut TextMeasurer,
 ) {
     for tick in &y_axis.ticks {
-        chart_text_end(
+        chart_text(
             surface,
             y_axis.axis_x - 1.5,
             tick.y + 0.8,
             &tick.label,
             2.3,
             "#666666",
+            ChartTextAlign::End,
             fonts,
             measurer,
         );
@@ -1409,31 +1343,33 @@ fn render_chart_x_labels(
     let angle = x_labels.rotate_angle;
     for label in &x_labels.labels {
         if angle > 0.0 {
-            surface.push_transform(&Transform::from_translate(pt(label.x), pt(label.y)));
+            surface.push_transform(&Transform::from_translate(mm(label.x), mm(label.y)));
             let angle_rad = (angle as f32).to_radians();
             let c = angle_rad.cos();
             let s = angle_rad.sin();
             surface.push_transform(&Transform::from_row(c, -s, s, c, 0.0, 0.0));
-            chart_text_end(
+            chart_text(
                 surface,
                 0.0,
                 0.0,
                 &label.text,
                 2.2,
                 "#666666",
+                ChartTextAlign::End,
                 fonts,
                 measurer,
             );
             surface.pop();
             surface.pop();
         } else {
-            chart_text_centered(
+            chart_text(
                 surface,
                 label.x,
                 label.y,
                 &label.text,
                 2.5,
                 "#666666",
+                ChartTextAlign::Center,
                 fonts,
                 measurer,
             );
@@ -1452,19 +1388,19 @@ fn build_arc_path(
 ) -> Option<krilla::geom::Path> {
     let mut pb = PathBuilder::new();
 
-    let sx = pt(cx + radius * start.cos());
-    let sy = pt(cy + radius * start.sin());
+    let sx = mm(cx + radius * start.cos());
+    let sy = mm(cy + radius * start.sin());
 
     if inner_r > 0.0 {
         pb.move_to(sx, sy);
         approximate_arc(&mut pb, cx, cy, radius, start, end);
-        let ix = pt(cx + inner_r * end.cos());
-        let iy = pt(cy + inner_r * end.sin());
+        let ix = mm(cx + inner_r * end.cos());
+        let iy = mm(cy + inner_r * end.sin());
         pb.line_to(ix, iy);
         approximate_arc(&mut pb, cx, cy, inner_r, end, start);
         pb.close();
     } else {
-        pb.move_to(pt(cx), pt(cy));
+        pb.move_to(mm(cx), mm(cy));
         pb.line_to(sx, sy);
         approximate_arc(&mut pb, cx, cy, radius, start, end);
         pb.close();
@@ -1496,7 +1432,7 @@ fn approximate_arc(pb: &mut PathBuilder, cx: f64, cy: f64, r: f64, start: f64, e
         let c2x = p2x + k * r * a2.sin();
         let c2y = p2y - k * r * a2.cos();
 
-        pb.cubic_to(pt(c1x), pt(c1y), pt(c2x), pt(c2y), pt(p2x), pt(p2y));
+        pb.cubic_to(mm(c1x), mm(c1y), mm(c2x), mm(c2y), mm(p2x), mm(p2y));
     }
 }
 
@@ -1792,7 +1728,7 @@ mod tests {
 
     #[test]
     fn test_pt_conversion() {
-        let result = pt(25.4);
+        let result = mm(25.4);
         assert!((result - 72.0).abs() < 0.01);
     }
 

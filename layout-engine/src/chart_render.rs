@@ -29,14 +29,14 @@ pub fn render_svg(data: &ResolvedChartData, width_mm: f64, height_mm: f64) -> St
     // Title
     if let Some(ref title) = cl.title {
         let anchor = match title.align.as_str() {
-            "left" => "start",
-            "right" => "end",
-            _ => "middle",
+            "left" => SvgAnchor::Start,
+            "right" => SvgAnchor::End,
+            _ => SvgAnchor::Middle,
         };
         write!(
             svg,
             r##"<text x="{:.2}" y="{:.2}" font-size="{:.1}" fill="{}" text-anchor="{}" font-weight="bold">{}</text>"##,
-            title.x, title.y, title.font_size, title.color, anchor, escape_xml(&title.text)
+            title.x, title.y, title.font_size, title.color, anchor.as_str(), escape_xml(&title.text)
         )
         .unwrap();
     }
@@ -56,14 +56,7 @@ pub fn render_svg(data: &ResolvedChartData, width_mm: f64, height_mm: f64) -> St
     let has_axis = !matches!(data.chart_type, dreport_core::models::ChartType::Pie);
     if has_axis && let Some(ref axis) = data.axis {
         if let Some(ref x_label) = axis.x_label {
-            let x = cl.plot_x + cl.plot_w / 2.0;
-            let y = height_mm - 2.0;
-            write!(
-                    svg,
-                    r##"<text x="{:.2}" y="{:.2}" font-size="2.8" fill="#666" text-anchor="middle">{}</text>"##,
-                    x, y, escape_xml(x_label)
-                )
-                .unwrap();
+            svg_text(&mut svg, cl.plot_x + cl.plot_w / 2.0, height_mm - 2.0, 2.8, "#666", SvgAnchor::Middle, x_label);
         }
         if let Some(ref y_label) = axis.y_label {
             let x = 3.0;
@@ -101,24 +94,8 @@ fn render_bar(svg: &mut String, data: &ResolvedChartData, cl: &ChartLayout) {
         )
         .unwrap();
 
-        if bl.show_labels {
-            if bl.stacked {
-                if bar.value > 0.0 {
-                    write!(
-                        svg,
-                        r##"<text x="{:.2}" y="{:.2}" font-size="{:.1}" fill="{}" text-anchor="middle">{}</text>"##,
-                        bar.label_x, bar.label_y, bl.label_font, bl.label_color, format_value(bar.value)
-                    )
-                    .unwrap();
-                }
-            } else {
-                write!(
-                    svg,
-                    r##"<text x="{:.2}" y="{:.2}" font-size="{:.1}" fill="{}" text-anchor="middle">{}</text>"##,
-                    bar.label_x, bar.label_y, bl.label_font, bl.label_color, format_value(bar.value)
-                )
-                .unwrap();
-            }
+        if bl.show_labels && (!bl.stacked || bar.value > 0.0) {
+            svg_text(svg, bar.label_x, bar.label_y, bl.label_font, &bl.label_color, SvgAnchor::Middle, &format_value(bar.value));
         }
     }
 
@@ -162,12 +139,7 @@ fn render_line(svg: &mut String, data: &ResolvedChartData, cl: &ChartLayout) {
             }
 
             if ll.show_labels {
-                write!(
-                    svg,
-                    r##"<text x="{:.2}" y="{:.2}" font-size="{:.1}" fill="{}" text-anchor="middle">{}</text>"##,
-                    pt.x, pt.y - 1.5, ll.label_font, ll.label_color, format_value(pt.value)
-                )
-                .unwrap();
+                svg_text(svg, pt.x, pt.y - 1.5, ll.label_font, &ll.label_color, SvgAnchor::Middle, &format_value(pt.value));
             }
         }
 
@@ -239,18 +211,11 @@ fn render_pie(svg: &mut String, data: &ResolvedChartData, cl: &ChartLayout) {
             .unwrap();
         }
 
-        // Percentage label inside slice
         if pl.show_labels {
-            write!(
-                svg,
-                r##"<text x="{:.2}" y="{:.2}" font-size="{:.1}" fill="{}" text-anchor="middle" dominant-baseline="central">{}%</text>"##,
-                slice.label_x, slice.label_y, pl.label_font, pl.label_color,
-                (slice.fraction * 100.0).round()
-            )
-            .unwrap();
+            let pct = format!("{}%", (slice.fraction * 100.0).round());
+            svg_text_central(svg, slice.label_x, slice.label_y, pl.label_font, &pl.label_color, SvgAnchor::Middle, &pct);
         }
 
-        // Category name label outside slice with leader line
         if pl.show_cat_labels && !slice.cat_label_text.is_empty() {
             write!(
                 svg,
@@ -259,18 +224,8 @@ fn render_pie(svg: &mut String, data: &ResolvedChartData, cl: &ChartLayout) {
                 slice.leader_end_x, slice.leader_end_y
             )
             .unwrap();
-
-            let anchor = if slice.cat_label_anchor_end {
-                "end"
-            } else {
-                "start"
-            };
-            write!(
-                svg,
-                r##"<text x="{:.2}" y="{:.2}" font-size="2.5" fill="#555" text-anchor="{}" dominant-baseline="central">{}</text>"##,
-                slice.cat_label_x, slice.cat_label_y, anchor, escape_xml(&slice.cat_label_text)
-            )
-            .unwrap();
+            let anchor = if slice.cat_label_anchor_end { SvgAnchor::End } else { SvgAnchor::Start };
+            svg_text_central(svg, slice.cat_label_x, slice.cat_label_y, 2.5, "#555", anchor, &slice.cat_label_text);
         }
     }
 }
@@ -292,15 +247,7 @@ fn render_legend(
             item.swatch_x, item.swatch_y, color
         )
         .unwrap();
-        write!(
-            svg,
-            r##"<text x="{:.2}" y="{:.2}" font-size="{:.1}" fill="#666">{}</text>"##,
-            item.text_x,
-            item.text_y,
-            legend.font_size,
-            escape_xml(&item.name)
-        )
-        .unwrap();
+        svg_text(svg, item.text_x, item.text_y, legend.font_size, "#666", SvgAnchor::Start, &item.name);
     }
 }
 
@@ -310,12 +257,7 @@ fn render_legend(
 
 fn render_y_axis_svg(svg: &mut String, y_axis: &chart_layout::YAxisLayout) {
     for tick in &y_axis.ticks {
-        write!(
-            svg,
-            r##"<text x="{:.2}" y="{:.2}" font-size="2.3" fill="#666" text-anchor="end">{}</text>"##,
-            y_axis.axis_x - 1.5, tick.y + 0.8, tick.label
-        )
-        .unwrap();
+        svg_text(svg, y_axis.axis_x - 1.5, tick.y + 0.8, 2.3, "#666", SvgAnchor::End, &tick.label);
 
         if y_axis.show_grid {
             write!(
@@ -340,6 +282,7 @@ fn render_x_labels_svg(svg: &mut String, x_labels: &chart_layout::XLabelLayout) 
     let angle = x_labels.rotate_angle;
     for label in &x_labels.labels {
         if angle > 0.0 {
+            // Döndürülmüş etiket — transform gerektiğinden helper kullanamıyoruz
             write!(
                 svg,
                 r##"<text x="{:.2}" y="{:.2}" font-size="2.2" fill="#666" text-anchor="end" transform="rotate(-{:.1},{:.2},{:.2})">{}</text>"##,
@@ -347,12 +290,7 @@ fn render_x_labels_svg(svg: &mut String, x_labels: &chart_layout::XLabelLayout) 
             )
             .unwrap();
         } else {
-            write!(
-                svg,
-                r##"<text x="{:.2}" y="{:.2}" font-size="2.5" fill="#666" text-anchor="middle">{}</text>"##,
-                label.x, label.y, escape_xml(&label.text)
-            )
-            .unwrap();
+            svg_text(svg, label.x, label.y, 2.5, "#666", SvgAnchor::Middle, &label.text);
         }
     }
 }
@@ -362,6 +300,61 @@ fn escape_xml(s: &str) -> String {
         .replace('<', "&lt;")
         .replace('>', "&gt;")
         .replace('"', "&quot;")
+}
+
+/// SVG text hizalama modu
+enum SvgAnchor {
+    Start,
+    Middle,
+    End,
+}
+
+impl SvgAnchor {
+    fn as_str(&self) -> &str {
+        match self {
+            SvgAnchor::Start => "start",
+            SvgAnchor::Middle => "middle",
+            SvgAnchor::End => "end",
+        }
+    }
+}
+
+/// Tekrarlayan SVG text element yazımını soyutlar.
+fn svg_text(
+    svg: &mut String,
+    x: f64,
+    y: f64,
+    font_size: f64,
+    fill: &str,
+    anchor: SvgAnchor,
+    text: &str,
+) {
+    write!(
+        svg,
+        r##"<text x="{x:.2}" y="{y:.2}" font-size="{font_size:.1}" fill="{fill}" text-anchor="{anchor}">{text}</text>"##,
+        anchor = anchor.as_str(),
+        text = escape_xml(text),
+    )
+    .unwrap();
+}
+
+/// SVG text with dominant-baseline="central" (pie labels vb.)
+fn svg_text_central(
+    svg: &mut String,
+    x: f64,
+    y: f64,
+    font_size: f64,
+    fill: &str,
+    anchor: SvgAnchor,
+    text: &str,
+) {
+    write!(
+        svg,
+        r##"<text x="{x:.2}" y="{y:.2}" font-size="{font_size:.1}" fill="{fill}" text-anchor="{anchor}" dominant-baseline="central">{text}</text>"##,
+        anchor = anchor.as_str(),
+        text = escape_xml(text),
+    )
+    .unwrap();
 }
 
 #[cfg(test)]

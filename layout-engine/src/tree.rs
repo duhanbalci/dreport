@@ -279,6 +279,30 @@ fn build_container(
     Ok(node)
 }
 
+/// Leaf node oluştur ve node_map'e kaydet (tekrarlayan boilerplate'i ortadan kaldırır).
+fn register_leaf(
+    taffy: &mut TaffyTree<MeasureContext>,
+    node_map: &mut HashMap<NodeId, NodeInfo>,
+    style: Style,
+    id: &str,
+    element_type: &str,
+    content: Option<ResolvedContent>,
+    resolved_style: ResolvedStyle,
+) -> Result<NodeId, LayoutError> {
+    let node = taffy.new_leaf(style)?;
+    node_map.insert(
+        node,
+        NodeInfo {
+            element_id: id.to_string(),
+            element_type: element_type.to_string(),
+            content,
+            style: resolved_style,
+            children_ids: vec![],
+        },
+    );
+    Ok(node)
+}
+
 /// Herhangi bir element tipini taffy node'a çevir
 #[allow(clippy::too_many_arguments)]
 fn build_element(
@@ -354,78 +378,45 @@ fn build_element(
         ),
         TemplateElement::Line(e) => {
             let stroke_w = e.style.stroke_width.unwrap_or(0.5);
-            let style = sizing::leaf_style(&e.base.size, &e.base.position, parent_direction);
-
-            // Line: genişlik parent'tan, yükseklik stroke width
-            let mut leaf_style = style;
+            let mut style = sizing::leaf_style(&e.base.size, &e.base.position, parent_direction);
             if matches!(e.base.size.height, SizeValue::Auto) {
-                leaf_style.size.height = Dimension::length(mm_to_pt(stroke_w));
+                style.size.height = Dimension::length(mm_to_pt(stroke_w));
             }
-
-            let node = taffy.new_leaf(leaf_style)?;
-            node_map.insert(
-                node,
-                NodeInfo {
-                    element_id: e.base.id.clone(),
-                    element_type: e.type_str().to_string(),
-                    content: Some(ResolvedContent::Line),
-                    style: {
-                        let mut s: ResolvedStyle = (&e.style).into();
-                        s.stroke_width = Some(stroke_w);
-                        s
-                    },
-                    children_ids: vec![],
-                },
-            );
-            Ok(node)
+            let mut rs: ResolvedStyle = (&e.style).into();
+            rs.stroke_width = Some(stroke_w);
+            register_leaf(
+                taffy, node_map, style,
+                &e.base.id, e.type_str(),
+                Some(ResolvedContent::Line),
+                rs,
+            )
         }
         TemplateElement::Image(e) => {
             let style = sizing::leaf_style(&e.base.size, &e.base.position, parent_direction);
             let src = resolved.images.get(&e.base.id).cloned().unwrap_or_default();
-
-            let node = taffy.new_leaf(style)?;
-            node_map.insert(
-                node,
-                NodeInfo {
-                    element_id: e.base.id.clone(),
-                    element_type: e.type_str().to_string(),
-                    content: Some(ResolvedContent::Image { src }),
-                    style: (&e.style).into(),
-                    children_ids: vec![],
-                },
-            );
-            Ok(node)
+            register_leaf(
+                taffy, node_map, style,
+                &e.base.id, e.type_str(),
+                Some(ResolvedContent::Image { src }),
+                (&e.style).into(),
+            )
         }
         TemplateElement::Barcode(e) => {
             let mut style = sizing::leaf_style(&e.base.size, &e.base.position, parent_direction);
             let value = resolved.barcodes.get(&e.base.id).cloned().unwrap_or_default();
-
-            // Barcode leaf'e minimum boyut ver (MeasureFunc yok, Auto=0 olur)
             let is_qr = e.format == "qr";
-            let default_h = if is_qr { 20.0 } else { 15.0 }; // mm
-            let default_w = if is_qr { 20.0 } else { 40.0 }; // mm
             if matches!(e.base.size.height, SizeValue::Auto) {
-                style.min_size.height = Dimension::length(mm_to_pt(default_h));
+                style.min_size.height = Dimension::length(mm_to_pt(if is_qr { 20.0 } else { 15.0 }));
             }
             if matches!(e.base.size.width, SizeValue::Auto) {
-                style.min_size.width = Dimension::length(mm_to_pt(default_w));
+                style.min_size.width = Dimension::length(mm_to_pt(if is_qr { 20.0 } else { 40.0 }));
             }
-
-            let node = taffy.new_leaf(style)?;
-            node_map.insert(
-                node,
-                NodeInfo {
-                    element_id: e.base.id.clone(),
-                    element_type: e.type_str().to_string(),
-                    content: Some(ResolvedContent::Barcode {
-                        format: e.format.clone(),
-                        value,
-                    }),
-                    style: (&e.style).into(),
-                    children_ids: vec![],
-                },
-            );
-            Ok(node)
+            register_leaf(
+                taffy, node_map, style,
+                &e.base.id, e.type_str(),
+                Some(ResolvedContent::Barcode { format: e.format.clone(), value }),
+                (&e.style).into(),
+            )
         }
         TemplateElement::RepeatingTable(e) => {
             // Tabloyu container ağacına expand et (cache ile)
@@ -459,52 +450,33 @@ fn build_element(
         }
         TemplateElement::Shape(e) => {
             let style = sizing::leaf_style(&e.base.size, &e.base.position, parent_direction);
-            let node = taffy.new_leaf(style)?;
-            node_map.insert(
-                node,
-                NodeInfo {
-                    element_id: e.base.id.clone(),
-                    element_type: e.type_str().to_string(),
-                    content: Some(ResolvedContent::Shape {
-                        shape_type: e.shape_type.clone(),
-                    }),
-                    style: (&e.style).into(),
-                    children_ids: vec![],
-                },
-            );
-            Ok(node)
+            register_leaf(
+                taffy, node_map, style,
+                &e.base.id, e.type_str(),
+                Some(ResolvedContent::Shape { shape_type: e.shape_type.clone() }),
+                (&e.style).into(),
+            )
         }
         TemplateElement::Checkbox(e) => {
-            let checked_str = resolved
+            let checked = resolved
                 .texts
                 .get(&e.base.id)
-                .map(|s| s.as_str())
-                .unwrap_or("false");
-            let checked = checked_str == "true";
+                .map(|s| s == "true")
+                .unwrap_or(false);
             let box_size_mm = e.style.size.unwrap_or(4.0);
-            let style = sizing::leaf_style(&e.base.size, &e.base.position, parent_direction);
-
-            // Auto size → square based on style.size
-            let mut leaf_style = style;
+            let mut style = sizing::leaf_style(&e.base.size, &e.base.position, parent_direction);
             if matches!(e.base.size.width, SizeValue::Auto) {
-                leaf_style.size.width = Dimension::length(mm_to_pt(box_size_mm));
+                style.size.width = Dimension::length(mm_to_pt(box_size_mm));
             }
             if matches!(e.base.size.height, SizeValue::Auto) {
-                leaf_style.size.height = Dimension::length(mm_to_pt(box_size_mm));
+                style.size.height = Dimension::length(mm_to_pt(box_size_mm));
             }
-
-            let node = taffy.new_leaf(leaf_style)?;
-            node_map.insert(
-                node,
-                NodeInfo {
-                    element_id: e.base.id.clone(),
-                    element_type: e.type_str().to_string(),
-                    content: Some(ResolvedContent::Checkbox { checked }),
-                    style: (&e.style).into(),
-                    children_ids: vec![],
-                },
-            );
-            Ok(node)
+            register_leaf(
+                taffy, node_map, style,
+                &e.base.id, e.type_str(),
+                Some(ResolvedContent::Checkbox { checked }),
+                (&e.style).into(),
+            )
         }
         TemplateElement::RichText(e) => {
             let spans = resolved.rich_texts.get(&e.base.id).cloned().unwrap_or_default();
@@ -563,28 +535,20 @@ fn build_element(
         }
         TemplateElement::Chart(e) => {
             let mut style = sizing::leaf_style(&e.base.size, &e.base.position, parent_direction);
-            // Default minimum boyut — Auto ise chart cok kucuk olmasin
             if matches!(e.base.size.width, SizeValue::Auto) {
                 style.min_size.width = Dimension::length(mm_to_pt(80.0));
             }
             if matches!(e.base.size.height, SizeValue::Auto) {
                 style.min_size.height = Dimension::length(mm_to_pt(60.0));
             }
-            let node = taffy.new_leaf(style)?;
-            node_map.insert(
-                node,
-                NodeInfo {
-                    element_id: e.base.id.clone(),
-                    element_type: e.type_str().to_string(),
-                    content: None, // SVG collect_layout'ta uretilecek
-                    style: ResolvedStyle::default(),
-                    children_ids: vec![],
-                },
-            );
-            Ok(node)
+            register_leaf(
+                taffy, node_map, style,
+                &e.base.id, e.type_str(),
+                None, // SVG collect_layout'ta üretilecek
+                ResolvedStyle::default(),
+            )
         }
         TemplateElement::PageBreak(e) => {
-            // Küçük yükseklik — editörde görünür olması için (0.5mm ≈ 1.4pt)
             let style = Style {
                 size: Size {
                     width: Dimension::auto(),
@@ -592,18 +556,12 @@ fn build_element(
                 },
                 ..Default::default()
             };
-            let node = taffy.new_leaf(style)?;
-            node_map.insert(
-                node,
-                NodeInfo {
-                    element_id: e.base.id.clone(),
-                    element_type: e.type_str().to_string(),
-                    content: None,
-                    style: ResolvedStyle::default(),
-                    children_ids: vec![],
-                },
-            );
-            Ok(node)
+            register_leaf(
+                taffy, node_map, style,
+                &e.base.id, e.type_str(),
+                None,
+                ResolvedStyle::default(),
+            )
         }
     }
 }
@@ -763,62 +721,12 @@ fn collect_layout(
     let w_mm = pt_to_mm(layout.size.width);
     let h_mm = pt_to_mm(layout.size.height);
 
-    // Chart elementleri icin SVG uret (boyutlar artik belli)
+    // Chart elementleri için SVG üret (boyutlar artık belli)
     let content = if info.element_type == "chart" {
         resolved.charts.get(&info.element_id).map(|cd| {
-            use crate::chart_layout::DEFAULT_COLORS;
-            use crate::{ChartRenderData, ChartSeriesData};
-
-            // Renk paleti olustur
-            let n_colors = cd.categories.len().max(cd.series.len()).max(1);
-            let colors: Vec<String> = (0..n_colors)
-                .map(|i| {
-                    cd.style
-                        .colors
-                        .as_ref()
-                        .and_then(|c| c.get(i).cloned())
-                        .unwrap_or_else(|| DEFAULT_COLORS[i % DEFAULT_COLORS.len()].to_string())
-                })
-                .collect();
-
             ResolvedContent::Chart {
                 svg: crate::chart_render::render_svg(cd, w_mm, h_mm),
-                chart_data: Box::new(ChartRenderData {
-                    chart_type: cd.chart_type.clone(),
-                    categories: cd.categories.clone(),
-                    series: cd
-                        .series
-                        .iter()
-                        .map(|s| ChartSeriesData {
-                            name: s.name.clone(),
-                            values: s.values.clone(),
-                        })
-                        .collect(),
-                    title_text: cd.title.as_ref().map(|t| t.text.clone()),
-                    title_font_size: cd.title.as_ref().and_then(|t| t.font_size),
-                    title_color: cd.title.as_ref().and_then(|t| t.color.clone()),
-                    colors,
-                    show_labels: cd.labels.as_ref().is_some_and(|l| l.show),
-                    label_font_size: cd.labels.as_ref().and_then(|l| l.font_size),
-                    show_grid: cd.axis.as_ref().and_then(|a| a.show_grid).unwrap_or(true),
-                    grid_color: cd.axis.as_ref().and_then(|a| a.grid_color.clone()),
-                    bar_gap: cd.style.bar_gap,
-                    stacked: matches!(
-                        cd.group_mode,
-                        Some(dreport_core::models::GroupMode::Stacked)
-                    ),
-                    inner_radius: cd.style.inner_radius,
-                    show_points: cd.style.show_points,
-                    line_width: cd.style.line_width,
-                    background_color: cd.style.background_color.clone(),
-                    label_color: cd.labels.as_ref().and_then(|l| l.color.clone()),
-                    legend_show: cd.legend.as_ref().is_some_and(|l| l.show),
-                    legend_position: cd.legend.as_ref().and_then(|l| l.position.clone()),
-                    legend_font_size: cd.legend.as_ref().and_then(|l| l.font_size),
-                    x_label: cd.axis.as_ref().and_then(|a| a.x_label.clone()),
-                    y_label: cd.axis.as_ref().and_then(|a| a.y_label.clone()),
-                    title_align: cd.title.as_ref().and_then(|t| t.align.clone()),
-                }),
+                chart_data: Box::new(crate::ChartRenderData::from(cd)),
             }
         })
     } else {

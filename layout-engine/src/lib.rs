@@ -292,6 +292,58 @@ impl From<&dreport_core::models::CheckboxStyle> for ResolvedStyle {
     }
 }
 
+impl From<&data_resolve::ResolvedChartData> for ChartRenderData {
+    fn from(cd: &data_resolve::ResolvedChartData) -> Self {
+        let n_colors = cd.categories.len().max(cd.series.len()).max(1);
+        let colors: Vec<String> = (0..n_colors)
+            .map(|i| {
+                cd.style
+                    .colors
+                    .as_ref()
+                    .and_then(|c| c.get(i).cloned())
+                    .unwrap_or_else(|| {
+                        chart_layout::DEFAULT_COLORS[i % chart_layout::DEFAULT_COLORS.len()]
+                            .to_string()
+                    })
+            })
+            .collect();
+
+        Self {
+            chart_type: cd.chart_type.clone(),
+            categories: cd.categories.clone(),
+            series: cd
+                .series
+                .iter()
+                .map(|s| ChartSeriesData {
+                    name: s.name.clone(),
+                    values: s.values.clone(),
+                })
+                .collect(),
+            title_text: cd.title.as_ref().map(|t| t.text.clone()),
+            title_font_size: cd.title.as_ref().and_then(|t| t.font_size),
+            title_color: cd.title.as_ref().and_then(|t| t.color.clone()),
+            title_align: cd.title.as_ref().and_then(|t| t.align.clone()),
+            colors,
+            show_labels: cd.labels.as_ref().is_some_and(|l| l.show),
+            label_font_size: cd.labels.as_ref().and_then(|l| l.font_size),
+            label_color: cd.labels.as_ref().and_then(|l| l.color.clone()),
+            show_grid: cd.axis.as_ref().and_then(|a| a.show_grid).unwrap_or(true),
+            grid_color: cd.axis.as_ref().and_then(|a| a.grid_color.clone()),
+            bar_gap: cd.style.bar_gap,
+            stacked: matches!(cd.group_mode, Some(dreport_core::models::GroupMode::Stacked)),
+            inner_radius: cd.style.inner_radius,
+            show_points: cd.style.show_points,
+            line_width: cd.style.line_width,
+            background_color: cd.style.background_color.clone(),
+            legend_show: cd.legend.as_ref().is_some_and(|l| l.show),
+            legend_position: cd.legend.as_ref().and_then(|l| l.position.clone()),
+            legend_font_size: cd.legend.as_ref().and_then(|l| l.font_size),
+            x_label: cd.axis.as_ref().and_then(|a| a.x_label.clone()),
+            y_label: cd.axis.as_ref().and_then(|a| a.y_label.clone()),
+        }
+    }
+}
+
 /// Ana layout hesaplama fonksiyonu.
 /// Template + data + font verileri alır, her element için pozisyon döner.
 pub fn compute_layout(
