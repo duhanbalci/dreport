@@ -247,6 +247,19 @@ function removeColor(index: number) {
         :model-value="element.axis?.gridColor ?? '#E5E7EB'"
         @update:model-value="(v) => updateNested('axis', 'gridColor', v, {})"
       />
+      <template v-if="element.chartType === 'line'">
+        <PropCheckbox
+          label="Dikey Izgara"
+          :model-value="element.axis?.showVerticalGrid ?? true"
+          @update:model-value="(v) => updateNested('axis', 'showVerticalGrid', v, {})"
+        />
+        <PropColorInput
+          v-if="element.axis?.showVerticalGrid !== false"
+          label="Dikey Izgara Renk"
+          :model-value="element.axis?.verticalGridColor ?? '#E5E7EB'"
+          @update:model-value="(v) => updateNested('axis', 'verticalGridColor', v, {})"
+        />
+      </template>
     </PropSection>
 
     <!-- Stil -->
@@ -291,6 +304,12 @@ function removeColor(index: number) {
         :step="0.1"
         :min="0.1"
         @update:model-value="(v) => updateStyle('lineWidth', v)"
+      />
+      <PropSelect
+        label="Egri Tipi"
+        :model-value="element.style.curveType ?? 'linear'"
+        :options="[{ value: 'linear', label: 'Duz' }, { value: 'smooth', label: 'Yumusak' }]"
+        @update:model-value="(v) => updateStyle('curveType', v)"
       />
       <PropCheckbox
         label="Noktalar"

@@ -1,25 +1,35 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useTemplateStore } from '../../../stores/template'
 import PropNumberInput from './PropNumberInput.vue'
 import PropColorInput from './PropColorInput.vue'
 import PropSelect from './PropSelect.vue'
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     fontSize: number
     fontWeight?: string
+    fontFamily?: string
     color: string
     align: string
     showWeight?: boolean
   }>(),
-  { fontWeight: 'normal', showWeight: true },
+  { fontWeight: 'normal', fontFamily: undefined, showWeight: true },
 )
 
 defineEmits<{
   'update:fontSize': [value: number]
   'update:fontWeight': [value: string]
+  'update:fontFamily': [value: string | undefined]
   'update:color': [value: string]
   'update:align': [value: string]
 }>()
+
+const templateStore = useTemplateStore()
+
+const fontOptions = computed(() =>
+  templateStore.template.fonts.map((f) => ({ value: f, label: f })),
+)
 
 const weightOptions = [
   { value: 'normal', label: 'Normal' },
@@ -34,6 +44,14 @@ const alignOptions = [
 </script>
 
 <template>
+  <PropSelect
+    v-if="fontOptions.length > 1"
+    label="Font"
+    :model-value="fontFamily ?? fontOptions[0]?.value ?? ''"
+    :options="fontOptions"
+    data-tip="Yazi tipi ailesi"
+    @update:model-value="$emit('update:fontFamily', $event)"
+  />
   <PropNumberInput
     label="Boyut (pt)"
     :model-value="fontSize"

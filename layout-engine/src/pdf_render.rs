@@ -1015,11 +1015,33 @@ fn render_chart(
                 }));
                 let path = {
                     let mut pb = PathBuilder::new();
-                    for (i, (lx, ly)) in points.iter().enumerate() {
-                        if i == 0 {
-                            pb.move_to(mm(*lx), mm(*ly));
-                        } else {
-                            pb.line_to(mm(*lx), mm(*ly));
+                    if ll.smooth && points.len() >= 2 {
+                        let pts = &series_layout.points;
+                        pb.move_to(mm(pts[0].x), mm(pts[0].y));
+                        for i in 0..pts.len() - 1 {
+                            let p0 = if i > 0 { &pts[i - 1] } else { &pts[i] };
+                            let p1 = &pts[i];
+                            let p2 = &pts[i + 1];
+                            let p3 = if i + 2 < pts.len() { &pts[i + 2] } else { &pts[i + 1] };
+
+                            let cp1x = p1.x + (p2.x - p0.x) / 6.0;
+                            let cp1y = p1.y + (p2.y - p0.y) / 6.0;
+                            let cp2x = p2.x - (p3.x - p1.x) / 6.0;
+                            let cp2y = p2.y - (p3.y - p1.y) / 6.0;
+
+                            pb.cubic_to(
+                                mm(cp1x), mm(cp1y),
+                                mm(cp2x), mm(cp2y),
+                                mm(p2.x), mm(p2.y),
+                            );
+                        }
+                    } else {
+                        for (i, (lx, ly)) in points.iter().enumerate() {
+                            if i == 0 {
+                                pb.move_to(mm(*lx), mm(*ly));
+                            } else {
+                                pb.line_to(mm(*lx), mm(*ly));
+                            }
                         }
                     }
                     pb.finish()
@@ -1053,6 +1075,32 @@ fn render_chart(
                             measurer,
                         );
                     }
+                }
+            }
+            // Reference lines (vertical)
+            for rl in &ll.ref_lines {
+                let rl_color = parse_color(&rl.color);
+                chart_line_seg(
+                    surface,
+                    rl.x,
+                    rl.y1,
+                    rl.x,
+                    rl.y2,
+                    rl_color,
+                    (rl.width * 2.5) as f32,
+                );
+                if let Some(ref label) = rl.label {
+                    chart_text(
+                        surface,
+                        rl.x,
+                        rl.y1 - 1.0,
+                        label,
+                        2.0,
+                        &rl.color,
+                        ChartTextAlign::Center,
+                        fonts,
+                        measurer,
+                    );
                 }
             }
             render_chart_x_labels(surface, &ll.x_labels, fonts, measurer);

@@ -250,11 +250,22 @@ export interface ChartLabels {
   color?: string
 }
 
+export interface ChartReferenceLine {
+  categoryIndex: number
+  color?: string
+  width?: number
+  label?: string
+  dash?: boolean
+}
+
 export interface ChartAxis {
   xLabel?: string
   yLabel?: string
   showGrid?: boolean
   gridColor?: string
+  showVerticalGrid?: boolean
+  verticalGridColor?: string
+  referenceLines?: ChartReferenceLine[]
 }
 
 export interface ChartStyle {

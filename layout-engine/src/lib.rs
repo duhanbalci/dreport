@@ -161,7 +161,20 @@ pub struct ChartRenderData {
     // Title align
     #[serde(default)]
     pub title_align: Option<String>,
+    // Curve type for line charts
+    #[serde(default)]
+    pub curve_type: Option<String>,
+    // Vertical reference lines
+    #[serde(default)]
+    pub reference_lines: Vec<dreport_core::models::ChartReferenceLine>,
+    // Vertical grid
+    #[serde(default = "default_true")]
+    pub show_vertical_grid: bool,
+    #[serde(default)]
+    pub vertical_grid_color: Option<String>,
 }
+
+fn default_true() -> bool { true }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChartSeriesData {
@@ -340,6 +353,10 @@ impl From<&data_resolve::ResolvedChartData> for ChartRenderData {
             legend_font_size: cd.legend.as_ref().and_then(|l| l.font_size),
             x_label: cd.axis.as_ref().and_then(|a| a.x_label.clone()),
             y_label: cd.axis.as_ref().and_then(|a| a.y_label.clone()),
+            curve_type: cd.style.curve_type.clone(),
+            reference_lines: cd.axis.as_ref().map_or_else(Vec::new, |a| a.reference_lines.clone()),
+            show_vertical_grid: cd.axis.as_ref().and_then(|a| a.show_vertical_grid).unwrap_or(true),
+            vertical_grid_color: cd.axis.as_ref().and_then(|a| a.vertical_grid_color.clone()),
         }
     }
 }

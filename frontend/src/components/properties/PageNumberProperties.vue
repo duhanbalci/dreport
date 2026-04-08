@@ -29,10 +29,13 @@ const formatOptions = [
     />
     <PropTextStyleGroup
       :font-size="style().fontSize ?? 10"
+      :font-weight="style().fontWeight ?? 'normal'"
+      :font-family="style().fontFamily"
       :color="style().color ?? '#666666'"
       :align="style().align ?? 'center'"
-      :show-weight="false"
       @update:font-size="(v) => updateStyle('fontSize', v)"
+      @update:font-weight="(v) => updateStyle('fontWeight', v)"
+      @update:font-family="(v) => updateStyle('fontFamily', v)"
       @update:color="(v) => updateStyle('color', v)"
       @update:align="(v) => updateStyle('align', v)"
     />

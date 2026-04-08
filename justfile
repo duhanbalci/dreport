@@ -55,6 +55,10 @@ test-visual-editor:
 test-visual: visual-refs
     cd frontend && bun run test:visual
 
+# Visual snapshot'lari guncelle (UI degisikliklerinden sonra)
+update-snapshots: visual-refs
+    cd frontend && bun run test:visual -- --update-snapshots
+
 # Tum testler (Rust + frontend unit + visual)
 test-all: test-rust test-front test-visual
 

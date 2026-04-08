@@ -32,6 +32,7 @@ import RichTextProperties from '../properties/RichTextProperties.vue'
 import ContainerProperties from '../properties/ContainerProperties.vue'
 import RepeatingTableProperties from '../properties/RepeatingTableProperties.vue'
 import ChartProperties from '../properties/ChartProperties.vue'
+import PropCondition from '../properties/shared/PropCondition.vue'
 import '../../styles/properties.css'
 
 const templateStore = useTemplateStore()
@@ -232,6 +233,13 @@ function deleteSelected() {
             />
           </div>
         </div>
+
+        <!-- Condition -->
+        <PropCondition
+          v-if="selectedElement.id !== 'root'"
+          :condition="selectedElement.condition"
+          @update:condition="(v) => templateStore.updateElement(selectedElement!.id, { condition: v } as any)"
+        />
 
         <!-- Delete -->
         <div v-if="selectedElement.id !== 'root'" class="prop-section">

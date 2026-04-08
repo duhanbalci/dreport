@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { usePropertyUpdate } from '../../composables/usePropertyUpdate'
+import { useSchemaStore } from '../../stores/schema'
 import PropSection from './shared/PropSection.vue'
 import PropColorInput from './shared/PropColorInput.vue'
 import PropSelect from './shared/PropSelect.vue'
+import PropFieldSelect from './shared/PropFieldSelect.vue'
 import PropTextStyleGroup from './shared/PropTextStyleGroup.vue'
 import type { RichTextElement, RichTextSpan, TextStyle } from '../../core/types'
 import '../../styles/properties.css'
 
 const props = defineProps<{ element: RichTextElement }>()
 const { update, updateStyle } = usePropertyUpdate(() => props.element)
+const schemaStore = useSchemaStore()
 
 function updateSpan(index: number, updates: Partial<RichTextSpan>) {
   const content = [...props.element.content]
@@ -43,10 +46,13 @@ const weightOptions = [
   <PropSection title="Varsayilan Stil">
     <PropTextStyleGroup
       :font-size="element.style.fontSize ?? 11"
+      :font-weight="element.style.fontWeight ?? 'normal'"
+      :font-family="element.style.fontFamily"
       :color="element.style.color ?? '#000000'"
       :align="element.style.align ?? 'left'"
-      :show-weight="false"
       @update:font-size="(v) => updateStyle('fontSize', v)"
+      @update:font-weight="(v) => updateStyle('fontWeight', v)"
+      @update:font-family="(v) => updateStyle('fontFamily', v)"
       @update:color="(v) => updateStyle('color', v)"
       @update:align="(v) => updateStyle('align', v)"
     />
@@ -79,6 +85,15 @@ const weightOptions = [
           @input="(e) => updateSpan(idx, { text: (e.target as HTMLInputElement).value })"
         />
       </div>
+      <PropFieldSelect
+        label="Binding"
+        :model-value="span.binding?.path ?? ''"
+        :fields="schemaStore.scalarFields"
+        :allow-empty="true"
+        empty-label="Yok (statik)"
+        data-tip="Span'in baglanacagi veri alani"
+        @update:model-value="(v) => updateSpan(idx, { binding: v ? { type: 'scalar', path: v } : undefined })"
+      />
       <div class="prop-row" data-tip="Span yazi boyutu — bos birakilirsa varsayilan kullanilir">
         <label class="prop-label">Boyut</label>
         <input
@@ -108,6 +123,13 @@ const weightOptions = [
         :model-value="(span.style as TextStyle).color ?? element.style.color ?? '#000000'"
         data-tip="Span metin rengi"
         @update:model-value="(v) => updateSpanStyle(idx, 'color', v)"
+      />
+      <PropSelect
+        label="Hizalama"
+        :model-value="(span.style as TextStyle).align ?? ''"
+        :options="[{ value: '', label: 'Varsayilan' }, { value: 'left', label: 'Sol' }, { value: 'center', label: 'Orta' }, { value: 'right', label: 'Sag' }]"
+        data-tip="Span hizalamasi"
+        @update:model-value="(v) => updateSpanStyle(idx, 'align', v || undefined)"
       />
     </div>
   </PropSection>

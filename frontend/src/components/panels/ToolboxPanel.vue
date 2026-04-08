@@ -3,6 +3,7 @@ import { useEditorStore } from '../../stores/editor'
 import { useSchemaStore } from '../../stores/schema'
 import type {
   TemplateElement,
+  TextElement,
   RepeatingTableElement,
   TableColumn,
   ImageElement,
@@ -44,6 +45,18 @@ const tools: ToolItem[] = [
       size: { width: sz.auto(), height: sz.auto() },
       style: { fontSize: 11, color: '#000000' },
       content: 'Yeni metin',
+    }),
+  },
+  {
+    label: 'Veri Metni',
+    icon: 'D',
+    create: (): TextElement => ({
+      id: nextId('dtxt'),
+      type: 'text',
+      position: { type: 'flow' },
+      size: { width: sz.auto(), height: sz.auto() },
+      style: { fontSize: 11, color: '#000000' },
+      binding: { type: 'scalar', path: '' },
     }),
   },
   {

@@ -129,10 +129,23 @@ pub struct LineChartLayout {
     pub show_labels: bool,
     pub label_font: f64,
     pub label_color: String,
+    pub smooth: bool,
     /// X axis line endpoints
     pub x_axis_y: f64,
     pub x_axis_x1: f64,
     pub x_axis_x2: f64,
+    /// Vertical reference lines
+    pub ref_lines: Vec<RefLineLayout>,
+}
+
+pub struct RefLineLayout {
+    pub x: f64,
+    pub y1: f64,
+    pub y2: f64,
+    pub color: String,
+    pub width: f64,
+    pub dash: bool,
+    pub label: Option<String>,
 }
 
 pub struct PieSlice {
@@ -223,6 +236,10 @@ pub trait ChartDataSource {
     fn inner_radius(&self) -> Option<f64>;
     fn show_points(&self) -> Option<bool>;
     fn line_width(&self) -> Option<f64>;
+    fn curve_type(&self) -> Option<&str>;
+    fn reference_lines(&self) -> &[dreport_core::models::ChartReferenceLine];
+    fn show_vertical_grid(&self) -> bool;
+    fn vertical_grid_color(&self) -> Option<&str>;
 }
 
 // ---------------------------------------------------------------------------
@@ -314,6 +331,18 @@ impl ChartDataSource for crate::data_resolve::ResolvedChartData {
     fn line_width(&self) -> Option<f64> {
         self.style.line_width
     }
+    fn curve_type(&self) -> Option<&str> {
+        self.style.curve_type.as_deref()
+    }
+    fn reference_lines(&self) -> &[dreport_core::models::ChartReferenceLine] {
+        self.axis.as_ref().map_or(&[], |a| &a.reference_lines)
+    }
+    fn show_vertical_grid(&self) -> bool {
+        self.axis.as_ref().and_then(|a| a.show_vertical_grid).unwrap_or(true)
+    }
+    fn vertical_grid_color(&self) -> Option<&str> {
+        self.axis.as_ref().and_then(|a| a.vertical_grid_color.as_deref())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -402,6 +431,18 @@ impl ChartDataSource for crate::ChartRenderData {
     }
     fn line_width(&self) -> Option<f64> {
         self.line_width
+    }
+    fn curve_type(&self) -> Option<&str> {
+        self.curve_type.as_deref()
+    }
+    fn reference_lines(&self) -> &[dreport_core::models::ChartReferenceLine] {
+        &self.reference_lines
+    }
+    fn show_vertical_grid(&self) -> bool {
+        self.show_vertical_grid
+    }
+    fn vertical_grid_color(&self) -> Option<&str> {
+        self.vertical_grid_color.as_deref()
     }
 }
 
@@ -693,22 +734,14 @@ pub fn compute_x_labels_line(
             rotate_angle: 0.0,
         };
     }
-    let spacing = if n_cats == 1 {
-        pw
-    } else {
-        pw / (n_cats - 1) as f64
-    };
+    let step = pw / n_cats as f64;
     let max_label_len = categories.iter().map(|c| c.len()).max().unwrap_or(0);
-    let rotate_angle = compute_label_rotation(max_label_len, spacing);
+    let rotate_angle = compute_label_rotation(max_label_len, step);
     let labels = categories
         .iter()
         .enumerate()
         .map(|(ci, cat)| {
-            let x = if n_cats == 1 {
-                px + pw / 2.0
-            } else {
-                px + ci as f64 * pw / (n_cats - 1) as f64
-            };
+            let x = px + step / 2.0 + ci as f64 * step;
             XLabel {
                 text: cat.clone(),
                 x,
@@ -833,6 +866,11 @@ pub fn compute_line_layout(data: &dyn ChartDataSource, cl: &ChartLayout) -> Line
     let show_labels = data.show_labels();
     let label_font = data.label_font_size().unwrap_or(2.2);
     let label_color = data.label_color().unwrap_or("#333").to_string();
+    let smooth = data.curve_type() == Some("smooth");
+
+    // Slot-based positioning: each category gets a slot, point centered in slot
+    // This adds padding on left/right so first/last points don't touch axes
+    let step = if n_cats > 0 { pw / n_cats as f64 } else { pw };
 
     let series = (0..data.series_count())
         .map(|si| {
@@ -841,11 +879,7 @@ pub fn compute_line_layout(data: &dyn ChartDataSource, cl: &ChartLayout) -> Line
                 .iter()
                 .enumerate()
                 .map(|(ci, val)| {
-                    let x = if n_cats == 1 {
-                        px + pw / 2.0
-                    } else {
-                        px + ci as f64 * pw / (n_cats - 1) as f64
-                    };
+                    let x = px + step / 2.0 + ci as f64 * step;
                     let y = py + ph - ((val - min_val) / range) * ph;
                     LinePoint { x, y, value: *val }
                 })
@@ -859,6 +893,42 @@ pub fn compute_line_layout(data: &dyn ChartDataSource, cl: &ChartLayout) -> Line
 
     let x_labels = compute_x_labels_line(data.categories(), px, py + ph, pw);
 
+    // Vertical grid lines at each category
+    let vgrid_color = data.vertical_grid_color().unwrap_or("#E5E7EB").to_string();
+    let mut ref_lines: Vec<RefLineLayout> = if data.show_vertical_grid() {
+        (0..n_cats).map(|ci| {
+            let x = px + step / 2.0 + ci as f64 * step;
+            RefLineLayout {
+                x,
+                y1: py,
+                y2: py + ph,
+                color: vgrid_color.clone(),
+                width: 0.15,
+                dash: false,
+                label: None,
+            }
+        }).collect()
+    } else {
+        vec![]
+    };
+
+    // Explicit reference lines (overlay on top of grid)
+    for rl in data.reference_lines() {
+        if rl.category_index >= n_cats {
+            continue;
+        }
+        let x = px + step / 2.0 + rl.category_index as f64 * step;
+        ref_lines.push(RefLineLayout {
+            x,
+            y1: py,
+            y2: py + ph,
+            color: rl.color.clone().unwrap_or_else(|| "#9CA3AF".to_string()),
+            width: rl.width.unwrap_or(0.3),
+            dash: rl.dash.unwrap_or(true),
+            label: rl.label.clone(),
+        });
+    }
+
     LineChartLayout {
         min_val,
         max_val,
@@ -870,9 +940,11 @@ pub fn compute_line_layout(data: &dyn ChartDataSource, cl: &ChartLayout) -> Line
         show_labels,
         label_font,
         label_color,
+        smooth,
         x_axis_y: py + ph,
         x_axis_x1: px,
         x_axis_x2: px + pw,
+        ref_lines,
     }
 }
 

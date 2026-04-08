@@ -121,14 +121,13 @@ fn render_line(svg: &mut String, data: &ResolvedChartData, cl: &ChartLayout) {
     // Y axis
     render_y_axis_svg(svg, &ll.y_axis);
 
+    let mut label_texts = String::new();
+
     for series_layout in &ll.series {
         let color = color_at(&cl.palette, series_layout.color_idx);
-        let mut points = String::new();
         let mut point_circles = String::new();
 
         for pt in &series_layout.points {
-            write!(points, "{:.2},{:.2} ", pt.x, pt.y).unwrap();
-
             if ll.show_points {
                 write!(
                     point_circles,
@@ -139,17 +138,73 @@ fn render_line(svg: &mut String, data: &ResolvedChartData, cl: &ChartLayout) {
             }
 
             if ll.show_labels {
-                svg_text(svg, pt.x, pt.y - 1.5, ll.label_font, &ll.label_color, SvgAnchor::Middle, &format_value(pt.value));
+                svg_text(&mut label_texts, pt.x, pt.y - 1.5, ll.label_font, &ll.label_color, SvgAnchor::Middle, &format_value(pt.value));
             }
         }
 
-        write!(
-            svg,
-            r##"<polyline points="{}" fill="none" stroke="{}" stroke-width="{:.2}" stroke-linejoin="round" stroke-linecap="round"/>"##,
-            points.trim(), color, ll.line_width
-        )
-        .unwrap();
+        if ll.smooth && series_layout.points.len() >= 2 {
+            // Catmull-Rom → cubic bezier smooth curve
+            let pts = &series_layout.points;
+            let mut d = format!("M{:.2},{:.2}", pts[0].x, pts[0].y);
+            for i in 0..pts.len() - 1 {
+                let p0 = if i > 0 { &pts[i - 1] } else { &pts[i] };
+                let p1 = &pts[i];
+                let p2 = &pts[i + 1];
+                let p3 = if i + 2 < pts.len() { &pts[i + 2] } else { &pts[i + 1] };
+
+                let cp1x = p1.x + (p2.x - p0.x) / 6.0;
+                let cp1y = p1.y + (p2.y - p0.y) / 6.0;
+                let cp2x = p2.x - (p3.x - p1.x) / 6.0;
+                let cp2y = p2.y - (p3.y - p1.y) / 6.0;
+
+                write!(d, " C{:.2},{:.2} {:.2},{:.2} {:.2},{:.2}",
+                    cp1x, cp1y, cp2x, cp2y, p2.x, p2.y
+                ).unwrap();
+            }
+            write!(
+                svg,
+                r##"<path d="{}" fill="none" stroke="{}" stroke-width="{:.2}" stroke-linejoin="round" stroke-linecap="round"/>"##,
+                d, color, ll.line_width
+            )
+            .unwrap();
+        } else {
+            let mut points = String::new();
+            for pt in &series_layout.points {
+                write!(points, "{:.2},{:.2} ", pt.x, pt.y).unwrap();
+            }
+            write!(
+                svg,
+                r##"<polyline points="{}" fill="none" stroke="{}" stroke-width="{:.2}" stroke-linejoin="round" stroke-linecap="round"/>"##,
+                points.trim(), color, ll.line_width
+            )
+            .unwrap();
+        }
         svg.push_str(&point_circles);
+    }
+
+    // Data labels (rendered after lines/points so they appear on top)
+    svg.push_str(&label_texts);
+
+    // Reference lines (vertical)
+    for rl in &ll.ref_lines {
+        if rl.dash {
+            write!(
+                svg,
+                r##"<line x1="{:.2}" y1="{:.2}" x2="{:.2}" y2="{:.2}" stroke="{}" stroke-width="{:.2}" stroke-dasharray="1.5,1"/>"##,
+                rl.x, rl.y1, rl.x, rl.y2, rl.color, rl.width
+            )
+            .unwrap();
+        } else {
+            write!(
+                svg,
+                r##"<line x1="{:.2}" y1="{:.2}" x2="{:.2}" y2="{:.2}" stroke="{}" stroke-width="{:.2}"/>"##,
+                rl.x, rl.y1, rl.x, rl.y2, rl.color, rl.width
+            )
+            .unwrap();
+        }
+        if let Some(ref label) = rl.label {
+            svg_text(svg, rl.x, rl.y1 - 1.0, 2.0, &rl.color, SvgAnchor::Middle, label);
+        }
     }
 
     // X axis labels
@@ -560,6 +615,9 @@ mod tests {
             y_label: Some("Revenue".to_string()),
             show_grid: None,
             grid_color: None,
+            show_vertical_grid: None,
+            vertical_grid_color: None,
+            reference_lines: vec![],
         });
         let svg = render_svg(&data, 100.0, 60.0);
 
@@ -575,6 +633,9 @@ mod tests {
             y_label: Some("Y Label".to_string()),
             show_grid: None,
             grid_color: None,
+            show_vertical_grid: None,
+            vertical_grid_color: None,
+            reference_lines: vec![],
         });
         let svg = render_svg(&data, 80.0, 80.0);
 

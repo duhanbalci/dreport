@@ -15,6 +15,12 @@ const shapeOptions = [
   { value: 'rounded_rectangle', label: 'Yuvarlak Dikdortgen' },
   { value: 'ellipse', label: 'Elips' },
 ]
+
+const borderStyleOptions = [
+  { value: 'solid', label: 'Duz' },
+  { value: 'dashed', label: 'Kesikli' },
+  { value: 'dotted', label: 'Noktali' },
+]
 </script>
 
 <template>
@@ -45,6 +51,13 @@ const shapeOptions = [
       :min="0"
       data-tip="Kenarlik cizgi kalinligi (mm)"
       @update:model-value="(v) => updateStyle('borderWidth', v)"
+    />
+    <PropSelect
+      label="Kenar Stili"
+      :model-value="element.style.borderStyle ?? 'solid'"
+      :options="borderStyleOptions"
+      data-tip="Kenarlik cizgi stili"
+      @update:model-value="(v) => updateStyle('borderStyle', v)"
     />
     <PropNumberInput
       v-if="element.shapeType === 'rounded_rectangle'"

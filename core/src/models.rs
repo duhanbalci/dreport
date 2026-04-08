@@ -230,6 +230,26 @@ pub struct ChartAxis {
     pub y_label: Option<String>,
     pub show_grid: Option<bool>,
     pub grid_color: Option<String>,
+    /// Show vertical grid lines at each category (line charts). Defaults to true.
+    pub show_vertical_grid: Option<bool>,
+    pub vertical_grid_color: Option<String>,
+    #[serde(default)]
+    pub reference_lines: Vec<ChartReferenceLine>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChartReferenceLine {
+    /// Category index (0-based) where the vertical line is drawn
+    pub category_index: usize,
+    #[serde(default)]
+    pub color: Option<String>,
+    #[serde(default)]
+    pub width: Option<f64>,
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub dash: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

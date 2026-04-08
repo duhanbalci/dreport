@@ -81,7 +81,25 @@ const emit = defineEmits<{
             &times;
           </button>
         </div>
-        <span class="ts-clbl">Zebra</span>
+        <span class="ts-clbl">Tek</span>
+      </div>
+      <div class="ts-color-item" data-tip="Zebra satir rengi — cift satirlar">
+        <div class="ts-swatch-wrap">
+          <input
+            class="ts-swatch"
+            type="color"
+            :value="style.zebraEven ?? '#ffffff'"
+            @input="(e) => emit('update:style', 'zebraEven', (e.target as HTMLInputElement).value)"
+          />
+          <button
+            v-if="style.zebraEven"
+            class="ts-swatch-clr"
+            @click="emit('update:style', 'zebraEven', undefined)"
+          >
+            &times;
+          </button>
+        </div>
+        <span class="ts-clbl">Cift</span>
       </div>
     </div>
 
