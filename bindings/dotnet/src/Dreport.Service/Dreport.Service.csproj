@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Dreport.Service.Tests" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Packaging is driven from a hand-rolled .nuspec next to this csproj
+         (see pack.nuspec). MSBuild's pack pipeline silently drops the runtimes/
+         folder under several scenarios we hit during development; hand-feeding
+         nuget pack a nuspec sidesteps the issue and is what the just recipe uses. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!-- Local-dev consumer copy: drop the host RID native binary next to the
+       referencing assembly so xUnit / dotnet run can dlopen it without going
+       through a published NuGet package. -->
+  <PropertyGroup>
+    <_DrHostExt Condition="$([MSBuild]::IsOSPlatform('OSX'))">.dylib</_DrHostExt>
+    <_DrHostExt Condition="$([MSBuild]::IsOSPlatform('Linux'))">.so</_DrHostExt>
+    <_DrHostExt Condition="$([MSBuild]::IsOSPlatform('Windows'))">.dll</_DrHostExt>
+    <_DrHostPrefix Condition="!$([MSBuild]::IsOSPlatform('Windows'))">lib</_DrHostPrefix>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="$(MSBuildThisFileDirectory)runtimes/**/native/$(_DrHostPrefix)dreport_ffi$(_DrHostExt)"
+             Link="$(_DrHostPrefix)dreport_ffi$(_DrHostExt)"
+             CopyToOutputDirectory="PreserveNewest"
+             Visible="false"
+             Pack="false" />
+  </ItemGroup>
+
+</Project>

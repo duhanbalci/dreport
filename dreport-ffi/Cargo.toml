@@ -1,0 +1,17 @@
+[package]
+name = "dreport-ffi"
+version = "0.2.0"
+edition = "2024"
+description = "C ABI for dreport-service (consumed by NuGet, native hosts, etc.)"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib", "staticlib"]
+
+[dependencies]
+dreport-service = { path = "../dreport-service" }
+serde_json = "1"
+
+[build-dependencies]
+cbindgen = { version = "0.28", default-features = false }

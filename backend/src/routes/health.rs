@@ -1,8 +1,7 @@
 use axum::{Json, Router, routing::get};
 use serde::Serialize;
-use std::sync::Arc;
 
-use crate::font_registry::FontRegistry;
+use super::AppState;
 
 #[derive(Serialize)]
 struct HealthResponse {
@@ -17,6 +16,6 @@ async fn health() -> Json<HealthResponse> {
     })
 }
 
-pub fn router() -> Router<Arc<FontRegistry>> {
+pub fn router() -> Router<AppState> {
     Router::new().route("/api/health", get(health))
 }

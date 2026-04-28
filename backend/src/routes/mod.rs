@@ -3,11 +3,12 @@ mod health;
 mod render;
 
 use axum::Router;
+use dreport_service::DreportService;
 use std::sync::Arc;
 
-use crate::font_registry::FontRegistry;
+pub type AppState = Arc<DreportService>;
 
-pub fn router() -> Router<Arc<FontRegistry>> {
+pub fn router() -> Router<AppState> {
     Router::new()
         .merge(health::router())
         .merge(render::router())

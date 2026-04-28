@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Dreport.AspNetCore/Dreport.AspNetCore.csproj" />
+    <Project Path="src/Dreport.Service/Dreport.Service.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Dreport.AspNetCore.Tests/Dreport.AspNetCore.Tests.csproj" />
+    <Project Path="tests/Dreport.Service.Tests/Dreport.Service.Tests.csproj" />
+  </Folder>
+</Solution>

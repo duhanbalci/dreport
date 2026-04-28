@@ -5,11 +5,10 @@ use axum::{
     response::IntoResponse,
     routing::post,
 };
+use dreport_service::{ServiceError, Template};
 use serde::Deserialize;
-use std::sync::Arc;
 
-use crate::font_registry::FontRegistry;
-use crate::models::Template;
+use super::AppState;
 
 #[derive(Deserialize)]
 pub struct RenderRequest {
@@ -19,18 +18,13 @@ pub struct RenderRequest {
 
 /// POST /api/render — Template + Data → PDF
 pub async fn render(
-    State(registry): State<Arc<FontRegistry>>,
+    State(service): State<AppState>,
     Json(payload): Json<RenderRequest>,
 ) -> impl IntoResponse {
     // CPU-intensive layout + PDF render'ı blocking thread'de çalıştır
-    let result = tokio::task::spawn_blocking(move || {
-        // Template'in fonts alanına göre sadece gerekli fontları yükle
-        let fonts = registry.fonts_for_families(&payload.template.fonts);
-        let layout = dreport_layout::compute_layout(&payload.template, &payload.data, &fonts)
-            .map_err(|e| format!("Layout error: {}", e))?;
-        dreport_layout::pdf_render::render_pdf(&layout, &fonts)
-    })
-    .await;
+    let result =
+        tokio::task::spawn_blocking(move || service.render_pdf(&payload.template, &payload.data))
+            .await;
 
     match result {
         Ok(Ok(pdf_bytes)) => (
@@ -39,11 +33,7 @@ pub async fn render(
             pdf_bytes,
         )
             .into_response(),
-        Ok(Err(err)) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("PDF render hatası: {}", err),
-        )
-            .into_response(),
+        Ok(Err(err)) => (status_for(&err), err.to_string()).into_response(),
         Err(err) => (
             StatusCode::INTERNAL_SERVER_ERROR,
             format!("Task hatası: {}", err),
@@ -52,6 +42,15 @@ pub async fn render(
     }
 }
 
-pub fn router() -> Router<Arc<FontRegistry>> {
+fn status_for(err: &ServiceError) -> StatusCode {
+    match err {
+        ServiceError::InvalidTemplateJson(_) | ServiceError::InvalidDataJson(_) => {
+            StatusCode::BAD_REQUEST
+        }
+        _ => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+pub fn router() -> Router<AppState> {
     Router::new().route("/api/render", post(render))
 }
